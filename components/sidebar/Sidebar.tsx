@@ -7,69 +7,83 @@ import {
   Cpu, 
   Briefcase, 
   Settings,
-  LineChart
+  LineChart,
+  Brain
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Sidebar() {
+  const pathname = usePathname();
+
+  const navItems = [
+    {
+      href: "/dashboard",
+      label: "Trading Workspace",
+      icon: LayoutDashboard,
+    },
+    {
+      href: "/market-intelligence",
+      label: "Market Intelligence",
+      icon: Brain,
+    },
+    {
+      href: "#market-overview",
+      label: "Market Overview",
+      icon: TrendingUp,
+    },
+    {
+      href: "#ai-signals",
+      label: "AI Trading Signals",
+      icon: Cpu,
+    },
+    {
+      href: "#portfolio",
+      label: "Portfolio Asset",
+      icon: Briefcase,
+    },
+    {
+      href: "#settings",
+      label: "Terminal Settings",
+      icon: Settings,
+    },
+  ];
+
   return (
-    <aside className="w-64 bg-slate-950 text-slate-100 flex flex-col h-full border-r border-slate-900 shrink-0">
+    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col h-full border-r border-sidebar-border shrink-0">
       {/* Brand logo */}
-      <div className="p-5 border-b border-slate-900 flex items-center gap-2">
-        <LineChart className="text-blue-500" size={24} />
-        <span className="text-lg font-black tracking-wider text-white">SYNAPSE</span>
-        <span className="text-[9px] font-bold bg-blue-900/60 text-blue-300 px-1 py-0.2 rounded uppercase">PRO</span>
+      <div className="p-5 border-b border-sidebar-border flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+          <LineChart className="text-primary-foreground" size={20} />
+        </div>
+        <span className="text-lg font-black tracking-wider text-foreground">SYNAPSE</span>
+        <span className="text-[9px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase border border-primary/20">PRO</span>
       </div>
 
       {/* Nav Links */}
       <nav className="flex-1 px-4 py-6 space-y-1.5">
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 bg-blue-600 text-white rounded font-medium text-sm transition"
-        >
-          <LayoutDashboard size={18} />
-          <span>Trading Workspace</span>
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white rounded text-sm transition"
-        >
-          <TrendingUp size={18} />
-          <span>Market Overview</span>
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white rounded text-sm transition"
-        >
-          <Cpu size={18} />
-          <span>AI Trading Signals</span>
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white rounded text-sm transition"
-        >
-          <Briefcase size={18} />
-          <span>Portfolio Asset</span>
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white rounded text-sm transition"
-        >
-          <Settings size={18} />
-          <span>Terminal Settings</span>
-        </a>
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition duration-200 group ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 font-semibold"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              <Icon 
+                size={18} 
+                className={isActive ? "" : "group-hover:text-primary transition-colors"} 
+              />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
-
-      {/* Connection summary */}
-      <div className="p-4 border-t border-slate-900 text-[10px] text-slate-500 flex flex-col gap-1 font-mono">
-        <div className="flex items-center justify-between">
-          <span>Binance Spot API:</span>
-          <span className="text-green-500 font-bold">ONLINE</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Latency:</span>
-          <span className="text-slate-400">~24ms</span>
-        </div>
-      </div>
     </aside>
   );
 }

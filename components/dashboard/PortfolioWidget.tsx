@@ -53,22 +53,22 @@ export default function PortfolioWidget() {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col h-[350px]">
-      <div className="flex items-center gap-2 mb-4 text-blue-400 shrink-0">
+    <div className="bg-card border border-border rounded-xl p-5 flex flex-col h-[350px] shadow-sm">
+      <div className="flex items-center gap-2 mb-4 text-primary shrink-0">
         <Briefcase size={16} />
-        <h3 className="font-bold text-white text-sm">Active Positions</h3>
+        <h3 className="font-bold text-card-foreground text-sm uppercase tracking-wider">Active Positions</h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-slate-800 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-              <th className="pb-2">Market</th>
-              <th className="pb-2">Side</th>
-              <th className="pb-2 text-right">Size</th>
-              <th className="pb-2 text-right">Entry</th>
-              <th className="pb-2 text-right">Mark Price</th>
-              <th className="pb-2 text-right">PnL (USDT)</th>
+            <tr className="border-b border-border text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">
+              <th className="px-2 py-2">Market</th>
+              <th className="px-2 py-2">Side</th>
+              <th className="px-2 py-2 text-right">Size</th>
+              <th className="px-2 py-2 text-right">Entry</th>
+              <th className="px-2 py-2 text-right">Mark Price</th>
+              <th className="px-2 py-2 text-right">PnL (USDT)</th>
             </tr>
           </thead>
           <tbody>
@@ -77,21 +77,24 @@ export default function PortfolioWidget() {
               const cleanSym = pos.symbol.replace("USDT", "");
               
               return (
-                <tr key={pos.symbol} className="border-b border-slate-850 py-2 hover:bg-slate-850/20">
-                  <td className="py-2.5 font-bold text-white">{cleanSym}</td>
-                  <td className="py-2.5">
-                    <span className="bg-green-950 text-green-400 px-1.5 py-0.5 rounded font-black text-[9px]">
+                <tr key={pos.symbol} className="border-b border-border/50 py-2 hover:bg-muted/50 transition-colors group">
+                  <td className="px-2 py-3 font-bold text-foreground">{cleanSym}</td>
+                  <td className="px-2 py-3">
+                    <span className={`${pos.type === 'BUY' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} border px-1.5 py-0.5 rounded font-black text-[9px]`}>
                       {pos.type}
                     </span>
                   </td>
-                  <td className="py-2.5 text-right font-mono text-slate-300">{pos.size}</td>
-                  <td className="py-2.5 text-right font-mono text-slate-400">${formatPrice(pos.entryPrice)}</td>
-                  <td className="py-2.5 text-right font-mono text-slate-200">${formatPrice(currentPrice)}</td>
-                  <td className={`py-2.5 text-right font-mono font-bold ${getPnLColor(pnl)}`}>
-                    <span className="flex items-center justify-end gap-1">
-                      {pnl >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      ${formatPrice(pnl)} ({pnl >= 0 ? "+" : ""}{percent.toFixed(2)}%)
-                    </span>
+                  <td className="px-2 py-3 text-right font-mono text-muted-foreground group-hover:text-foreground transition-colors">{pos.size}</td>
+                  <td className="px-2 py-3 text-right font-mono text-muted-foreground/80 font-medium">${formatPrice(pos.entryPrice)}</td>
+                  <td className="px-2 py-3 text-right font-mono text-foreground font-semibold">${formatPrice(currentPrice)}</td>
+                  <td className={`px-2 py-3 text-right font-mono font-bold ${getPnLColor(pnl)}`}>
+                    <div className="flex flex-col items-end">
+                      <span className="flex items-center justify-end gap-1">
+                        {pnl >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        ${formatPrice(pnl)}
+                      </span>
+                      <span className="text-[10px] opacity-80">{pnl >= 0 ? "+" : ""}{percent.toFixed(2)}%</span>
+                    </div>
                   </td>
                 </tr>
               );
@@ -100,9 +103,9 @@ export default function PortfolioWidget() {
         </table>
       </div>
       
-      <div className="border-t border-slate-800 pt-3 flex items-center justify-between text-[10px] text-slate-500 shrink-0">
-        <span>Margin Ratio: <b className="text-green-500">1.4%</b></span>
-        <span>Maintenance Margin: <b className="text-slate-300">$185.20 USDT</b></span>
+      <div className="border-t border-border pt-3 mt-2 flex items-center justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-tight shrink-0">
+        <span>Margin Ratio: <b className="text-green-500 font-bold">1.4%</b></span>
+        <span>Maint. Margin: <b className="text-foreground font-bold">$185.20 USDT</b></span>
       </div>
     </div>
   );

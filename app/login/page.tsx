@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import LoginForm from "@/components/LoginForm";
+import { AuthLayout } from "@/components/auth/auth-layout";
+import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
   title: "Login - Synapse",
@@ -8,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <AuthLayout>
       <LoginForm />
-    </main>
+    </AuthLayout>
   );
 }

@@ -96,48 +96,53 @@ export default function MarketPulse() {
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden flex flex-col h-[350px]">
-      <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/85 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-blue-400">
+    <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-[350px] shadow-sm">
+      <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 text-primary">
           <Activity size={16} />
-          <h3 className="font-bold text-white text-sm">Market Pulse</h3>
+          <h3 className="font-bold text-card-foreground text-sm uppercase tracking-wider">Market Pulse</h3>
         </div>
-        <span className="text-[10px] text-slate-500 font-mono">Live Trades</span>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Live Trades</span>
+        </div>
       </div>
 
       {/* Spread panel */}
-      <div className="px-4 py-2 bg-slate-950/45 border-b border-slate-800/60 flex items-center justify-between text-[10px] text-slate-400 font-mono shrink-0">
-        <span>Spread: <b className="text-slate-200">{getSpread()}</b></span>
-        <span>Depth: <b className="text-green-500">Strong</b></span>
+      <div className="px-4 py-2 bg-muted/20 border-b border-border/50 flex items-center justify-between text-[10px] text-muted-foreground font-mono shrink-0">
+        <span>Spread: <b className="text-foreground font-bold">{getSpread()}</b></span>
+        <span className="flex items-center gap-1">
+          Depth: <b className="text-green-500 font-bold uppercase">Strong</b>
+        </span>
       </div>
 
       {/* Trades Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar bg-background/30">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-slate-800/40 text-[9px] uppercase font-bold text-slate-500 tracking-wider">
-              <th className="px-4 py-1.5">Time</th>
-              <th className="px-4 py-1.5 text-right">Price</th>
-              <th className="px-4 py-1.5 text-right">Size</th>
-              <th className="px-4 py-1.5 text-right">Total (USDT)</th>
+            <tr className="border-b border-border/50 text-[9px] uppercase font-bold text-muted-foreground tracking-widest sticky top-0 bg-background/80 backdrop-blur-sm z-10">
+              <th className="px-4 py-2">Time</th>
+              <th className="px-4 py-2 text-right">Price</th>
+              <th className="px-4 py-2 text-right">Size</th>
+              <th className="px-4 py-2 text-right">Total (USDT)</th>
             </tr>
           </thead>
           <tbody>
             {trades.slice().reverse().map((trade) => {
               const total = trade.price * trade.size;
-              const sideColor = trade.side === "BUY" ? "text-green-400" : "text-red-400";
+              const isBuy = trade.side === "BUY";
               
               return (
                 <tr 
                   key={trade.id} 
-                  className="hover:bg-slate-850/30 transition-colors border-b border-slate-850/10"
+                  className={`hover:bg-muted transition-colors border-b border-border/10 group ${isBuy ? 'bg-green-500/[0.02]' : 'bg-red-500/[0.02]'}`}
                 >
-                  <td className="px-4 py-2 font-mono text-slate-500 text-[10px]">{trade.time}</td>
-                  <td className={`px-4 py-2 text-right font-mono font-semibold ${sideColor}`}>
+                  <td className="px-4 py-2 font-mono text-muted-foreground/60 text-[10px] group-hover:text-muted-foreground transition-colors">{trade.time}</td>
+                  <td className={`px-4 py-2 text-right font-mono font-bold ${isBuy ? 'text-green-500' : 'text-red-500'}`}>
                     ${formatPrice(trade.price)}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono text-slate-300">{trade.size.toFixed(4)}</td>
-                  <td className="px-4 py-2 text-right font-mono text-slate-400">
+                  <td className="px-4 py-2 text-right font-mono text-foreground font-medium">{trade.size.toFixed(4)}</td>
+                  <td className="px-4 py-2 text-right font-mono text-muted-foreground/80 group-hover:text-foreground transition-colors">
                     ${total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </td>
                 </tr>

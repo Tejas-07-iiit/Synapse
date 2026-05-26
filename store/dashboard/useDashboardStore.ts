@@ -7,11 +7,13 @@ interface DashboardState {
   tickerData: Record<string, TickerInfo>;
   wsConnected: boolean;
   wsError: string | null;
+  wsStatus: "CONNECTED" | "RECONNECTING" | "DISCONNECTED";
 
   setSymbol: (symbol: string) => void;
   setSupportedSymbols: (symbols: string[]) => void;
   updateTicker: (symbol: string, data: TickerInfo) => void;
   setWsConnectionState: (connected: boolean, error?: string | null) => void;
+  setWsStatus: (status: "CONNECTED" | "RECONNECTING" | "DISCONNECTED") => void;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
@@ -20,6 +22,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   tickerData: {},
   wsConnected: false,
   wsError: null,
+  wsStatus: "DISCONNECTED",
 
   setSymbol: (symbol) => set({ selectedSymbol: symbol.toUpperCase() }),
   
@@ -38,5 +41,11 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     })),
     
   setWsConnectionState: (connected, error = null) => 
-    set({ wsConnected: connected, wsError: error }),
+    set({ 
+      wsConnected: connected, 
+      wsError: error,
+      wsStatus: connected ? "CONNECTED" : (error ? "DISCONNECTED" : "RECONNECTING")
+    }),
+
+  setWsStatus: (status) => set({ wsStatus: status }),
 }));

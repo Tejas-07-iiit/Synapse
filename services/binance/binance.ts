@@ -2,6 +2,7 @@ import { TickerInfo } from "@/types/market";
 
 export async function fetch24hTicker(symbol: string): Promise<TickerInfo> {
   const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol.toUpperCase()}`);
+  console.log(res , "tejas")
   if (!res.ok) {
     throw new Error(`Binance API error: ${res.statusText}`);
   }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import RegisterForm from "@/components/RegisterForm";
+import { AuthLayout } from "@/components/auth/auth-layout";
+import { RegisterForm } from "@/components/auth/register-form";
 
 export const metadata: Metadata = {
   title: "Register - Synapse",
@@ -8,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <AuthLayout>
       <RegisterForm />
-    </main>
+    </AuthLayout>
   );
 }

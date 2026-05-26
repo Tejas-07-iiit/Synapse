@@ -11,9 +11,6 @@ export default function Home() {
           <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
             SYNAPSE
           </h1>
-          <p className="text-base text-gray-500">
-            A simple, stable foundation for secure user authentication and session management.
-          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -31,10 +28,6 @@ export default function Home() {
           </Link>
         </div>
       </main>
-
-      <footer className="mt-16 text-center text-xs text-gray-400">
-        Synapse Platform &copy; {new Date().getFullYear()}. Built with Next.js 15 & Prisma.
-      </footer>
     </div>
   );
 }

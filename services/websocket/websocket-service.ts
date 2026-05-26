@@ -1,6 +1,7 @@
 import { TickerInfo, Candle } from "@/types/market";
 import { MarketInterval } from "@/services/market/intervals";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
+import { normalizer } from "@/services/market/normalizer";
 
 export interface BinanceKlinePayload {
   e: string;
@@ -39,7 +40,7 @@ class WebSocketService {
   private lastMessageTime = Date.now();
   private isDisconnecting = false;
 
-  private activeStreams: Set<string> = new Set();
+  private activeStreams: Map<string, number> = new Map();
   private tickerCallbacks: Set<TickerCallback> = new Set();
   private candleCallbacks: Set<CandleCallback> = new Set();
 
@@ -97,32 +98,15 @@ class WebSocketService {
 
           // 1. Handle ticker updates
           if (data.e === "24hrTicker") {
-            const ticker: TickerInfo = {
-              symbol: data.s,
-              price: parseFloat(data.c),
-              priceChange24h: parseFloat(data.p),
-              priceChangePercent24h: parseFloat(data.P),
-              volume24h: parseFloat(data.v),
-              high24h: parseFloat(data.h),
-              low24h: parseFloat(data.l),
-              lastUpdate: data.E,
-            };
-            this.tickerCallbacks.forEach((cb) => cb(data.s, ticker));
+            const ticker = normalizer.normalizeWsTicker(data);
+            this.tickerCallbacks.forEach((cb) => cb(ticker.symbol, ticker));
           }
 
           // 2. Handle kline updates
           if (data.e === "kline") {
             const raw = data as BinanceKlinePayload;
-            const k = raw.k;
-            const candle: Candle = {
-              time: k.t,
-              open: parseFloat(k.o),
-              high: parseFloat(k.h),
-              low: parseFloat(k.l),
-              close: parseFloat(k.c),
-              volume: parseFloat(k.v),
-            };
-            this.candleCallbacks.forEach((cb) => cb(raw.s, k.i as MarketInterval, candle, k.x));
+            const candle = normalizer.normalizeWsKline(raw.k);
+            this.candleCallbacks.forEach((cb) => cb(raw.s, raw.k.i as MarketInterval, candle, raw.k.x));
           }
         } catch (err) {
           console.error("[WS] Error processing websocket message:", err);
@@ -155,36 +139,53 @@ class WebSocketService {
   }
 
   public subscribe(streams: string[]) {
-    const newStreams = streams.map(s => s.toLowerCase()).filter(s => !this.activeStreams.has(s));
-    if (newStreams.length === 0) return;
+    const streamsToSubscribe: string[] = [];
 
-    newStreams.forEach(s => this.activeStreams.add(s));
+    streams.forEach((stream) => {
+      const s = stream.toLowerCase();
+      const count = this.activeStreams.get(s) || 0;
+      this.activeStreams.set(s, count + 1);
 
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      if (count === 0) {
+        streamsToSubscribe.push(s);
+      }
+    });
+
+    if (streamsToSubscribe.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
       const payload = {
         method: "SUBSCRIBE",
-        params: newStreams,
+        params: streamsToSubscribe,
         id: Date.now(),
       };
       this.socket.send(JSON.stringify(payload));
-      console.log("[WS] Subscribed to streams:", newStreams);
+      console.log("[WS] Subscribed to streams:", streamsToSubscribe);
     }
   }
 
   public unsubscribe(streams: string[]) {
-    const streamsToUnsub = streams.map(s => s.toLowerCase()).filter(s => this.activeStreams.has(s));
-    if (streamsToUnsub.length === 0) return;
+    const streamsToUnsubscribe: string[] = [];
 
-    streamsToUnsub.forEach(s => this.activeStreams.delete(s));
+    streams.forEach((stream) => {
+      const s = stream.toLowerCase();
+      const count = this.activeStreams.get(s) || 0;
+      if (count <= 1) {
+        this.activeStreams.delete(s);
+        if (count === 1) {
+          streamsToUnsubscribe.push(s);
+        }
+      } else {
+        this.activeStreams.set(s, count - 1);
+      }
+    });
 
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+    if (streamsToUnsubscribe.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
       const payload = {
         method: "UNSUBSCRIBE",
-        params: streamsToUnsub,
+        params: streamsToUnsubscribe,
         id: Date.now(),
       };
       this.socket.send(JSON.stringify(payload));
-      console.log("[WS] Unsubscribed from streams:", streamsToUnsub);
+      console.log("[WS] Unsubscribed from streams:", streamsToUnsubscribe);
     }
   }
 
@@ -206,15 +207,16 @@ class WebSocketService {
   }
 
   private resubscribeActiveStreams() {
-    if (this.activeStreams.size === 0) return;
+    const streams = Array.from(this.activeStreams.keys());
+    if (streams.length === 0) return;
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       const payload = {
         method: "SUBSCRIBE",
-        params: Array.from(this.activeStreams),
+        params: streams,
         id: Date.now(),
       };
       this.socket.send(JSON.stringify(payload));
-      console.log("[WS] Resubscribed to streams:", Array.from(this.activeStreams));
+      console.log("[WS] Resubscribed to streams:", streams);
     }
   }
 

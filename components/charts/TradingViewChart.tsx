@@ -18,6 +18,8 @@ import { useMarketStore } from "@/store/market/useMarketStore";
 import { IndicatorValues } from "@/types/market";
 import { useTheme } from "next-themes";
 import { Eye, EyeOff } from "lucide-react";
+import { timezoneEngine } from "@/services/market/timezone";
+import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
 
 interface HoverData {
   open: string;
@@ -43,6 +45,9 @@ export default function TradingViewChart() {
   const timeframe = useMarketStore((state) => state.timeframe);
   const setTimeframe = useMarketStore((state) => state.setTimeframe);
   const loading = useMarketStore((state) => state.loading);
+
+  const wsStatus = useDashboardStore((state) => state.wsStatus);
+  const activeChartRef = useRef<number>(1); // 1 = main, 2 = rsi, 3 = macd
 
   const { resolvedTheme } = useTheme();
 
@@ -387,23 +392,38 @@ export default function TradingViewChart() {
     macdHistSeriesRef.current = macdHistSeries;
 
     // --- TIMELINE SYNC ROUTINES ---
-    const syncTimeScale = (sourceChart: IChartApi, targets: IChartApi[]) => {
+    const syncTimeScale = (chartId: number, sourceChart: IChartApi, targets: IChartApi[]) => {
       sourceChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (isSyncingRef.current || !range) return;
-        isSyncingRef.current = true;
+        if (activeChartRef.current !== chartId || !range) return;
+        
         targets.forEach((target) => {
           const targetRange = target.timeScale().getVisibleLogicalRange();
           if (!targetRange || targetRange.from !== range.from || targetRange.to !== range.to) {
             target.timeScale().setVisibleLogicalRange(range);
           }
         });
-        isSyncingRef.current = false;
       });
     };
 
-    syncTimeScale(chart1, [chart2, chart3]);
-    syncTimeScale(chart2, [chart1, chart3]);
-    syncTimeScale(chart3, [chart1, chart2]);
+    syncTimeScale(1, chart1, [chart2, chart3]);
+    syncTimeScale(2, chart2, [chart1, chart3]);
+    syncTimeScale(3, chart3, [chart1, chart2]);
+
+    // --- MOUSE/TOUCH INTERACTION TO PREVENT FEEDBACK LOOPS ---
+    const setChart1Active = () => { activeChartRef.current = 1; };
+    const setChart2Active = () => { activeChartRef.current = 2; };
+    const setChart3Active = () => { activeChartRef.current = 3; };
+
+    const container1 = mainChartRef.current;
+    const container2 = rsiChartRef.current;
+    const container3 = macdChartRef.current;
+
+    container1?.addEventListener("mouseenter", setChart1Active);
+    container1?.addEventListener("touchstart", setChart1Active, { passive: true });
+    container2?.addEventListener("mouseenter", setChart2Active);
+    container2?.addEventListener("touchstart", setChart2Active, { passive: true });
+    container3?.addEventListener("mouseenter", setChart3Active);
+    container3?.addEventListener("touchstart", setChart3Active, { passive: true });
 
     // --- REALTIME HOVER HUD INTERACTION ---
     const handleCrosshairMove = (param: MouseEventParams) => {
@@ -417,7 +437,8 @@ export default function TradingViewChart() {
       }
 
       isHoveringRef.current = true;
-      const idx = currentCandles.findIndex((c) => Math.floor(c.time / 1000) === (param.time as number));
+      const utcTimeMs = timezoneEngine.localToUtc((param.time as number) * 1000);
+      const idx = currentCandles.findIndex((c) => Math.abs(c.time - utcTimeMs) < 1000);
       if (idx === -1) return;
 
       const c = currentCandles[idx];
@@ -443,22 +464,35 @@ export default function TradingViewChart() {
     chart2.subscribeCrosshairMove(handleCrosshairMove);
     chart3.subscribeCrosshairMove(handleCrosshairMove);
 
-    // Handle Window Resize events
-    const handleResize = () => {
-      if (mainChartRef.current && rsiChartRef.current && macdChartRef.current) {
-        const width = mainChartRef.current.clientWidth;
+    // --- RESPONSIVE RESIZING WITH RESIZEOBSERVER ---
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const { width } = entries[0].contentRect;
+      if (width > 0) {
         chart1.resize(width, 600);
         chart2.resize(width, 120);
         chart3.resize(width, 140);
       }
-    };
-    window.addEventListener("resize", handleResize);
+    });
+
+    if (mainChartRef.current) {
+      resizeObserver.observe(mainChartRef.current);
+    }
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      container1?.removeEventListener("mouseenter", setChart1Active);
+      container1?.removeEventListener("touchstart", setChart1Active);
+      container2?.removeEventListener("mouseenter", setChart2Active);
+      container2?.removeEventListener("touchstart", setChart2Active);
+      container3?.removeEventListener("mouseenter", setChart3Active);
+      container3?.removeEventListener("touchstart", setChart3Active);
+
+      resizeObserver.disconnect();
+
       chart1.unsubscribeCrosshairMove(handleCrosshairMove);
       chart2.unsubscribeCrosshairMove(handleCrosshairMove);
       chart3.unsubscribeCrosshairMove(handleCrosshairMove);
+
       chart1.remove();
       chart2.remove();
       chart3.remove();
@@ -507,7 +541,7 @@ export default function TradingViewChart() {
         const val = arr[idx];
         if (val !== undefined && !isNaN(val)) {
           result.push({
-            time: (sortedCandles[idx].time / 1000) as UTCTimestamp,
+            time: (timezoneEngine.utcToLocal(sortedCandles[idx].time) / 1000) as UTCTimestamp,
             value: val,
           });
         }
@@ -521,7 +555,7 @@ export default function TradingViewChart() {
         const val = arr[idx];
         if (val !== undefined && !isNaN(val)) {
           result.push({
-            time: (sortedCandles[idx].time / 1000) as UTCTimestamp,
+            time: (timezoneEngine.utcToLocal(sortedCandles[idx].time) / 1000) as UTCTimestamp,
             value: val,
             color: val >= 0 ? "rgba(34, 197, 94, 0.45)" : "rgba(239, 68, 68, 0.45)",
           });
@@ -534,11 +568,11 @@ export default function TradingViewChart() {
       if (isFullReload) {
         // 1. Full reload using setData()
         const dummyData2: LineData[] = sortedCandles.map((c) => ({
-          time: (c.time / 1000) as UTCTimestamp,
+          time: (timezoneEngine.utcToLocal(c.time) / 1000) as UTCTimestamp,
           value: 50,
         }));
         const dummyData3: LineData[] = sortedCandles.map((c) => ({
-          time: (c.time / 1000) as UTCTimestamp,
+          time: (timezoneEngine.utcToLocal(c.time) / 1000) as UTCTimestamp,
           value: 0,
         }));
 
@@ -550,7 +584,7 @@ export default function TradingViewChart() {
         }
 
         const candleData: CandlestickData[] = sortedCandles.map((c) => ({
-          time: (c.time / 1000) as UTCTimestamp,
+          time: (timezoneEngine.utcToLocal(c.time) / 1000) as UTCTimestamp,
           open: c.open,
           high: c.high,
           low: c.low,
@@ -560,7 +594,7 @@ export default function TradingViewChart() {
         const volumeData: HistogramData[] = sortedCandles.map((c) => {
           const isUp = c.close >= c.open;
           return {
-            time: (c.time / 1000) as UTCTimestamp,
+            time: (timezoneEngine.utcToLocal(c.time) / 1000) as UTCTimestamp,
             value: c.volume,
             color: isUp ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
           };
@@ -632,7 +666,7 @@ export default function TradingViewChart() {
       } else {
         // 2. Incremental real-time updates using update()
         const lastCandle = sortedCandles[sortedCandles.length - 1];
-        const timeVal = (lastCandle.time / 1000) as UTCTimestamp;
+        const timeVal = (timezoneEngine.utcToLocal(lastCandle.time) / 1000) as UTCTimestamp;
 
         if (dummySeries2Ref.current) {
           dummySeries2Ref.current.update({ time: timeVal, value: 50 });
@@ -714,9 +748,21 @@ export default function TradingViewChart() {
           <h3 className="font-extrabold text-card-foreground text-lg uppercase tracking-tight">
             {symbol}
           </h3>
-          <span className="text-[9px] font-black bg-primary/15 text-primary border border-primary/25 px-2 py-0.5 rounded tracking-widest uppercase">
-            Live Engine
-          </span>
+          {wsStatus === "CONNECTED" && (
+            <span className="text-[9px] font-black bg-emerald-500/10 text-emerald-500 border border-emerald-500/25 px-2 py-0.5 rounded tracking-widest uppercase animate-pulse">
+              Live
+            </span>
+          )}
+          {wsStatus === "RECONNECTING" && (
+            <span className="text-[9px] font-black bg-amber-500/10 text-amber-500 border border-amber-500/25 px-2 py-0.5 rounded tracking-widest uppercase animate-pulse">
+              Reconnecting
+            </span>
+          )}
+          {wsStatus === "DISCONNECTED" && (
+            <span className="text-[9px] font-black bg-rose-500/10 text-rose-500 border border-rose-500/25 px-2 py-0.5 rounded tracking-widest uppercase">
+              Offline
+            </span>
+          )}
         </div>
 
         {/* View toggles & Interval switcher */}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse Candle Data Flow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #09090b; color: #fafafa; font-family: 'Inter', sans-serif; }
+        .flow-card { background: #0c0c0e; border: 1px solid #18181b; border-radius: 12px; transition: all 0.3s ease; }
+        .flow-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+        .arrow { color: #3b82f6; font-size: 24px; display: flex; justify-content: center; padding: 10px 0; }
+        .file-path { font-family: 'JetBrains Mono', monospace; color: #3b82f6; font-size: 0.85rem; }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-12 text-center">
+            <h1 class="text-4xl font-black tracking-tight mb-4 uppercase">Candle Data Architecture</h1>
+            <p class="text-zinc-400">Technical flow of real-time market data in Synapse platform</p>
+        </header>
+
+        <!-- Step 1 -->
+        <div class="flow-card p-6 mb-4">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg">1. External Data Source</h2>
+                    <p class="file-path">Binance WebSocket API</p>
+                </div>
+            </div>
+            <p class="text-zinc-400 text-sm">Raw K-Line (Candle) data is streamed via WebSockets from Binance. This includes open, high, low, close, and volume for specific intervals (1m, 1h, etc.).</p>
+        </div>
+
+        <div class="arrow"><i class="fa-solid fa-chevron-down"></i></div>
+
+        <!-- Step 2 -->
+        <div class="flow-card p-6 mb-4 border-l-4 border-l-blue-500">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <i class="fa-solid fa-gears"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg">2. WebSocket Manager</h2>
+                    <p class="file-path">services/websocket/websocketManager.ts</p>
+                </div>
+            </div>
+            <p class="text-zinc-400 text-sm">This service maintains the persistent connection. It listens for <code>onMessage</code> events, parses the JSON payload, and identifies it as a 'kline' event.</p>
+        </div>
+
+        <div class="arrow"><i class="fa-solid fa-chevron-down"></i></div>
+
+        <!-- Step 3 -->
+        <div class="flow-card p-6 mb-4">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <i class="fa-solid fa-database"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg">3. State Normalization (Cache)</h2>
+                    <p class="file-path">store/dashboard/useDashboardStore.ts</p>
+                </div>
+            </div>
+            <p class="text-zinc-400 text-sm">The <code>updateTicker</code> or specialized candle actions update the Zustand store. Candles are typically stored in a <code>Record&lt;string, TickerInfo&gt;</code> map keyed by the symbol (e.g., 'BTCUSDT').</p>
+            <div class="mt-4 bg-black/50 p-3 rounded font-mono text-xs text-blue-300 border border-white/5">
+                // Internal Cache Structure<br>
+                tickerData: {<br>
+                &nbsp;&nbsp;"BTCUSDT": { price: 96000, high: 97000, ... },<br>
+                &nbsp;&nbsp;"ETHUSDT": { ... }<br>
+                }
+            </div>
+        </div>
+
+        <div class="arrow"><i class="fa-solid fa-chevron-down"></i></div>
+
+        <!-- Step 4 -->
+        <div class="flow-card p-6 mb-4">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg">4. UI Sync & Rendering</h2>
+                    <p class="file-path">components/charts/TradingViewChart.tsx</p>
+                </div>
+            </div>
+            <p class="text-zinc-400 text-sm">The chart component subscribes to the store. In this project, the TradingView widget handles its own internal caching once pointed at the <code>selectedSymbol</code>, but React components like <code>MarketCards</code> pull directly from the Zustand cache.</p>
+        </div>
+
+        <footer class="mt-12 pt-8 border-t border-zinc-800 text-center">
+            <p class="text-zinc-500 text-xs uppercase tracking-widest font-bold font-mono">Synapse Technical Documentation &copy; 2026</p>
+        </footer>
+    </div>
+</body>
+</html>

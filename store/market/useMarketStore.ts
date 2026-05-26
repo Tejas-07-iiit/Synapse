@@ -13,7 +13,7 @@ interface MarketState {
   allIndicators: Record<string, IndicatorValues>;
   allAnalytics: Record<string, MarketAnalytics>;
 
-  setSymbol: (symbol: string) => void;
+  setSymbol: (symbol: string) => void;  
   setCandles: (candles: Candle[]) => void;
   setTimeframe: (timeframe: MarketInterval) => void;
   setIndicators: (indicators: IndicatorValues | null) => void;

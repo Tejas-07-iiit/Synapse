@@ -1,5 +1,6 @@
 import { Candle } from "@/types/market";
 import { MarketInterval, toBinanceInterval } from "./intervals";
+import { normalizer } from "./normalizer";
 
 export async function fetchHistoricalCandles(
   symbol: string,
@@ -19,15 +20,5 @@ export async function fetchHistoricalCandles(
     throw new Error("Invalid klines format received from Binance API");
   }
 
-  // Type assertion to ensure strict typing and avoid 'any'
-  const rawKlines = data as Array<Array<string | number>>;
-
-  return rawKlines.map((item) => ({
-    time: Number(item[0]),
-    open: parseFloat(item[1] as string),
-    high: parseFloat(item[2] as string),
-    low: parseFloat(item[3] as string),
-    close: parseFloat(item[4] as string),
-    volume: parseFloat(item[5] as string),
-  }));
+  return normalizer.normalizeRestKlines(data as Array<Array<string | number>>);
 }

@@ -289,12 +289,12 @@ export default function TradingViewChart() {
       },
       handleScroll: {
         mouseWheel: true,
-        pressedMouseButton: true,
+        pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
-        axisPressedMouseButton: true,
+        axisPressedMouseMove: true,
         mouseWheel: true,
         pinch: true,
       },
@@ -363,7 +363,6 @@ export default function TradingViewChart() {
         top: 0.8,
         bottom: 0,
       },
-      visible: false,
     });
     volumeSeriesRef.current = volumeSeries;
 
@@ -374,6 +373,11 @@ export default function TradingViewChart() {
       priceScaleId: "volume-scale",
     });
     volumeMASeriesRef.current = volumeMASeries;
+    
+    chart1.priceScale("right").applyOptions({
+      autoScale: true,
+      alignLabels: true,
+    });
 
     // 2. Create RSI Chart (Chart 2)
     const chart2 = createChart(rsiChartRef.current, {
@@ -398,12 +402,12 @@ export default function TradingViewChart() {
       },
       handleScroll: {
         mouseWheel: true,
-        pressedMouseButton: true,
+        pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
-        axisPressedMouseButton: true,
+        axisPressedMouseMove: true,
         mouseWheel: true,
         pinch: true,
       },
@@ -480,12 +484,12 @@ export default function TradingViewChart() {
       },
       handleScroll: {
         mouseWheel: true,
-        pressedMouseButton: true,
+        pressedMouseMove: true,
         horzTouchDrag: true,
         vertTouchDrag: false,
       },
       handleScale: {
-        axisPressedMouseButton: true,
+        axisPressedMouseMove: true,
         mouseWheel: true,
         pinch: true,
       },
@@ -525,14 +529,18 @@ export default function TradingViewChart() {
     let isSyncing = false;
     const syncTimeScale = (sourceChart: IChartApi, targets: IChartApi[]) => {
       sourceChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (isSyncing || !range) return;
+        if (isSyncing || isSyncingRef.current || !range) return;
         
         isSyncing = true;
         targets.forEach((target) => {
           try {
             const targetRange = target.timeScale().getVisibleLogicalRange();
-            if (targetRange && (targetRange.from !== range.from || targetRange.to !== range.to)) {
-              target.timeScale().setVisibleLogicalRange(range);
+            if (targetRange) {
+              const diffFrom = Math.abs(targetRange.from - range.from);
+              const diffTo = Math.abs(targetRange.to - range.to);
+              if (diffFrom > 0.01 || diffTo > 0.01) {
+                target.timeScale().setVisibleLogicalRange(range);
+              }
             }
           } catch (e) {
             // Ignore if chart is not fully initialized yet
@@ -614,7 +622,7 @@ export default function TradingViewChart() {
       chart2.remove();
       chart3.remove();
     };
-  }, [resolvedTheme, updateHoverWithLatest]);
+  }, [resolvedTheme, updateHoverWithLatest, symbol, timeframe]);
 
   // Feed/Sync Data to Chart series
   useEffect(() => {

@@ -85,6 +85,12 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {sig.blocked && (
+                      <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1.5">
+                        <span className="w-1 h-1 bg-amber-500 rounded-full animate-pulse"></span>
+                        BLOCKED
+                      </span>
+                    )}
                     {isLong && (
                       <span className="flex items-center gap-0.5 bg-green-500/10 text-green-500 text-[10px] font-extrabold px-2 py-0.5 rounded border border-green-500/20">
                         <TrendingUp size={10} />
@@ -108,6 +114,14 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                 {/* Reasoning text */}
                 <div className="text-[11px] text-muted-foreground leading-relaxed pl-1 border-l-2 border-primary/15">
                   {sig.reasoning.join(" ")}
+                  {sig.blocked && (
+                    <div className="mt-1 text-[10px] font-semibold text-amber-400 flex flex-wrap items-center gap-1 bg-amber-500/5 border border-amber-500/10 p-1.5 rounded-lg">
+                      <span>ACTIVE POSITION EXISTS: Trade execution locked for {sig.symbol}</span>
+                      {sig.activePositionId && (
+                        <span className="text-[9px] text-muted-foreground font-mono font-normal bg-muted px-1.5 py-0.5 rounded">(ID: {sig.activePositionId.slice(0, 8)}...)</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer time */}

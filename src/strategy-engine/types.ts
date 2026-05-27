@@ -76,6 +76,9 @@ export interface StrategySignal {
     [key: string]: number | undefined;
   };
   timestamp: number;
+  blocked?: boolean;
+  blockReason?: string;
+  activePositionId?: string;
 }
 
 export interface TradingStrategy {

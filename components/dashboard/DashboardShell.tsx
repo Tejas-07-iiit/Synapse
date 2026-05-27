@@ -13,10 +13,25 @@ import MarketAnalytics from "@/components/analytics/MarketAnalytics";
 import SignalPanel from "@/components/signals/SignalPanel";
 import { useMarketStore } from "@/src/stores/marketStore";
 import { TickerInfo } from "@/src/strategy-engine/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useSettingsStore } from "@/src/stores/settingsStore";
+import { useWalletStore } from "@/src/stores/walletStore";
 
 export default function DashboardShell() {
   const setSupportedSymbols = useMarketStore((state) => state.setSupportedSymbols);
   const supportedSymbols = useMarketStore((state) => state.supportedSymbols);
+
+  const fetchSettings = useSettingsStore((state) => state.fetchSettings);
+  const fetchWallet = useWalletStore((state) => state.fetchWallet);
+  const user = useAuthStore((state) => state.user);
+
+  // Load user settings and wallet on mount / user change
+  useEffect(() => {
+    if (user?.id) {
+      fetchSettings(user.id).catch(() => {});
+      fetchWallet(user.id).catch(() => {});
+    }
+  }, [user?.id, fetchSettings, fetchWallet]);
 
   // Initialize the Market Engine Hook (manages active symbol/timeframe calculations)
   useMarketEngine();

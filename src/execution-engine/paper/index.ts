@@ -73,6 +73,7 @@ export class PaperTradingEngine {
       const lastUpdate = this.lastDbUpdate.get(pos.id) || 0;
       if (now - lastUpdate > 10000) {
         this.lastDbUpdate.set(pos.id, now);
+        console.log(`[SLTP_MONITOR] Symbol: ${sym} | Price: $${currentPrice.toFixed(2)} | Pos ID: ${pos.id} | Entry: $${pos.entryPrice.toFixed(2)} | SL: ${pos.stopLoss ? pos.stopLoss.toFixed(2) : "None"} | TP: ${pos.takeProfit ? pos.takeProfit.toFixed(2) : "None"} | Current PnL: $${pos.pnl.toFixed(2)}`);
         fetch("/api/positions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -127,32 +128,65 @@ export class PaperTradingEngine {
   ): Promise<VirtualPosition | null> {
     const sym = symbol.toUpperCase();
 
-    // Check if position already exists for symbol
-    const alreadyOpen = Array.from(this.positions.values()).some(
+    console.log(`[PAPER_TRADING] Attempting to open position: ${direction} ${sym} @ $${price}`);
+
+    // Check if position already exists for symbol in memory
+    let alreadyOpen = Array.from(this.positions.values()).some(
       (p) => p.symbol === sym && p.status === "OPEN" && p.userId === userId
     );
+
     if (alreadyOpen) {
-      console.warn(`[PaperTrading] Position already open for ${sym}. Skipping.`);
+      console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+      console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
       return null;
     }
+
+    // Double-check database via API call to be absolutely sure
+    try {
+      const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
+      const body = await res.json();
+      if (body.success && Array.isArray(body.positions)) {
+        const dbOpen = body.positions.some(
+          (p: { symbol: string; status: string }) => p.symbol === sym && p.status === "OPEN"
+        );
+        if (dbOpen) {
+          alreadyOpen = true;
+          console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+          console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+          return null;
+        }
+      }
+    } catch (e) {
+      console.warn("[PaperTradingEngine] Database position lock check failed, proceeding with in-memory state:", e);
+    }
+
+    console.log(`[TRADE_ALLOWED] No active position found for ${sym}`);
 
     let qty = 0;
     let orderValueUsdt = 0;
 
+    const wallet = useWalletStore.getState();
+    const settings = useSettingsStore.getState();
+
     if (sizeUsdt === null) {
-      const wallet = useWalletStore.getState();
-      const settings = useSettingsStore.getState();
       orderValueUsdt = wallet.balance * (settings.riskPerTradePct / 100) * leverage;
     } else {
       orderValueUsdt = sizeUsdt;
     }
     
+    console.log(`[POSITION_SIZING] Wallet balance: $${wallet.balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
+
     if (orderValueUsdt <= 0 || isNaN(orderValueUsdt)) {
-      console.warn(`[PaperTrading] Invalid position size calculated: ${orderValueUsdt}. Aborting.`);
+      console.log(`[POSITION_REJECTED] Invalid position size calculated: $${orderValueUsdt.toFixed(2)}. Aborting.`);
       return null;
     }
 
     qty = orderValueUsdt / price;
+
+    if (qty <= 0 || isNaN(qty)) {
+      console.log(`[POSITION_REJECTED] Invalid quantity calculated: ${qty}. Aborting.`);
+      return null;
+    }
     
     // Validate order against risk manager
     const dummyOrder: VirtualOrder = {
@@ -166,13 +200,13 @@ export class PaperTradingEngine {
       status: "PENDING",
     };
 
-    const riskResult = RiskEngine.validateOrder(dummyOrder, this.getOpenPositions().length);
+    const riskResult = RiskEngine.validateOrder(dummyOrder, this.getOpenPositions().length, alreadyOpen);
     if (!riskResult.allowed) {
-      console.warn(`[PaperTrading] Order rejected by Risk Engine: ${riskResult.reason}`);
       return null;
     }
 
     try {
+      console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
       // Save position to DB via API
       const res = await fetch("/api/positions", {
         method: "POST",
@@ -198,6 +232,7 @@ export class PaperTradingEngine {
       }
 
       const dbPos = body.position;
+      console.log(`[TRADE_CREATED] Trade successfully saved in DB. Position ID: ${dbPos.id}`);
 
       const position: VirtualPosition = {
         id: dbPos.id,
@@ -217,9 +252,14 @@ export class PaperTradingEngine {
       };
 
       this.positions.set(position.id, position);
-      console.log(`[PaperTrading] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
+      console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
+      
+      // Update store balance to keep in sync
+      useWalletStore.getState().fetchWallet(userId).catch(() => {});
+
       return position;
     } catch (err) {
+      console.log(`[POSITION_REJECTED] Database write failed: ${err}`);
       console.error("[PaperTrading] Failed to open position in DB:", err);
       return null;
     }
@@ -237,6 +277,8 @@ export class PaperTradingEngine {
     const pos = this.positions.get(positionId);
     if (!pos || pos.status === "CLOSED") return false;
 
+    console.log(`[PAPER_TRADING] Closing position ${positionId} for ${pos.symbol} at exit price $${exitPrice} (Reason: ${reason})`);
+
     const closedAt = Date.now();
     pos.status = "CLOSED";
     pos.closedAt = closedAt;
@@ -252,6 +294,7 @@ export class PaperTradingEngine {
     }
 
     try {
+      console.log(`[DB_WRITE] Dispatching position close transaction to database for ID: ${positionId}`);
       // Close position in DB via API
       const res = await fetch("/api/positions", {
         method: "POST",
@@ -283,9 +326,16 @@ export class PaperTradingEngine {
       }
 
       this.positions.delete(positionId);
-      console.log(`[PaperTrading] ✅ Closed position: ${pos.direction} ${pos.symbol} at $${exitPrice} (${reason}). PnL: $${pos.pnl.toFixed(2)}`);
+      console.log(`[POSITION_CLOSED] ✅ Closed position: ${pos.direction} ${pos.symbol} at $${exitPrice} (${reason}). PnL: $${pos.pnl.toFixed(2)}`);
+      
+      // Update store balance to keep in sync
+      if (pos.userId) {
+        useWalletStore.getState().fetchWallet(pos.userId).catch(() => {});
+      }
+
       return true;
     } catch (err) {
+      console.log(`[POSITION_REJECTED] Failed closing position ${positionId} in DB: ${err}`);
       console.error(`[PaperTrading] Failed closing position ${positionId} in DB:`, err);
       return false;
     }

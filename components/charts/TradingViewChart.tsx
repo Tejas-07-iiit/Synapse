@@ -23,6 +23,250 @@ import { timezoneEngine } from "@/services/market/timezone";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
 import { useAuthStore } from "@/store/useAuthStore";
 
+// --- TYPES FOR CHART TRADING OVERLAYS ---
+interface TradeOverlay {
+  id: string;
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  status: "OPEN" | "CLOSED" | "TP HIT" | "SL HIT";
+  entryPrice: number;
+  tpPrice: number;
+  slPrice: number;
+  quantity: number;
+  pnl: number;
+  roi: number;
+  exitPrice?: number;
+  closeReason?: string;
+  entryY: number | null;
+  tpY: number | null;
+  slY: number | null;
+  currentPriceY: number | null;
+  startX: number;
+  width: number;
+}
+
+interface ActivePosition {
+  id: string;
+  userId: string;
+  symbol: string;
+  direction: string;
+  entryPrice: number;
+  quantity: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  leverage: number;
+  openedAt: string;
+}
+
+interface ClosedTrade {
+  id: string;
+  symbol: string;
+  direction: string;
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  pnl: number;
+  roi: number;
+  status: string;
+  openedAt: string;
+  closedAt: string;
+  stopLoss: number | null;
+  takeProfit: number | null;
+}
+
+// --- TRADINGVIEW POSITION OVERLAY VIEW ---
+const TradeOverlayView = ({ overlay, chartWidth }: { overlay: TradeOverlay; chartWidth: number }) => {
+  const {
+    direction,
+    status,
+    entryPrice,
+    tpPrice,
+    slPrice,
+    quantity,
+    pnl,
+    roi,
+    entryY,
+    tpY,
+    slY,
+    currentPriceY,
+    startX,
+    width,
+    exitPrice,
+    closeReason,
+  } = overlay;
+
+  if (entryY === null || tpY === null || slY === null) return null;
+
+  const isLong = direction === "LONG";
+  const isOpen = status === "OPEN";
+
+  // Calculate box heights and positions
+  const tpBoxTop = Math.min(entryY, tpY);
+  const tpBoxHeight = Math.abs(entryY - tpY);
+  const slBoxTop = Math.min(entryY, slY);
+  const slBoxHeight = Math.abs(entryY - slY);
+
+  // Set colors based on active/historical status
+  const entryColor = isOpen ? "#06b6d4" : "#94a3b8"; // Cyan vs Slate
+  const tpColor = isOpen ? "#10b981" : "#059669"; // Emerald vs Dark Emerald
+  const slColor = isOpen ? "#f43f5e" : "#dc2626"; // Rose vs Red
+
+  // Calculate Risk/Reward ratio
+  const riskPct = Math.abs(entryPrice - slPrice) / entryPrice * 100;
+  const rewardPct = Math.abs(tpPrice - entryPrice) / entryPrice * 100;
+  const rrRatio = riskPct > 0 ? (rewardPct / riskPct).toFixed(2) : "0.00";
+
+  return (
+    <div 
+      className={`absolute inset-0 pointer-events-none z-20 select-none ${isOpen ? "opacity-100" : "opacity-30 transition-opacity duration-300 hover:opacity-75"}`}
+      style={{ width: `${chartWidth}px` }}
+    >
+      {/* 1. Green Zone (TP Box - Profit Zone) */}
+      <div 
+        className="absolute border-l"
+        style={{
+          top: `${tpBoxTop}px`,
+          left: `${startX}px`,
+          width: `${width}px`,
+          height: `${tpBoxHeight}px`,
+          backgroundColor: isOpen ? "rgba(16, 185, 129, 0.035)" : "rgba(16, 185, 129, 0.01)",
+          borderLeft: `2px ${isOpen ? "solid" : "dashed"} ${isLong ? tpColor : slColor}`,
+          borderColor: isLong ? "rgba(16, 185, 129, 0.3)" : "rgba(244, 63, 94, 0.3)",
+        }}
+      />
+
+      {/* 2. Red Zone (SL Box - Loss Zone) */}
+      <div 
+        className="absolute border-l"
+        style={{
+          top: `${slBoxTop}px`,
+          left: `${startX}px`,
+          width: `${width}px`,
+          height: `${slBoxHeight}px`,
+          backgroundColor: isOpen ? "rgba(244, 63, 94, 0.035)" : "rgba(244, 63, 94, 0.01)",
+          borderLeft: `2px ${isOpen ? "solid" : "dashed"} ${isLong ? slColor : tpColor}`,
+          borderColor: isLong ? "rgba(244, 63, 94, 0.3)" : "rgba(16, 185, 129, 0.3)",
+        }}
+      />
+
+      {/* 3. Entry Line */}
+      <div 
+        className="absolute flex items-center"
+        style={{
+          top: `${entryY}px`,
+          left: `${startX}px`,
+          width: `${width}px`,
+          borderTop: `1.5px dashed ${entryColor}`,
+        }}
+      >
+        <div 
+          className="bg-cyan-950/95 text-cyan-400 border border-cyan-500/30 text-[9px] font-black px-2 py-0.5 rounded-r-md uppercase flex items-center gap-1.5 shadow-md -translate-y-1/2 select-none"
+          style={{ borderColor: `${entryColor}40`, color: entryColor }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: entryColor }}></span>
+          {direction} {quantity.toFixed(4)} @ ${entryPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </div>
+      </div>
+
+      {/* 4. Take Profit Line */}
+      <div 
+        className="absolute flex items-center"
+        style={{
+          top: `${tpY}px`,
+          left: `${startX}px`,
+          width: `${width}px`,
+          borderTop: `1.5px ${isOpen ? "solid" : "dashed"} ${isLong ? tpColor : slColor}`,
+        }}
+      >
+        <div 
+          className="bg-emerald-950/95 text-emerald-400 border border-emerald-500/30 text-[9px] font-black px-2 py-0.5 rounded-r-md uppercase flex items-center gap-1.5 shadow-md -translate-y-1/2 select-none"
+          style={{
+            borderColor: isLong ? `${tpColor}35` : `${slColor}35`,
+            color: isLong ? tpColor : slColor,
+          }}
+        >
+          TP: ${tpPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {isOpen && ` | Target: +$${(Math.abs(tpPrice - entryPrice) * quantity).toFixed(2)} (+${rewardPct.toFixed(2)}%)`}
+        </div>
+      </div>
+
+      {/* 5. Stop Loss Line */}
+      <div 
+        className="absolute flex items-center"
+        style={{
+          top: `${slY}px`,
+          left: `${startX}px`,
+          width: `${width}px`,
+          borderTop: `1.5px ${isOpen ? "solid" : "dashed"} ${isLong ? slColor : tpColor}`,
+        }}
+      >
+        <div 
+          className="bg-rose-950/95 text-rose-400 border border-rose-500/30 text-[9px] font-black px-2 py-0.5 rounded-r-md uppercase flex items-center gap-1.5 shadow-md -translate-y-1/2 select-none"
+          style={{
+            borderColor: isLong ? `${slColor}35` : `${tpColor}35`,
+            color: isLong ? slColor : tpColor,
+          }}
+        >
+          SL: ${slPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {isOpen && ` | Risk: -$${(Math.abs(entryPrice - slPrice) * quantity).toFixed(2)} (-${riskPct.toFixed(2)}%)`}
+        </div>
+      </div>
+
+      {/* 6. Live HUD Label (Floating PNL & Status Tag) */}
+      <div 
+        className="absolute"
+        style={{
+          top: `${isOpen ? currentPriceY : entryY}px`,
+          left: `${startX + Math.max(10, width - 240)}px`,
+          transform: "translateY(-100%)",
+        }}
+      >
+        <div 
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[9px] font-black tracking-tight border uppercase shadow-xl ${
+            !isOpen
+              ? "bg-secondary/90 text-muted-foreground border-border"
+              : pnl >= 0
+              ? "bg-emerald-950/95 text-emerald-400 border-emerald-500/35 shadow-emerald-500/5"
+              : "bg-rose-950/95 text-rose-400 border-rose-500/35 shadow-rose-500/5"
+          }`}
+        >
+          {/* Position Badge Status */}
+          <span 
+            className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider ${
+              !isOpen
+                ? "bg-muted text-muted-foreground"
+                : isLong
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "bg-rose-500/20 text-rose-300"
+            }`}
+          >
+            {status}
+          </span>
+          
+          {/* PnL Value */}
+          <span className="font-extrabold font-mono text-sm leading-none">
+            {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} ({pnl >= 0 ? "+" : ""}{roi.toFixed(2)}%)
+          </span>
+
+          {/* Risk Reward Badge */}
+          {isOpen && (
+            <span className="text-[8px] text-muted-foreground/80 font-semibold tracking-wider">
+              (R:R {rrRatio})
+            </span>
+          )}
+
+          {/* Historical Details */}
+          {!isOpen && (
+            <span className="text-[8px] text-muted-foreground font-normal normal-case">
+              Exit: ${exitPrice?.toLocaleString()} ({closeReason})
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface HoverData {
   open: string;
   high: string;
@@ -47,10 +291,10 @@ export default function TradingViewChart() {
   const timeframe = useMarketStore((state) => state.timeframe);
   const setTimeframe = useMarketStore((state) => state.setTimeframe);
   const loading = useMarketStore((state) => state.loading);
+  const tickerData = useMarketStore((state) => state.tickerData);
 
   const wsStatus = useDashboardStore((state) => state.wsStatus);
   const user = useAuthStore((state) => state.user);
-  const activeChartRef = useRef<number>(1); // 1 = main, 2 = rsi, 3 = macd
 
   const { resolvedTheme } = useTheme();
 
@@ -71,6 +315,11 @@ export default function TradingViewChart() {
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const isHoveringRef = useRef(false);
   const [chartReady, setChartReady] = useState(false);
+  const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
+  const [closedTrades, setClosedTrades] = useState<ClosedTrade[]>([]);
+  const [overlays, setOverlays] = useState<TradeOverlay[]>([]);
+  const [clientWidth, setClientWidth] = useState(0);
+  const [timeScaleTrigger, setTimeScaleTrigger] = useState(0);
 
   // DOM Refs
   const mainChartRef = useRef<HTMLDivElement>(null);
@@ -112,6 +361,7 @@ export default function TradingViewChart() {
   const isSyncingRef = useRef<boolean>(false);
   const prevIndicatorsRef = useRef<IndicatorValues | null>(null);
   const prevThemeRef = useRef<string | undefined>(resolvedTheme);
+  const lastChartTimeRef = useRef<number | null>(null);
 
   // Data refs to prevent stale closures in event listeners without chart recreation
   const candlesRef = useRef(candles);
@@ -202,6 +452,7 @@ export default function TradingViewChart() {
         }
 
         if (activeData.success && Array.isArray(activeData.positions)) {
+          setActivePositions(activeData.positions);
           activeData.positions
             .filter((p: PositionResponse) => p.symbol.toUpperCase() === currentSymbol)
             .forEach((p: PositionResponse) => {
@@ -211,9 +462,12 @@ export default function TradingViewChart() {
                 price: p.entryPrice,
               });
             });
+        } else {
+          setActivePositions([]);
         }
 
         if (closedData.success && Array.isArray(closedData.trades)) {
+          setClosedTrades(closedData.trades);
           closedData.trades
             .filter((t: TradeResponse) => t.symbol.toUpperCase() === currentSymbol)
             .forEach((t: TradeResponse) => {
@@ -230,6 +484,8 @@ export default function TradingViewChart() {
                 price: t.exitPrice,
               });
             });
+        } else {
+          setClosedTrades([]);
         }
 
         // Sort events by time
@@ -248,6 +504,171 @@ export default function TradingViewChart() {
       clearInterval(interval);
     };
   }, [symbol, user?.id]);
+
+  // Synchronize timescale updates (zoom/scroll) to force React overlay recalculation
+  useEffect(() => {
+    if (!chartReady || !chart1Ref.current) return;
+
+    const handleTimeScaleChange = () => {
+      setTimeScaleTrigger((prev) => prev + 1);
+    };
+
+    chart1Ref.current.timeScale().subscribeVisibleLogicalRangeChange(handleTimeScaleChange);
+    chart1Ref.current.timeScale().subscribeVisibleTimeRangeChange(handleTimeScaleChange);
+
+    return () => {
+      if (chart1Ref.current) {
+        chart1Ref.current.timeScale().unsubscribeVisibleLogicalRangeChange(handleTimeScaleChange);
+        chart1Ref.current.timeScale().unsubscribeVisibleTimeRangeChange(handleTimeScaleChange);
+      }
+    };
+  }, [chartReady]);
+
+  const livePrice = tickerData[symbol.toUpperCase()]?.price;
+
+  // Recalculate overlay Y and X coordinates
+  const updateOverlays = useCallback(() => {
+    if (!chartReady || !chart1Ref.current || !candleSeriesRef.current || !mainChartRef.current || clientWidth === 0) return;
+
+    // Reference dependencies to satisfy React Hook ESLint rules
+    void livePrice;
+    void timeScaleTrigger;
+
+    const currentSymbol = symbol.toUpperCase();
+    const currentPrice = tickerData[currentSymbol]?.price || (candles.length > 0 ? candles[candles.length - 1].close : 0);
+    const rightOffset = 90; // width of price scale
+    const chartWidth = clientWidth - rightOffset;
+
+    const newOverlays: TradeOverlay[] = [];
+
+    // 1. Active Positions
+    activePositions.forEach((pos) => {
+      if (pos.symbol.toUpperCase() !== currentSymbol) return;
+
+      const entryPrice = pos.entryPrice;
+      const tpPrice = pos.takeProfit || (pos.direction === "LONG" ? entryPrice * 1.03 : entryPrice * 0.97);
+      const slPrice = pos.stopLoss || (pos.direction === "LONG" ? entryPrice * 0.985 : entryPrice * 1.015);
+      const qty = pos.quantity;
+      const direction = pos.direction as "LONG" | "SHORT";
+
+      // Floating PnL
+      let pnl = 0;
+      if (direction === "LONG") {
+        pnl = (currentPrice - entryPrice) * qty;
+      } else {
+        pnl = (entryPrice - currentPrice) * qty;
+      }
+      const roi = (pnl / (entryPrice * qty)) * 100;
+
+      // Coordinate projections
+      const entryY = candleSeriesRef.current!.priceToCoordinate(entryPrice);
+      const tpY = candleSeriesRef.current!.priceToCoordinate(tpPrice);
+      const slY = candleSeriesRef.current!.priceToCoordinate(slPrice);
+      const currentPriceY = candleSeriesRef.current!.priceToCoordinate(currentPrice);
+
+      const openedAtSeconds = Math.floor(new Date(pos.openedAt).getTime() / 1000);
+      const startXVal = chart1Ref.current!.timeScale().timeToCoordinate(openedAtSeconds as UTCTimestamp);
+      
+      let startX = startXVal !== null ? startXVal : 0;
+      if (startX < 0) startX = 0;
+      if (startX > chartWidth) startX = chartWidth;
+
+      const width = chartWidth - startX;
+
+      newOverlays.push({
+        id: pos.id,
+        symbol: pos.symbol,
+        direction,
+        status: "OPEN",
+        entryPrice,
+        tpPrice,
+        slPrice,
+        quantity: qty,
+        pnl,
+        roi,
+        entryY,
+        tpY,
+        slY,
+        currentPriceY,
+        startX,
+        width: width > 0 ? width : 0,
+      });
+    });
+
+    // 2. Closed Trades
+    const recentClosed = [...closedTrades]
+      .filter((t) => t.symbol.toUpperCase() === currentSymbol)
+      .slice(0, 5);
+
+    recentClosed.forEach((t) => {
+      const entryPrice = t.entryPrice;
+      const tpPrice = t.takeProfit || entryPrice;
+      const slPrice = t.stopLoss || entryPrice;
+      const qty = t.quantity || 0;
+      const direction = t.direction as "LONG" | "SHORT";
+      const exitPrice = t.exitPrice;
+      const pnl = t.pnl;
+      const roi = t.roi;
+      const status = t.status as string;
+      
+      const openedAtSeconds = Math.floor(new Date(t.openedAt).getTime() / 1000);
+      const closedAtSeconds = Math.floor(new Date(t.closedAt).getTime() / 1000);
+
+      const entryY = candleSeriesRef.current!.priceToCoordinate(entryPrice);
+      const tpY = candleSeriesRef.current!.priceToCoordinate(tpPrice);
+      const slY = candleSeriesRef.current!.priceToCoordinate(slPrice);
+      const exitY = candleSeriesRef.current!.priceToCoordinate(exitPrice);
+
+      const startXVal = chart1Ref.current!.timeScale().timeToCoordinate(openedAtSeconds as UTCTimestamp);
+      const endXVal = chart1Ref.current!.timeScale().timeToCoordinate(closedAtSeconds as UTCTimestamp);
+
+      if (startXVal === null && endXVal === null) return; // not visible
+
+      let startX = startXVal !== null ? startXVal : 0;
+      let endX = endXVal !== null ? endXVal : chartWidth;
+
+      if (startX < 0) startX = 0;
+      if (startX > chartWidth) startX = chartWidth;
+      if (endX < 0) endX = 0;
+      if (endX > chartWidth) endX = chartWidth;
+
+      const width = endX - startX;
+
+      let statusBadge: "OPEN" | "CLOSED" | "TP HIT" | "SL HIT" = "CLOSED";
+      if (status === "STOPPED" || status === "STOP LOSS" || status === "SL HIT") {
+        statusBadge = "SL HIT";
+      } else if (status === "TP HIT" || status === "TAKE PROFIT") {
+        statusBadge = "TP HIT";
+      }
+
+      newOverlays.push({
+        id: t.id || Math.random().toString(),
+        symbol: t.symbol,
+        direction,
+        status: statusBadge,
+        entryPrice,
+        tpPrice,
+        slPrice,
+        quantity: qty,
+        pnl,
+        roi,
+        exitPrice,
+        closeReason: statusBadge === "SL HIT" ? "STOP LOSS" : statusBadge === "TP HIT" ? "TAKE PROFIT" : "MANUAL",
+        entryY,
+        tpY,
+        slY,
+        currentPriceY: exitY,
+        startX,
+        width: width > 0 ? width : 0,
+      });
+    });
+
+    setOverlays(newOverlays);
+  }, [chartReady, symbol, activePositions, closedTrades, candles, clientWidth, timeScaleTrigger, livePrice, tickerData]);
+
+  useEffect(() => {
+    updateOverlays();
+  }, [updateOverlays]);
 
   useEffect(() => {
     if (!mainChartRef.current || !rsiChartRef.current || !macdChartRef.current) return;
@@ -542,7 +963,7 @@ export default function TradingViewChart() {
                 target.timeScale().setVisibleLogicalRange(range);
               }
             }
-          } catch (e) {
+          } catch {
             // Ignore if chart is not fully initialized yet
           }
         });
@@ -601,10 +1022,12 @@ export default function TradingViewChart() {
         chart1.resize(width, 600);
         chart2.resize(width, 120);
         chart3.resize(width, 140);
+        setClientWidth(width);
       }
     });
 
     if (mainChartRef.current) {
+      setClientWidth(mainChartRef.current.clientWidth);
       resizeObserver.observe(mainChartRef.current);
     }
 
@@ -612,6 +1035,7 @@ export default function TradingViewChart() {
 
     return () => {
       setChartReady(false);
+      lastChartTimeRef.current = null;
       resizeObserver.disconnect();
 
       chart1.unsubscribeCrosshairMove(handleCrosshairMove);
@@ -734,6 +1158,11 @@ export default function TradingViewChart() {
           volumeSeriesRef.current.setData(volumeData);
         }
 
+        const lastCandle = sortedCandles[sortedCandles.length - 1];
+        if (lastCandle) {
+          lastChartTimeRef.current = timezoneEngine.utcToLocal(lastCandle.time) / 1000;
+        }
+
         if (!indicators) return;
 
         // Plot EMA(20)
@@ -797,70 +1226,82 @@ export default function TradingViewChart() {
         const lastCandle = sortedCandles[sortedCandles.length - 1];
         const timeVal = (timezoneEngine.utcToLocal(lastCandle.time) / 1000) as UTCTimestamp;
 
-        if (dummySeries2Ref.current) {
-          dummySeries2Ref.current.update({ time: timeVal, value: 50 });
-        }
-        if (dummySeries3Ref.current) {
-          dummySeries3Ref.current.update({ time: timeVal, value: 0 });
+        // Skip updates if the new timestamp is strictly older than the last update timestamp to prevent lightweight-charts crash
+        if (lastChartTimeRef.current !== null && (timeVal as number) < lastChartTimeRef.current) {
+          console.warn(`[Chart] Ignoring older tick timestamp: ${timeVal} < ${lastChartTimeRef.current}`);
+          return;
         }
 
-        candleSeriesRef.current.update({
-          time: timeVal,
-          open: lastCandle.open,
-          high: lastCandle.high,
-          low: lastCandle.low,
-          close: lastCandle.close,
-        });
+        lastChartTimeRef.current = timeVal as number;
 
-        if (volumeSeriesRef.current) {
-          const isUp = lastCandle.close >= lastCandle.open;
-          volumeSeriesRef.current.update({
+        try {
+          if (dummySeries2Ref.current) {
+            dummySeries2Ref.current.update({ time: timeVal, value: 50 });
+          }
+          if (dummySeries3Ref.current) {
+            dummySeries3Ref.current.update({ time: timeVal, value: 0 });
+          }
+
+          candleSeriesRef.current.update({
             time: timeVal,
-            value: lastCandle.volume,
-            color: isUp ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
+            open: lastCandle.open,
+            high: lastCandle.high,
+            low: lastCandle.low,
+            close: lastCandle.close,
           });
-        }
 
-        if (!indicators) return;
-
-        const lastIdx = sortedCandles.length - 1;
-
-        const updateLine = (seriesRef: React.RefObject<ISeriesApi<"Line"> | null>, arr: number[] | undefined) => {
-          if (seriesRef.current && arr) {
-            const val = arr[lastIdx];
-            if (val !== undefined && !isNaN(val)) {
-              seriesRef.current.update({ time: timeVal, value: val });
-            }
+          if (volumeSeriesRef.current) {
+            const isUp = lastCandle.close >= lastCandle.open;
+            volumeSeriesRef.current.update({
+              time: timeVal,
+              value: lastCandle.volume,
+              color: isUp ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
+            });
           }
-        };
 
-        const updateHist = (seriesRef: React.RefObject<ISeriesApi<"Histogram"> | null>, arr: number[] | undefined) => {
-          if (seriesRef.current && arr) {
-            const val = arr[lastIdx];
-            if (val !== undefined && !isNaN(val)) {
-              seriesRef.current.update({
-                time: timeVal,
-                value: val,
-                color: val >= 0 ? "rgba(34, 197, 94, 0.45)" : "rgba(239, 68, 68, 0.45)",
-              });
+          if (!indicators) return;
+
+          const lastIdx = sortedCandles.length - 1;
+
+          const updateLine = (seriesRef: React.RefObject<ISeriesApi<"Line"> | null>, arr: number[] | undefined) => {
+            if (seriesRef.current && arr) {
+              const val = arr[lastIdx];
+              if (val !== undefined && !isNaN(val)) {
+                seriesRef.current.update({ time: timeVal, value: val });
+              }
             }
+          };
+
+          const updateHist = (seriesRef: React.RefObject<ISeriesApi<"Histogram"> | null>, arr: number[] | undefined) => {
+            if (seriesRef.current && arr) {
+              const val = arr[lastIdx];
+              if (val !== undefined && !isNaN(val)) {
+                seriesRef.current.update({
+                  time: timeVal,
+                  value: val,
+                  color: val >= 0 ? "rgba(34, 197, 94, 0.45)" : "rgba(239, 68, 68, 0.45)",
+                });
+              }
+            }
+          };
+
+          if (showEMA) updateLine(emaSeriesRef, indicators.ema20);
+          if (showSMA) updateLine(smaSeriesRef, indicators.sma50);
+
+          if (showBB) {
+            updateLine(bbUpperSeriesRef, indicators.bbUpper);
+            updateLine(bbMiddleSeriesRef, indicators.bbMiddle);
+            updateLine(bbLowerSeriesRef, indicators.bbLower);
           }
-        };
 
-        if (showEMA) updateLine(emaSeriesRef, indicators.ema20);
-        if (showSMA) updateLine(smaSeriesRef, indicators.sma50);
-
-        if (showBB) {
-          updateLine(bbUpperSeriesRef, indicators.bbUpper);
-          updateLine(bbMiddleSeriesRef, indicators.bbMiddle);
-          updateLine(bbLowerSeriesRef, indicators.bbLower);
+          updateLine(volumeMASeriesRef, indicators.volumeMA);
+          updateLine(rsiSeriesRef, indicators.rsi);
+          updateLine(macdLineSeriesRef, indicators.macdLine);
+          updateLine(macdSignalSeriesRef, indicators.signalLine);
+          updateHist(macdHistSeriesRef, indicators.macdHist);
+        } catch (updateErr) {
+          console.error("[Chart] Error during real-time update():", updateErr);
         }
-
-        updateLine(volumeMASeriesRef, indicators.volumeMA);
-        updateLine(rsiSeriesRef, indicators.rsi);
-        updateLine(macdLineSeriesRef, indicators.macdLine);
-        updateLine(macdSignalSeriesRef, indicators.signalLine);
-        updateHist(macdHistSeriesRef, indicators.macdHist);
       }
 
       // Set markers on the candlestick series for executions (BUY/SELL)
@@ -1000,6 +1441,11 @@ export default function TradingViewChart() {
               <span className="text-sm font-bold">Recalculating indicators...</span>
             </div>
           )}
+
+          {/* Active / Closed Position Overlay Renderers */}
+          {chartReady && overlays.map((overlay) => (
+            <TradeOverlayView key={overlay.id} overlay={overlay} chartWidth={clientWidth - 90} />
+          ))}
         </div>
         
         <div className="relative w-full rounded-lg border border-border/80 overflow-hidden bg-card/50" ref={rsiChartRef}>

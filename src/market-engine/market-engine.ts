@@ -9,6 +9,7 @@ import { PaperTradingEngine } from "../execution-engine/paper";
 import { Candle, TickerInfo, IndicatorValues } from "../strategy-engine/types";
 import { calculateMarketAnalytics } from "@/services/analytics/analytics-engine";
 import { useSettingsStore } from "@/src/stores/settingsStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 class MarketEngine {
   private activeSymbol: string = "";
@@ -120,7 +121,8 @@ class MarketEngine {
       });
 
       // 3. Load active paper positions
-      PaperTradingEngine.loadActivePositions("default-user-id").catch(() => {});
+      const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
+      PaperTradingEngine.loadActivePositions(targetUserId).catch(() => {});
 
       // 4. Connect WebSocket & register callbacks
       marketWsService.connect();
@@ -232,6 +234,7 @@ class MarketEngine {
     const sym = symbol.toUpperCase();
     const tf = timeframe.toLowerCase();
 
+    console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym}`);
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
     const signals = await strategyEngine.processTick(sym, tf, candles, ticker);
 
@@ -273,17 +276,45 @@ class MarketEngine {
     const settings = useSettingsStore.getState();
 
     for (const sig of signals) {
+      const isTradeDirection = sig.signal === "LONG" || sig.signal === "SHORT";
+      if (isTradeDirection) {
+        const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
+        const activePos = PaperTradingEngine.getOpenPositions().find(
+          (p) => p.symbol === sym && p.status === "OPEN" && p.userId === targetUserId
+        );
+        if (activePos) {
+          sig.blocked = true;
+          sig.blockReason = "ACTIVE POSITION EXISTS";
+          sig.activePositionId = activePos.id;
+          
+          console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+          console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+        }
+      }
+
       signalStore.addSignal(sig);
 
-      const isAutonomous = settings.autoTrading;
+      console.log(`[STRATEGY_SIGNAL] Strategy: ${sig.strategyName} | Symbol: ${sig.symbol} | Type: ${sig.signal} | Confidence: ${sig.confidence}% | Price: $${sig.entry}`);
+
+      const isAutonomous = settings.autoTrading || 
+        process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING === "true" || 
+        process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING === "on";
+
+      console.log(`[EXECUTION_ENGINE] Auto-trading check for ${sym}: isAutonomous = ${isAutonomous} | settings.autoTrading = ${settings.autoTrading} | env = ${process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING}`);
 
       if (sig.signal === "LONG" || sig.signal === "SHORT") {
+        if (sig.blocked) {
+          console.log(`[EXECUTION_ENGINE] Signal blocked: Active position already exists for ${sym}`);
+          continue;
+        }
         if (isAutonomous) {
           const direction: "LONG" | "SHORT" = sig.signal;
           try {
             // Resolve user for trade execution, fallback to default-user-id
-            const targetUserId = "default-user-id";
+            const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
             
+            console.log(`[EXECUTION_ENGINE] Attempting to open position for ${sym} (Direction: ${direction}) for User ID: ${targetUserId} via PaperTradingEngine.`);
+
             // Calculate dynamic SL/TP based on settings if not provided by signal
             const defaultSl = direction === "LONG" 
               ? sig.entry * (1 - settings.defaultSlPct / 100)
@@ -311,7 +342,7 @@ class MarketEngine {
             console.error(`[MarketEngine] Auto-execution failed for ${sym}:`, err);
           }
         } else {
-          console.log(`[MarketEngine] Signal generated: ${sig.signal} ${sym} @ $${sig.entry} (AUTONOMOUS_TRADING is OFF — signal only, no trade executed)`);
+          console.log(`[EXECUTION_ENGINE] Signal ignored: ${sig.signal} ${sym} @ $${sig.entry} (Auto-trading is OFF — no trade placed)`);
         }
       }
     }

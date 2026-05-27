@@ -76,6 +76,11 @@ export interface IndicatorValues {
   atr: number[];
   vwap: number[];
   volumeMA: number[];
+  stochRsiK: number[];
+  stochRsiD: number[];
+  adx: number[];
+  supportLevels: number[];
+  resistanceLevels: number[];
 }
 
 export interface MarketAnalytics {
@@ -85,7 +90,7 @@ export interface MarketAnalytics {
   volatilityScore: "HIGH" | "LOW" | "NORMAL";
   momentumScore: "STRONG" | "WEAK" | "NEUTRAL";
   volumeStrength: "HIGH" | "LOW" | "NORMAL";
-  marketRegime: "BULLISH" | "BEARISH" | "SIDEWAYS" | "VOLATILE" | "ACCUMULATION" | "DISTRIBUTION";
+  marketRegime: "BULLISH" | "BEARISH" | "SIDEWAYS" | "VOLATILE" | "ACCUMULATION" | "DISTRIBUTION" | "Bullish Trend" | "Bearish Trend" | "Ranging" | "Breakout" | "Distribution" | "Accumulation" | "High Volatility" | "Low Volatility";
   emaAlignment: "BULLISH" | "BEARISH" | "NEUTRAL";
   bollingerPosition: "ABOVE_UPPER" | "BELOW_LOWER" | "IN_CHANNEL";
   macdStatus: "BULLISH_CROSSOVER" | "BEARISH_CROSSOVER" | "NEUTRAL";

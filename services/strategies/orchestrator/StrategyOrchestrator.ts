@@ -32,7 +32,7 @@ export class StrategyOrchestrator {
           generatedSignals.push(signal);
           
           // 4. Update the Zustand strategy store
-          useStrategyStore.getState().addSignal(signal);
+          useStrategyStore.getState().addSignal(signal as any);
         }
       } catch (err) {
         console.error(`[Orchestrator] Failed executing strategy "${strategy.name}":`, err);

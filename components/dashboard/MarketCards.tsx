@@ -1,12 +1,62 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
-import { Wallet, TrendingUp, Cpu, Activity } from "lucide-react";
+import { useWalletStore } from "@/src/stores/walletStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { Wallet, TrendingUp, Activity } from "lucide-react";
+
+interface Position {
+  id: string;
+  userId: string;
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  entryPrice: number;
+  currentPrice: number;
+  quantity: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  leverage: number;
+  pnl: number;
+  status: string;
+  openedAt: string | number;
+  closedAt: string | number | null;
+}
 
 export default function MarketCards() {
   const selectedSymbol = useDashboardStore((state) => state.selectedSymbol);
   const ticker = useDashboardStore((state) => state.tickerData[selectedSymbol]);
+  const tickerData = useDashboardStore((state) => state.tickerData);
+  
+  const { user } = useAuthStore();
+  const wallet = useWalletStore();
+  const fetchWallet = useWalletStore((state) => state.fetchWallet);
+  
+  const [activePositions, setActivePositions] = useState<Position[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchWallet(user.id);
+    }
+  }, [user?.id, fetchWallet]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchPositions = async () => {
+      try {
+        const res = await fetch(`/api/positions?userId=${user.id}&type=active`);
+        const data = await res.json();
+        if (data.success) {
+          setActivePositions(data.positions || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch active positions", err);
+      }
+    };
+    fetchPositions();
+    const interval = setInterval(fetchPositions, 4000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const formatPrice = (price: number | undefined) => {
     if (price === undefined) return "Loading...";
@@ -21,6 +71,41 @@ export default function MarketCards() {
     return change >= 0 ? "+" : "";
   };
 
+  const usedMargin = useMemo(() => {
+    let total = 0;
+    activePositions.forEach((pos) => {
+      const entryPrice = pos.entryPrice;
+      const quantity = pos.quantity;
+      const leverage = pos.leverage || 1;
+      total += (entryPrice * quantity) / leverage;
+    });
+    return total;
+  }, [activePositions]);
+
+  const unrealizedPnl = useMemo(() => {
+    let total = 0;
+    activePositions.forEach((pos) => {
+      const livePrice = tickerData[pos.symbol]?.price || pos.currentPrice || pos.entryPrice;
+      const leverage = pos.leverage || 1;
+      const isLong = pos.direction === "LONG";
+      
+      const currentPrice = livePrice;
+      const entryVal = pos.entryPrice * pos.quantity;
+      const currentVal = currentPrice * pos.quantity;
+      
+      const pnl = isLong 
+        ? (currentVal - entryVal) * leverage
+        : (entryVal - currentVal) * leverage;
+      
+      total += pnl;
+    });
+    return total;
+  }, [activePositions, tickerData]);
+
+  const availableBalance = wallet.balance - usedMargin;
+  const portfolioValue = wallet.balance + unrealizedPnl;
+  const dailyGain = wallet.totalDeposited > 0 ? ((portfolioValue - wallet.totalDeposited) / wallet.totalDeposited) * 100 : 0;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       {/* Wallet Balance */}
@@ -29,7 +114,9 @@ export default function MarketCards() {
           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block">
             Wallet Balance
           </span>
-          <span className="text-lg font-bold text-foreground block">$10000.00</span>
+          <span className="text-lg font-bold text-foreground block">
+            ${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
           <span className="text-[10px] text-muted-foreground/60 block font-medium uppercase tracking-tight">USDT Available</span>
         </div>
         <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 text-primary shadow-inner">
@@ -41,12 +128,16 @@ export default function MarketCards() {
       <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
         <div className="space-y-1">
           <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block">
-            Portfolio Value
+            Net Asset Value
           </span>
-          <span className="text-lg font-bold text-foreground block">$10000.90</span>
-          <span className="text-[10px] text-green-500 font-bold block uppercase tracking-tight">+1.3% Daily Gain</span>
+          <span className="text-lg font-bold text-foreground block">
+            ${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className={`text-[10px] font-bold block uppercase tracking-tight ${dailyGain >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+            {dailyGain >= 0 ? "+" : ""}{dailyGain.toFixed(2)}% Total ROI
+          </span>
         </div>
-        <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 text-green-500 shadow-inner">
+        <div className={`p-3 rounded-xl border shadow-inner ${dailyGain >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-destructive/10 border-destructive/20 text-destructive'}`}>
           <TrendingUp size={18} />
         </div>
       </div>
@@ -85,20 +176,7 @@ export default function MarketCards() {
           <Activity size={18} />
         </div>
       </div>
-
-      {/* AI Confidence */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
-        <div className="space-y-1">
-          <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest block">
-            AI Confidence
-          </span>
-          <span className="text-lg font-bold text-primary block">77%</span>
-          <span className="text-[10px] text-muted-foreground/60 block font-medium uppercase tracking-tight">Breakout Indicator</span>
-        </div>
-        <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-500 shadow-inner">
-          <Cpu size={18} />
-        </div>
-      </div>
     </div>
   );
 }
+

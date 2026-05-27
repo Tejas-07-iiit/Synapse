@@ -8,10 +8,208 @@ generator client {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
-  email        String   @unique
+  id           String     @id @default(uuid())
+  username     String     @unique
+  email        String     @unique
   passwordHash String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  positions    Position[]
+  trades       Trade[]
+  wallet       Wallet?
+  settings     UserSettings?
+}
+
+model TradeSignal {
+  id          String   @id @default(uuid())
+  symbol      String
+  timeframe   String
+  strategyId  String
+  direction   String   // LONG, SHORT, HOLD
+  confidence  Float
+  entry       Float
+  stopLoss    Float
+  takeProfit  Float
+  timestamp   DateTime
+  reasoning   String[] // Array of reasoning strings
+  createdAt   DateTime @default(now())
+  
+  @@index([symbol, timeframe])
+  @@index([strategyId])
+}
+
+model SignalLog {
+  id          String   @id @default(uuid())
+  symbol      String
+  timeframe   String
+  strategyId  String
+  direction   String
+  confidence  Float
+  reasoning   String[]
+  indicators  Json     // Store raw indicators snapshot
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+}
+
+model StrategyExecution {
+  id           String   @id @default(uuid())
+  strategyId   String
+  symbol       String
+  timeframe    String
+  timestamp    DateTime @default(now())
+  durationMs   Int
+  signalResult String   // LONG, SHORT, HOLD
+  success      Boolean  @default(true)
+}
+
+model IndicatorSnapshot {
+  id          String   @id @default(uuid())
+  symbol      String
+  timeframe   String
+  timestamp   DateTime
+  rsi         Float?
+  ema12       Float?
+  ema26       Float?
+  ema20       Float?
+  sma50       Float?
+  macdLine    Float?
+  signalLine  Float?
+  macdHist    Float?
+  bbUpper     Float?
+  bbMiddle    Float?
+  bbLower     Float?
+  atr         Float?
+  vwap        Float?
+  volume      Float?
+  createdAt   DateTime @default(now())
+
+  @@index([symbol, timeframe, timestamp])
+}
+
+model MarketSnapshot {
+  id          String   @id @default(uuid())
+  symbol      String
+  timeframe   String
+  timestamp   DateTime
+  open        Float
+  high        Float
+  low         Float
+  close       Float
+  volume      Float
+  createdAt   DateTime @default(now())
+
+  @@index([symbol, timeframe, timestamp])
+}
+
+model Position {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  symbol       String
+  direction    String    // LONG, SHORT
+  entryPrice   Float
+  currentPrice Float
+  quantity     Float
+  stopLoss     Float?
+  takeProfit   Float?
+  leverage     Int       @default(1)
+  pnl          Float     @default(0.0)
+  status       String    // OPEN, CLOSED
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+
+  @@index([userId])
+  @@index([symbol])
+}
+
+model Trade {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  symbol        String
+  strategyName  String
+  direction     String    // LONG, SHORT
+  entryPrice    Float
+  exitPrice     Float
+  currentPrice  Float?
+  stopLoss      Float?
+  takeProfit    Float?
+  quantity      Float     @default(0.0)
+  leverage      Int       @default(1)
+  pnl           Float
+  roi           Float     // ROI %
+  confidence    Float     // Confidence score used
+  status        String    // OPEN, CLOSED, STOPPED, TP HIT
+  openedAt      DateTime
+  closedAt      DateTime  @default(now())
+  executionType String    // PAPER, LIVE
+
+  @@index([userId])
+  @@index([symbol])
+}
+
+model Strategy {
+  id          String   @id
+  name        String
+  description String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  signals     Signal[]
+}
+
+model Signal {
+  id           String   @id @default(uuid())
+  strategyId   String
+  strategy     Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  symbol       String
+  timeframe    String
+  signalType   String   // LONG, SHORT, HOLD
+  confidence   Float
+  entry        Float
+  stopLoss     Float
+  takeProfit   Float
+  reasoning    String[]
+  indicators   Json     // Store indicator snapshot at time of signal
+  timestamp    DateTime
   createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+
+  @@index([symbol, timeframe])
+  @@index([strategyId])
+}
+
+model StrategyResult {
+  id           String   @id @default(uuid())
+  strategyId   String
+  symbol       String
+  timeframe    String
+  timestamp    DateTime @default(now())
+  durationMs   Int
+  signalResult String   // LONG, SHORT, HOLD
+  success      Boolean  @default(true)
+}
+
+model Wallet {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance          Float    @default(10000.0) // Available balance
+  totalDeposited   Float    @default(10000.0)
+  totalWithdrawn   Float    @default(0.0)
+  realizedPnl      Float    @default(0.0)
+  updatedAt        DateTime @updatedAt
+}
+
+model UserSettings {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autoTrading      Boolean  @default(false)
+  riskPerTradePct  Float    @default(2.0)
+  maxOpenTrades    Int      @default(3)
+  defaultSlPct     Float    @default(1.5)
+  defaultTpPct     Float    @default(3.0)
+  prefTimeframe    String   @default("15m")
+  prefSymbol       String   @default("BTCUSDT")
+  updatedAt        DateTime @updatedAt
 }

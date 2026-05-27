@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeFlow Quant Strategies Map</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #1a1a1a;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .category-section {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 40px;
+            border-top: 4px solid #007bff;
+        }
+        .category-header {
+            margin-top: 0;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+        .category-purpose {
+            font-style: italic;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        tr:hover {
+            background-color: #f1f3f5;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        .badge-native { background: #e3f2fd; color: #0d47a1; }
+        .badge-legacy { background: #fff3e0; color: #e65100; }
+        .complexity-low { color: #2e7d32; font-weight: bold;}
+        .complexity-med { color: #f57c00; font-weight: bold;}
+        .complexity-high { color: #c62828; font-weight: bold;}
+    </style>
+</head>
+<body>
+
+    <h1>TradeFlow Quant Strategies</h1>
+
+    <!-- TREND SECTION -->
+    <div class="category-section" style="border-top-color: #28a745;">
+        <h2 class="category-header">Trend</h2>
+        <div class="category-purpose">Purpose: Directional continuation</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Defensive Strategy</strong></td>
+                    <td><span class="badge badge-legacy">Legacy Node.js</span></td>
+                    <td class="complexity-med">Low-Medium</td>
+                    <td>Yes (Refactored)</td>
+                    <td>RSI14, Momentum, MACD, Support Level</td>
+                </tr>
+                <tr>
+                    <td><strong>EMA Cross ADX</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>EMA20, EMA50, ADX14, MACD</td>
+                </tr>
+                <tr>
+                    <td><strong>Golden Cross</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>SMA50, SMA200</td>
+                </tr>
+                <tr>
+                    <td><strong>Heiken Ashi Swing</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Heiken Ashi color flips (Slow confirmation)</td>
+                </tr>
+                <tr>
+                    <td><strong>Hyper Supertrend</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Supertrend (10, 2) + Supertrend (12, 3)</td>
+                </tr>
+                <tr>
+                    <td><strong>Ichimoku Cloud</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Tenkan, Kijun, Senkou Span A/B</td>
+                </tr>
+                <tr>
+                    <td><strong>MA Crossover Variable</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>EMA20, EMA50, SMA200</td>
+                </tr>
+                <tr>
+                    <td><strong>SMA Trend Filter</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>SMA50, SMA200, RSI14</td>
+                </tr>
+                <tr>
+                    <td><strong>T3 Nexus</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Tillson T3 Moving Average (8, 0.7)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOMENTUM SECTION -->
+    <div class="category-section" style="border-top-color: #007bff;">
+        <h2 class="category-header">Momentum</h2>
+        <div class="category-purpose">Purpose: Acceleration / strength</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Momentum Strategy</strong></td>
+                    <td><span class="badge badge-legacy">Legacy Node.js</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes (Refactored)</td>
+                    <td>RSI14, Trend, Momentum, EMA20, EMA50, MACD, Volatility</td>
+                </tr>
+                <tr>
+                    <td><strong>Dow Factor MFI RSI</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Dow theory swing high/low, RSI14, MFI14</td>
+                </tr>
+                <tr>
+                    <td><strong>Parabolic RSI</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Parabolic SAR applied to RSI(14)</td>
+                </tr>
+                <tr>
+                    <td><strong>Range Breakout High</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>Range High/Low 52, EMA50</td>
+                </tr>
+                <tr>
+                    <td><strong>Residual Momentum</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>Momentum12, EMA50, EMA200</td>
+                </tr>
+                <tr>
+                    <td><strong>Time Series Momentum</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>Momentum12, ADX14</td>
+                </tr>
+                <tr>
+                    <td><strong>WaveTrend Oscillator</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>WaveTrend (LazyBear), EMA20</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MEAN REVERSION SECTION -->
+    <div class="category-section" style="border-top-color: #6f42c1;">
+        <h2 class="category-header">Mean Reversion</h2>
+        <div class="category-purpose">Purpose: Pullback reversals</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Mean Reversion</strong></td>
+                    <td><span class="badge badge-legacy">Legacy Node.js</span></td>
+                    <td class="complexity-med">Low-Medium</td>
+                    <td>Yes (Refactored)</td>
+                    <td>RSI14, Volatility (10-bar), Support & Resistance (10-bar)</td>
+                </tr>
+                <tr>
+                    <td><strong>Bollinger Reversion</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>Bollinger Bands (20,2), ADX14, RSI14</td>
+                </tr>
+                <tr>
+                    <td><strong>Short Term Reversal</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>RSI14, Momentum12, EMA50</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- VOLATILITY SECTION -->
+    <div class="category-section" style="border-top-color: #fd7e14;">
+        <h2 class="category-header">Volatility</h2>
+        <div class="category-purpose">Purpose: Breakout/compression</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Grid Strategy</strong></td>
+                    <td><span class="badge badge-legacy">Legacy Node.js</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes (Refactored)</td>
+                    <td>RSI14, Volatility, Support & Resistance, EMA20/50, MACD</td>
+                </tr>
+                <tr>
+                    <td><strong>Bollinger Breakout</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Bollinger Bands (20,2), ADX14</td>
+                </tr>
+                <tr>
+                    <td><strong>Donchian Breakout</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>Donchian Channels (20), ADX14</td>
+                </tr>
+                <tr>
+                    <td><strong>Squeeze Momentum</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Bollinger Bands inside Keltner Channels</td>
+                </tr>
+                <tr>
+                    <td><strong>Volatility Regime</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-low">Low</td>
+                    <td>Yes</td>
+                    <td>ATRPct, ADX14</td>
+                </tr>
+                <tr>
+                    <td><strong>Zeiierman Volatility</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Volatility Bands, ADX14, Volume</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MARKET STRUCTURE SECTION -->
+    <div class="category-section" style="border-top-color: #17a2b8;">
+        <h2 class="category-header">Market Structure</h2>
+        <div class="category-purpose">Purpose: Liquidity/zones</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Rally Base Drop</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Supply/Demand Zones, High-Volume zones</td>
+                </tr>
+                <tr>
+                    <td><strong>Support Resistance Sweep</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Yes</td>
+                    <td>Range High/Low 52, RSI14</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SENTIMENT SECTION -->
+    <div class="category-section" style="border-top-color: #e83e8c;">
+        <h2 class="category-header">Sentiment</h2>
+        <div class="category-purpose">Purpose: Macro filter</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Hash Ribbons</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-med">Medium</td>
+                    <td>Optional</td>
+                    <td>Hashrate SMA 30/60 (Crypto-specific)</td>
+                </tr>
+                <tr>
+                    <td><strong>News Fear Greed</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-high">High</td>
+                    <td>Yes</td>
+                    <td>News Sentiment, Fear/Greed Index</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ML/STATISTICAL SECTION -->
+    <div class="category-section" style="border-top-color: #dc3545;">
+        <h2 class="category-header">ML/Statistical</h2>
+        <div class="category-purpose">Purpose: Advanced probabilistic</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Strategy Name</th>
+                    <th>Source System</th>
+                    <th>Complexity</th>
+                    <th>Reusable?</th>
+                    <th>Primary Indicators Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Lorentzian Classification</strong></td>
+                    <td><span class="badge badge-native">Framework Native</span></td>
+                    <td class="complexity-high">High</td>
+                    <td>Yes (Highly)</td>
+                    <td>RSI, ADX, CCI, WaveTrend, EMA200 (k-NN Lite)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>

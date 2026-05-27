@@ -12,7 +12,8 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
-  MouseEventParams
+  MouseEventParams,
+  createSeriesMarkers
 } from "lightweight-charts";
 import { useMarketStore } from "@/store/market/useMarketStore";
 import { IndicatorValues } from "@/types/market";
@@ -20,6 +21,7 @@ import { useTheme } from "next-themes";
 import { Eye, EyeOff } from "lucide-react";
 import { timezoneEngine } from "@/services/market/timezone";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface HoverData {
   open: string;
@@ -47,18 +49,28 @@ export default function TradingViewChart() {
   const loading = useMarketStore((state) => state.loading);
 
   const wsStatus = useDashboardStore((state) => state.wsStatus);
+  const user = useAuthStore((state) => state.user);
   const activeChartRef = useRef<number>(1); // 1 = main, 2 = rsi, 3 = macd
 
   const { resolvedTheme } = useTheme();
 
-  // Overlay Visibility Toggles
-  const [showEMA, setShowEMA] = useState(true);
-  const [showSMA, setShowSMA] = useState(true);
-  const [showBB, setShowBB] = useState(true);
+  // Overlay Visibility Toggles (initially false/turned off)
+  const [showEMA, setShowEMA] = useState(false);
+  const [showSMA, setShowSMA] = useState(false);
+  const [showBB, setShowBB] = useState(false);
+
+  // Trade Events state for executions markers
+  interface TradeEvent {
+    time: number;
+    type: "BUY" | "SELL";
+    price: number;
+  }
+  const [tradeEvents, setTradeEvents] = useState<TradeEvent[]>([]);
 
   // Dynamic Hover HUD State
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const isHoveringRef = useRef(false);
+  const [chartReady, setChartReady] = useState(false);
 
   // DOM Refs
   const mainChartRef = useRef<HTMLDivElement>(null);
@@ -94,11 +106,12 @@ export default function TradingViewChart() {
   const prevSymbolRef = useRef<string>("");
   const prevTimeframeRef = useRef<string>("");
   const prevCandlesLengthRef = useRef<number>(0);
-  const prevShowEMARef = useRef<boolean>(true);
-  const prevShowSMARef = useRef<boolean>(true);
-  const prevShowBBRef = useRef<boolean>(true);
+  const prevShowEMARef = useRef<boolean>(false);
+  const prevShowSMARef = useRef<boolean>(false);
+  const prevShowBBRef = useRef<boolean>(false);
   const isSyncingRef = useRef<boolean>(false);
   const prevIndicatorsRef = useRef<IndicatorValues | null>(null);
+  const prevThemeRef = useRef<string | undefined>(resolvedTheme);
 
   // Data refs to prevent stale closures in event listeners without chart recreation
   const candlesRef = useRef(candles);
@@ -153,15 +166,99 @@ export default function TradingViewChart() {
   }, [candles, indicators, updateHoverWithLatest]);
 
   useEffect(() => {
+    let active = true;
+    const fetchTrades = async () => {
+      if (!user?.id) {
+        setTradeEvents([]);
+        return;
+      }
+      try {
+        const [activeRes, closedRes] = await Promise.all([
+          fetch(`/api/positions?userId=${user.id}&type=active`),
+          fetch(`/api/positions?userId=${user.id}&type=closed`),
+        ]);
+        const activeData = await activeRes.json();
+        const closedData = await closedRes.json();
+
+        if (!active) return;
+
+        const events: TradeEvent[] = [];
+        const currentSymbol = symbol.toUpperCase();
+
+        interface PositionResponse {
+          symbol: string;
+          openedAt: string;
+          direction: string;
+          entryPrice: number;
+        }
+
+        interface TradeResponse {
+          symbol: string;
+          openedAt: string;
+          closedAt: string;
+          direction: string;
+          entryPrice: number;
+          exitPrice: number;
+        }
+
+        if (activeData.success && Array.isArray(activeData.positions)) {
+          activeData.positions
+            .filter((p: PositionResponse) => p.symbol.toUpperCase() === currentSymbol)
+            .forEach((p: PositionResponse) => {
+              events.push({
+                time: new Date(p.openedAt).getTime(),
+                type: p.direction === "LONG" ? "BUY" : "SELL",
+                price: p.entryPrice,
+              });
+            });
+        }
+
+        if (closedData.success && Array.isArray(closedData.trades)) {
+          closedData.trades
+            .filter((t: TradeResponse) => t.symbol.toUpperCase() === currentSymbol)
+            .forEach((t: TradeResponse) => {
+              // Entry
+              events.push({
+                time: new Date(t.openedAt).getTime(),
+                type: t.direction === "LONG" ? "BUY" : "SELL",
+                price: t.entryPrice,
+              });
+              // Exit
+              events.push({
+                time: new Date(t.closedAt).getTime(),
+                type: t.direction === "LONG" ? "SELL" : "BUY",
+                price: t.exitPrice,
+              });
+            });
+        }
+
+        // Sort events by time
+        events.sort((a, b) => a.time - b.time);
+        setTradeEvents(events);
+      } catch (err) {
+        console.error("[Chart] Failed to fetch trade events for markers:", err);
+      }
+    };
+
+    fetchTrades();
+    const interval = setInterval(fetchTrades, 5000); // refresh every 5 seconds
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [symbol, user?.id]);
+
+  useEffect(() => {
     if (!mainChartRef.current || !rsiChartRef.current || !macdChartRef.current) return;
 
     // Theme values
     const isDark = resolvedTheme === "dark";
     const colors = {
-      bg: isDark ? "#090d16" : "#ffffff",
-      text: isDark ? "#94a3b8" : "#475569",
-      grid: isDark ? "#161f32" : "#f1f5f9",
-      border: isDark ? "#1e293b" : "#e2e8f0",
+      bg: isDark ? "#0c0c0e" : "#ffffff", // Matches --card in globals.css
+      text: isDark ? "#a1a1aa" : "#64748b", // Matches --muted-foreground
+      grid: isDark ? "#18181b" : "#f1f5f9", // Matches --border / --muted
+      border: isDark ? "#18181b" : "#e2e8f0", // Matches --border
       upColor: "#22c55e",
       downColor: "#ef4444",
       upVolume: "rgba(34, 197, 94, 0.25)",
@@ -189,6 +286,17 @@ export default function TradingViewChart() {
         borderVisible: true,
         borderColor: colors.border,
         minimumWidth: 90,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseButton: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseButton: true,
+        mouseWheel: true,
+        pinch: true,
       },
       width: mainChartRef.current.clientWidth,
       height: 600,
@@ -288,6 +396,17 @@ export default function TradingViewChart() {
         borderColor: colors.border,
         minimumWidth: 90,
       },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseButton: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseButton: true,
+        mouseWheel: true,
+        pinch: true,
+      },
       width: rsiChartRef.current.clientWidth,
       height: 120,
     });
@@ -359,6 +478,17 @@ export default function TradingViewChart() {
         borderColor: colors.border,
         minimumWidth: 90,
       },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseButton: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseButton: true,
+        mouseWheel: true,
+        pinch: true,
+      },
       width: macdChartRef.current.clientWidth,
       height: 140,
     });
@@ -392,38 +522,29 @@ export default function TradingViewChart() {
     macdHistSeriesRef.current = macdHistSeries;
 
     // --- TIMELINE SYNC ROUTINES ---
-    const syncTimeScale = (chartId: number, sourceChart: IChartApi, targets: IChartApi[]) => {
+    let isSyncing = false;
+    const syncTimeScale = (sourceChart: IChartApi, targets: IChartApi[]) => {
       sourceChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (activeChartRef.current !== chartId || !range) return;
+        if (isSyncing || !range) return;
         
+        isSyncing = true;
         targets.forEach((target) => {
-          const targetRange = target.timeScale().getVisibleLogicalRange();
-          if (!targetRange || targetRange.from !== range.from || targetRange.to !== range.to) {
-            target.timeScale().setVisibleLogicalRange(range);
+          try {
+            const targetRange = target.timeScale().getVisibleLogicalRange();
+            if (targetRange && (targetRange.from !== range.from || targetRange.to !== range.to)) {
+              target.timeScale().setVisibleLogicalRange(range);
+            }
+          } catch (e) {
+            // Ignore if chart is not fully initialized yet
           }
         });
+        isSyncing = false;
       });
     };
 
-    syncTimeScale(1, chart1, [chart2, chart3]);
-    syncTimeScale(2, chart2, [chart1, chart3]);
-    syncTimeScale(3, chart3, [chart1, chart2]);
-
-    // --- MOUSE/TOUCH INTERACTION TO PREVENT FEEDBACK LOOPS ---
-    const setChart1Active = () => { activeChartRef.current = 1; };
-    const setChart2Active = () => { activeChartRef.current = 2; };
-    const setChart3Active = () => { activeChartRef.current = 3; };
-
-    const container1 = mainChartRef.current;
-    const container2 = rsiChartRef.current;
-    const container3 = macdChartRef.current;
-
-    container1?.addEventListener("mouseenter", setChart1Active);
-    container1?.addEventListener("touchstart", setChart1Active, { passive: true });
-    container2?.addEventListener("mouseenter", setChart2Active);
-    container2?.addEventListener("touchstart", setChart2Active, { passive: true });
-    container3?.addEventListener("mouseenter", setChart3Active);
-    container3?.addEventListener("touchstart", setChart3Active, { passive: true });
+    syncTimeScale(chart1, [chart2, chart3]);
+    syncTimeScale(chart2, [chart1, chart3]);
+    syncTimeScale(chart3, [chart1, chart2]);
 
     // --- REALTIME HOVER HUD INTERACTION ---
     const handleCrosshairMove = (param: MouseEventParams) => {
@@ -479,14 +600,10 @@ export default function TradingViewChart() {
       resizeObserver.observe(mainChartRef.current);
     }
 
-    return () => {
-      container1?.removeEventListener("mouseenter", setChart1Active);
-      container1?.removeEventListener("touchstart", setChart1Active);
-      container2?.removeEventListener("mouseenter", setChart2Active);
-      container2?.removeEventListener("touchstart", setChart2Active);
-      container3?.removeEventListener("mouseenter", setChart3Active);
-      container3?.removeEventListener("touchstart", setChart3Active);
+    setChartReady(true);
 
+    return () => {
+      setChartReady(false);
       resizeObserver.disconnect();
 
       chart1.unsubscribeCrosshairMove(handleCrosshairMove);
@@ -501,7 +618,7 @@ export default function TradingViewChart() {
 
   // Feed/Sync Data to Chart series
   useEffect(() => {
-    if (candles.length === 0 || !candleSeriesRef.current) return;
+    if (!chartReady || candles.length === 0 || !candleSeriesRef.current) return;
 
     isSyncingRef.current = true;
 
@@ -512,6 +629,8 @@ export default function TradingViewChart() {
       symbol !== prevSymbolRef.current || 
       timeframe !== prevTimeframeRef.current;
 
+    const isThemeChanged = resolvedTheme !== prevThemeRef.current;
+
     const isVisibilityToggled = 
       showEMA !== prevShowEMARef.current ||
       showSMA !== prevShowSMARef.current ||
@@ -521,6 +640,7 @@ export default function TradingViewChart() {
 
     const isFullReload = 
       isNewSymbolOrTimeframe || 
+      isThemeChanged ||
       isVisibilityToggled ||
       isIndicatorsLoaded ||
       sortedCandles.length < prevCandlesLengthRef.current || 
@@ -529,6 +649,7 @@ export default function TradingViewChart() {
     // Update refs for the next run
     prevSymbolRef.current = symbol;
     prevTimeframeRef.current = timeframe;
+    prevThemeRef.current = resolvedTheme;
     prevCandlesLengthRef.current = sortedCandles.length;
     prevShowEMARef.current = showEMA;
     prevShowSMARef.current = showSMA;
@@ -539,7 +660,7 @@ export default function TradingViewChart() {
       const result: LineData[] = [];
       for (let idx = 0; idx < arr.length; idx++) {
         const val = arr[idx];
-        if (val !== undefined && !isNaN(val)) {
+        if (val !== undefined && !isNaN(val) && sortedCandles[idx]) {
           result.push({
             time: (timezoneEngine.utcToLocal(sortedCandles[idx].time) / 1000) as UTCTimestamp,
             value: val,
@@ -553,7 +674,7 @@ export default function TradingViewChart() {
       const result: HistogramData[] = [];
       for (let idx = 0; idx < arr.length; idx++) {
         const val = arr[idx];
-        if (val !== undefined && !isNaN(val)) {
+        if (val !== undefined && !isNaN(val) && sortedCandles[idx]) {
           result.push({
             time: (timezoneEngine.utcToLocal(sortedCandles[idx].time) / 1000) as UTCTimestamp,
             value: val,
@@ -733,12 +854,40 @@ export default function TradingViewChart() {
         updateLine(macdSignalSeriesRef, indicators.signalLine);
         updateHist(macdHistSeriesRef, indicators.macdHist);
       }
+
+      // Set markers on the candlestick series for executions (BUY/SELL)
+      if (candleSeriesRef.current && sortedCandles.length > 0) {
+        const markers = tradeEvents.map((evt) => {
+          // Find closest candle time
+          let closestCandle = sortedCandles[0];
+          let minDiff = Math.abs(sortedCandles[0].time - evt.time);
+          for (const candle of sortedCandles) {
+            const diff = Math.abs(candle.time - evt.time);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestCandle = candle;
+            }
+          }
+
+          const isBuy = evt.type === "BUY";
+          return {
+            time: (timezoneEngine.utcToLocal(closestCandle.time) / 1000) as UTCTimestamp,
+            position: (isBuy ? "belowBar" : "aboveBar") as "belowBar" | "aboveBar",
+            shape: (isBuy ? "arrowUp" : "arrowDown") as "arrowUp" | "arrowDown",
+            color: isBuy ? "#22c55e" : "#ef4444",
+            text: `${evt.type} @ $${getFormat(evt.price)}`,
+          };
+        });
+
+        markers.sort((a, b) => (a.time as number) - (b.time as number));
+        createSeriesMarkers(candleSeriesRef.current, markers);
+      }
     } finally {
       setTimeout(() => {
         isSyncingRef.current = false;
       }, 50);
     }
-  }, [candles, indicators, showEMA, showSMA, showBB, symbol, timeframe]);
+  }, [candles, indicators, showEMA, showSMA, showBB, symbol, timeframe, chartReady, tradeEvents, resolvedTheme]);
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex flex-col h-auto w-full shadow-sm" ref={containerRef}>

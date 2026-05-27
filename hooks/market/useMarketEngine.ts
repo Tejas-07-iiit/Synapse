@@ -1,7 +1,6 @@
 import { useEffect } from "react";
-import { useMarketStore } from "@/store/market/useMarketStore";
-import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
-import { marketEngine } from "@/services/market/market-engine";
+import { useMarketStore } from "@/src/stores/marketStore";
+import { marketEngine } from "@/src/market-engine/market-engine";
 
 /**
  * Reusable React hook connecting components to the Synapse Market Engine.
@@ -9,7 +8,7 @@ import { marketEngine } from "@/services/market/market-engine";
  * Optimized to only subscribe to symbol and timeframe, preventing excessive re-renders of the calling component.
  */
 export function useMarketEngine() {
-  const selectedSymbol = useDashboardStore((state) => state.selectedSymbol);
+  const selectedSymbol = useMarketStore((state) => state.selectedSymbol);
   const timeframe = useMarketStore((state) => state.timeframe);
 
   useEffect(() => {
@@ -26,13 +25,14 @@ export function useMarketEngine() {
     startEngine();
   }, [selectedSymbol, timeframe]);
 
+  // Return from store state to ensure consistency across UI layers
   return {
     symbol: selectedSymbol,
     timeframe,
-    candles: useMarketStore.getState().candles,
-    indicators: useMarketStore.getState().indicators,
-    analytics: useMarketStore.getState().analytics,
-    loading: useMarketStore.getState().loading,
-    error: useMarketStore.getState().error,
+    candles: useMarketStore((state) => state.candles),
+    indicators: useMarketStore((state) => state.indicators),
+    analytics: useMarketStore((state) => state.analytics),
+    loading: useMarketStore((state) => state.loading),
+    error: useMarketStore((state) => state.error),
   };
 }

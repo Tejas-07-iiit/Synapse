@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useMarketStore } from "@/store/market/useMarketStore";
+import { useMarketStore } from "@/src/stores/marketStore";
 import { 
   TrendingUp, 
   TrendingDown, 

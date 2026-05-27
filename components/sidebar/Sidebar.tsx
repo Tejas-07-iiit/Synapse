@@ -28,22 +28,17 @@ export default function Sidebar() {
       icon: Brain,
     },
     {
-      href: "#market-overview",
-      label: "Market Overview",
+      href: "/trade-history",
+      label: "Trade History",
       icon: TrendingUp,
     },
     {
-      href: "#ai-signals",
-      label: "AI Trading Signals",
-      icon: Cpu,
-    },
-    {
-      href: "#portfolio",
+      href: "/portfolio",
       label: "Portfolio Asset",
       icon: Briefcase,
     },
     {
-      href: "#settings",
+      href: "/settings",
       label: "Terminal Settings",
       icon: Settings,
     },

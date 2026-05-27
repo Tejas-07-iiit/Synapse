@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useStrategyStore } from "@/store/strategy/useStrategyStore";
+import { useSignalStore } from "@/src/stores/signalStore";
 import { TrendingUp, TrendingDown, Clock, ShieldAlert, Zap } from "lucide-react";
 
 interface SignalPanelProps {
@@ -9,8 +9,8 @@ interface SignalPanelProps {
 }
 
 export default function SignalPanel({ className }: SignalPanelProps) {
-  const activeSignals = useStrategyStore((state) => state.activeSignals);
-  const clearSignals = useStrategyStore((state) => state.clearSignals);
+  const activeSignals = useSignalStore((state) => state.activeSignals);
+  const clearSignals = useSignalStore((state) => state.clearSignals);
 
   const formatTime = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -23,7 +23,9 @@ export default function SignalPanel({ className }: SignalPanelProps) {
 
   const getStrategyName = (strategyId: string) => {
     if (strategyId === "ema-crossover") return "EMA Crossover Strategy";
-    if (strategyId === "rsi-momentum") return "RSI Momentum Strategy";
+    if (strategyId === "rsi-reversal") return "RSI Reversal Strategy";
+    if (strategyId === "macd-momentum") return "MACD Momentum Strategy";
+    if (strategyId === "bollinger-breakout") return "Bollinger Breakout Strategy";
     return strategyId.toUpperCase();
   };
 
@@ -60,8 +62,8 @@ export default function SignalPanel({ className }: SignalPanelProps) {
         ) : (
           activeSignals.map((sig, idx) => {
             const cleanSymbol = sig.symbol.replace("USDT", "");
-            const isLong = sig.direction === "LONG";
-            const isShort = sig.direction === "SHORT";
+            const isLong = sig.signal === "LONG";
+            const isShort = sig.signal === "SHORT";
 
             return (
               <div
@@ -95,25 +97,22 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                         SHORT
                       </span>
                     )}
-                    {sig.direction === "HOLD" && (
+                    {sig.signal === "HOLD" && (
                       <span className="bg-muted text-muted-foreground text-[10px] font-extrabold px-2 py-0.5 rounded border border-border">
                         HOLD
                       </span>
                     )}
-                    <span className="text-[10px] font-bold text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
-                      {sig.confidence}%
-                    </span>
                   </div>
                 </div>
 
                 {/* Reasoning text */}
                 <div className="text-[11px] text-muted-foreground leading-relaxed pl-1 border-l-2 border-primary/15">
-                  {sig.reasoning}
+                  {sig.reasoning.join(" ")}
                 </div>
 
                 {/* Footer time */}
                 <div className="flex items-center justify-between text-[9px] text-muted-foreground/60 pt-1 border-t border-border/40">
-                  <span>Price: ${sig.indicators.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>Price: ${sig.entry.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   <div className="flex items-center gap-1">
                     <Clock size={10} />
                     <span>{formatTime(sig.timestamp)}</span>

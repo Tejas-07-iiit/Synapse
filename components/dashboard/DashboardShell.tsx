@@ -1,29 +1,22 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
 import { useMarketEngine } from "@/hooks/market/useMarketEngine";
 import { fetch24hTickers } from "@/services/market/ticker";
-import { marketWsService } from "@/services/websocket/websocket-service";
+import { marketWsService } from "@/src/market-engine/websocket";
 import Sidebar from "@/components/sidebar/Sidebar";
 import Navbar from "@/components/navbar/Navbar";
 import MarketCards from "@/components/dashboard/MarketCards";
 import TradingViewChart from "@/components/charts/TradingViewChart";
-import PortfolioWidget from "@/components/dashboard/PortfolioWidget";
 import MarketTable from "@/components/market/MarketTable";
-import AISignals from "@/components/dashboard/AISignals";
-import MarketPulse from "@/components/dashboard/MarketPulse";
 import MarketAnalytics from "@/components/analytics/MarketAnalytics";
 import SignalPanel from "@/components/signals/SignalPanel";
-import { marketCache } from "@/services/market/cache";
-import { fetchHistoricalCandles } from "@/services/market/candles";
-import { calculateAllIndicators } from "@/services/indicators";
-import { calculateMarketAnalytics } from "@/services/analytics/analytics-engine";
-import { useMarketStore } from "@/store/market/useMarketStore";
+import { useMarketStore } from "@/src/stores/marketStore";
+import { TickerInfo } from "@/src/strategy-engine/types";
 
 export default function DashboardShell() {
-  const setSupportedSymbols = useDashboardStore((state) => state.setSupportedSymbols);
-  const supportedSymbols = useDashboardStore((state) => state.supportedSymbols);
+  const setSupportedSymbols = useMarketStore((state) => state.setSupportedSymbols);
+  const supportedSymbols = useMarketStore((state) => state.supportedSymbols);
 
   // Initialize the Market Engine Hook (manages active symbol/timeframe calculations)
   useMarketEngine();
@@ -47,32 +40,15 @@ export default function DashboardShell() {
       try {
         console.log("[Dashboard] Fetching initial ticker data from Binance REST API...");
         const initialTickers = await fetch24hTickers(supportedSymbols);
-        const store = useDashboardStore.getState();
+        const store = useMarketStore.getState();
         
         for (const [sym, ticker] of Object.entries(initialTickers)) {
-          store.updateTicker(sym, ticker);
+          store.updateTicker(sym, ticker as unknown as TickerInfo);
         }
       } catch (err) {
         console.error("[Dashboard] Failed to load initial REST tickers:", err);
       }
 
-      // Pre-load candles, indicators and analytics for all watchlist coins in the background
-      for (const sym of supportedSymbols) {
-        try {
-          const timeframe = useMarketStore.getState().timeframe || "15m";
-          let candles = marketCache.get(sym, timeframe);
-          if (!candles) {
-            candles = await fetchHistoricalCandles(sym, timeframe, 200);
-            marketCache.set(sym, timeframe, candles);
-          }
-          const indicators = calculateAllIndicators(candles);
-          const analytics = calculateMarketAnalytics(sym, candles, indicators);
-          useMarketStore.getState().setIndicatorsForSymbol(sym, indicators);
-          useMarketStore.getState().setAnalyticsForSymbol(sym, analytics);
-        } catch (err) {
-          console.error(`[Dashboard] Failed loading indicators for background symbol ${sym}:`, err);
-        }
-      }
     };
 
     loadInitialStats();
@@ -114,21 +90,14 @@ export default function DashboardShell() {
             <MarketAnalytics />
           </div>
 
-          {/* Bottom Widgets Grid (3-Column Layout, matching height alignment) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-5">
-            {/* Column 1: Market Watchlist + Portfolio Status */}
-            <div className="space-y-6 flex flex-col justify-between">
+          {/* Bottom Widgets Grid (2-Column Layout) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-5">
+            {/* Column 1: Market Watchlist */}
+            <div className="flex flex-col">
               <MarketTable />
-              <PortfolioWidget />
             </div>
 
-            {/* Column 2: AI Analytics + Real-time order book pulse */}
-            <div className="space-y-6 flex flex-col justify-between">
-              <AISignals />
-              <MarketPulse />
-            </div>
-
-            {/* Column 3: Full Height Strategy Signal Log */}
+            {/* Column 2: Full Height Strategy Signal Log */}
             <div className="flex flex-col">
               <SignalPanel className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-[724px] shadow-sm hover:shadow-md transition-all" />
             </div>

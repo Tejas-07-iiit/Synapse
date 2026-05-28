@@ -29,7 +29,7 @@ export class SignalPriorityEngine {
       if (!seen.has(key)) {
         seen.add(key);
         uniqueSetups.push(setup);
-      }
+      } 
     }
 
     return uniqueSetups;

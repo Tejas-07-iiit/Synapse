@@ -64,6 +64,9 @@ class MarketEngine {
       selectedSymbol: sym,
       symbol: sym, // Alias for backward compatibility
       timeframe: tf,
+      candles: [], // Clear old candles to prevent UI showing wrong price on switch
+      indicators: null,
+      analytics: null,
     });
 
     const isSymbolChangeOnly = this.activeTimeframe === tf && this.activeSymbol !== sym && this.initializedTimeframe === tf;
@@ -291,7 +294,7 @@ class MarketEngine {
       // 2. Generate standard market analytics metadata using the helper
       // This bridges the gap between old indicators layout and the new unified engine
       const legacyIndicators = this.mapIndicatorsToLegacy(currentIndicators);
-      const legacyCandles = candles.map((c) => ({
+      const legacyCandles = candles.map((c) => ({ 
         time: c.time,
         open: c.open,
         high: c.high,

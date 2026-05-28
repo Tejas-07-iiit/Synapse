@@ -3,7 +3,6 @@
 import React, { useEffect } from "react";
 import { useMarketEngine } from "@/hooks/market/useMarketEngine";
 import { fetch24hTickers } from "@/services/market/ticker";
-import { marketWsService } from "@/src/market-engine/websocket";
 import Sidebar from "@/components/sidebar/Sidebar";
 import Navbar from "@/components/navbar/Navbar";
 import MarketCards from "@/components/dashboard/MarketCards";

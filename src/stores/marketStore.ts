@@ -79,8 +79,19 @@ export const useMarketStore = create<MarketState>((set) => ({
   wsStatus: "DISCONNECTED",
   wsError: null,
 
-  setSymbol: (symbol) => set({ selectedSymbol: symbol.toUpperCase(), symbol: symbol.toUpperCase() }),
-  setTimeframe: (timeframe) => set({ timeframe }),
+  setSymbol: (symbol) => set({ 
+    selectedSymbol: symbol.toUpperCase(), 
+    symbol: symbol.toUpperCase(),
+    candles: [], // Clear active candles to prevent stale data leak
+    indicators: null,
+    analytics: null
+  }),
+  setTimeframe: (timeframe) => set({ 
+    timeframe,
+    candles: [], // Clear active candles to prevent stale data leak
+    indicators: null,
+    analytics: null
+  }),
   setSupportedSymbols: (symbols) =>
     set((state) => ({
       supportedSymbols: symbols.map((s) => s.toUpperCase()),
@@ -93,36 +104,43 @@ export const useMarketStore = create<MarketState>((set) => ({
   setIndicators: (indicators) => set({ indicators }),
   setAnalytics: (analytics) => set({ analytics }),
   setIndicatorsForSymbol: (symbol, indicators) =>
-    set((state) => ({
-      allIndicators: {
-        ...state.allIndicators,
-        [symbol]: indicators,
-      },
-    })),
+    set((state) => {
+      const sym = symbol.toUpperCase();
+      const isCurrentlyActive = sym === state.selectedSymbol;
+      return {
+        allIndicators: {
+          ...state.allIndicators,
+          [sym]: indicators,
+        },
+        ...(isCurrentlyActive ? { indicators } : {})
+      };
+    }),
   setAnalyticsForSymbol: (symbol, analytics) =>
-    set((state) => ({
-      allAnalytics: {
-        ...state.allAnalytics,
-        [symbol]: analytics,
-      },
-    })),
+    set((state) => {
+      const sym = symbol.toUpperCase();
+      const isCurrentlyActive = sym === state.selectedSymbol;
+      return {
+        allAnalytics: {
+          ...state.allAnalytics,
+          [sym]: analytics,
+        },
+        ...(isCurrentlyActive ? { analytics } : {})
+      };
+    }),
   setCandlesForSymbol: (symbol, timeframe, candles) =>
     set((state) => {
       const sym = symbol.toUpperCase();
       const tf = timeframe.toLowerCase();
       const cacheKey = `${sym}_${tf}`;
-      const updatedAllCandles = {
-        ...state.allCandles,
-        [cacheKey]: [...candles],
-      };
       
       const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
-      if (isCurrentlyActive) {
-        updatedAllCandles[sym] = [...candles];
-      }
 
       return {
-        allCandles: updatedAllCandles,
+        allCandles: {
+          ...state.allCandles,
+          [cacheKey]: [...candles],
+        },
+        ...(isCurrentlyActive ? { candles: [...candles] } : {})
       };
     }),
   updateLastCandleForSymbol: (symbol, timeframe, candle, _isClosed) =>
@@ -131,17 +149,16 @@ export const useMarketStore = create<MarketState>((set) => ({
       const tf = timeframe.toLowerCase();
       const cacheKey = `${sym}_${tf}`;
       const currentCandles = state.allCandles[cacheKey] ? [...state.allCandles[cacheKey]] : [];
+      
       if (currentCandles.length === 0) {
         const updatedAllCandles = {
           ...state.allCandles,
           [cacheKey]: [candle],
         };
         const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
-        if (isCurrentlyActive) {
-          updatedAllCandles[sym] = [candle];
-        }
         return {
           allCandles: updatedAllCandles,
+          ...(isCurrentlyActive ? { candles: [candle] } : {})
         };
       }
 
@@ -155,18 +172,13 @@ export const useMarketStore = create<MarketState>((set) => ({
         }
       }
 
-      const updatedAllCandles = {
-        ...state.allCandles,
-        [cacheKey]: currentCandles,
-      };
-
       const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
-      if (isCurrentlyActive) {
-        updatedAllCandles[sym] = currentCandles;
-      }
-
       return {
-        allCandles: updatedAllCandles,
+        allCandles: {
+          ...state.allCandles,
+          [cacheKey]: currentCandles,
+        },
+        ...(isCurrentlyActive ? { candles: currentCandles } : {})
       };
     }),
   updateTicker: (symbol, ticker) =>

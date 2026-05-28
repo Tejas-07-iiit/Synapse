@@ -100,12 +100,24 @@ export default function AISignals() {
                 </span>
               )}
               <span className="text-sm font-bold text-foreground">{cleanName}</span>
+              {latestSignal && (
+                <span className="text-[9px] bg-secondary border border-border px-1.5 py-0.5 rounded text-muted-foreground uppercase font-black tracking-tight">
+                  {latestSignal.strategyName}
+                </span>
+              )}
             </div>
             
             {signalType !== "HOLD" && (
-              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
-                <Award size={14} className="text-primary" />
-                <span>Confidence: <b className="text-primary font-bold">{confidence}%</b></span>
+              <div className="flex items-center gap-2">
+                {latestSignal?.marketContext?.regimeCategory && (
+                  <div className="flex items-center gap-1 text-muted-foreground text-xs font-semibold bg-indigo-500/5 px-2 py-1 rounded-md border border-indigo-500/10">
+                    <span>Regime: <b className="text-indigo-400 font-bold uppercase">{latestSignal.marketContext.regimeCategory}</b></span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
+                  <Award size={14} className="text-primary" />
+                  <span>Confidence: <b className="text-primary font-bold">{confidence}%</b></span>
+                </div>
               </div>
             )}
           </div>

@@ -96,14 +96,14 @@ export const useMarketStore = create<MarketState>((set) => ({
     set((state) => ({
       allIndicators: {
         ...state.allIndicators,
-        [symbol.toUpperCase()]: indicators,
+        [symbol]: indicators,
       },
     })),
   setAnalyticsForSymbol: (symbol, analytics) =>
     set((state) => ({
       allAnalytics: {
         ...state.allAnalytics,
-        [symbol.toUpperCase()]: analytics,
+        [symbol]: analytics,
       },
     })),
   setCandlesForSymbol: (symbol, timeframe, candles) =>

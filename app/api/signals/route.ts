@@ -71,7 +71,10 @@ export async function POST(request: Request) {
             stopLoss: sig.stopLoss,
             takeProfit: sig.takeProfit,
             reasoning: sig.reasoning,
-            indicators: sig.indicators || {},
+            indicators: {
+              ...(sig.indicators || {}),
+              marketContext: sig.marketContext || {},
+            },
             timestamp: new Date(sig.timestamp),
           },
         });
@@ -84,7 +87,10 @@ export async function POST(request: Request) {
             direction: sig.signal,
             confidence: sig.confidence,
             reasoning: sig.reasoning,
-            indicators: sig.indicators,
+            indicators: {
+              ...(sig.indicators || {}),
+              marketContext: sig.marketContext || {},
+            },
             timestamp: new Date(sig.timestamp),
           },
         });

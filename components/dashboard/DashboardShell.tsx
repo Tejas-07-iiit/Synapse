@@ -46,7 +46,7 @@ export default function DashboardShell() {
     setSupportedSymbols(coinsList);
   }, [setSupportedSymbols]);
 
-  // 2. Fetch initial statistics and manage global watchlist WebSocket ticker streams
+  // 2. Fetch initial statistics
   useEffect(() => {
     if (supportedSymbols.length === 0) return;
 
@@ -63,21 +63,9 @@ export default function DashboardShell() {
       } catch (err) {
         console.error("[Dashboard] Failed to load initial REST tickers:", err);
       }
-
     };
 
     loadInitialStats();
-
-    // Connect to WebSocket and subscribe to ticker streams for all supported symbols (for watchlist/table views)
-    marketWsService.connect();
-    const tickerStreams = supportedSymbols.map((sym) => `${sym.toLowerCase()}@ticker`);
-    marketWsService.subscribe(tickerStreams);
-
-    // Cleanup connection and subscription on unmount
-    return () => {
-      console.log("[Dashboard] Cleaning up global ticker streams...");
-      marketWsService.unsubscribe(tickerStreams);
-    };
   }, [supportedSymbols]);
 
   return (

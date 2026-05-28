@@ -26,6 +26,17 @@ export default function SignalPanel({ className }: SignalPanelProps) {
     if (strategyId === "rsi-reversal") return "RSI Reversal Strategy";
     if (strategyId === "macd-momentum") return "MACD Momentum Strategy";
     if (strategyId === "bollinger-breakout") return "Bollinger Breakout Strategy";
+    if (strategyId === "mean-reversion") return "Mean Reversion Strategy";
+    if (strategyId === "momentum") return "Momentum Strategy";
+    if (strategyId === "defensive") return "Defensive Strategy";
+    if (strategyId === "grid") return "Grid Strategy";
+    if (strategyId === "lorentzian") return "Lorentzian Classification";
+    if (strategyId === "donchian-breakout") return "Donchian Breakout Strategy";
+    if (strategyId === "rally-base-drop") return "Rally Base Drop Strategy";
+    if (strategyId === "sr-sweep") return "SR Sweep Strategy";
+    if (strategyId === "bollinger-reversion") return "Bollinger Reversion Strategy";
+    if (strategyId === "short-term-reversal") return "Short Term Reversal Strategy";
+    if (strategyId === "dow-mfi-rsi") return "Dow Factor MFI RSI Strategy";
     return strategyId.toUpperCase();
   };
 
@@ -109,6 +120,106 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                       </span>
                     )}
                   </div>
+                </div>
+
+                 {/* Advanced Market Context Metrics */}
+                <div className="flex flex-wrap gap-1.5 py-1">
+                  {/* Confidence Score */}
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                    sig.confidence >= 75
+                      ? "bg-green-500/10 text-green-400 border-green-500/25"
+                      : sig.confidence >= 50
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/25"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}>
+                    {sig.confidence}% Confidence
+                  </span>
+
+                  {/* Market Regime Category */}
+                  {sig.marketContext?.regimeCategory && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                      sig.marketContext.regimeCategory === "TRENDING"
+                        ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/25"
+                        : sig.marketContext.regimeCategory === "BREAKOUT"
+                        ? "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                        : sig.marketContext.regimeCategory === "LIQUIDITY_SWEEP"
+                        ? "bg-purple-500/10 text-purple-400 border-purple-500/25"
+                        : sig.marketContext.regimeCategory === "ACCUMULATION"
+                        ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/25"
+                        : sig.marketContext.regimeCategory === "DISTRIBUTION"
+                        ? "bg-orange-500/10 text-orange-400 border-orange-500/25"
+                        : "bg-amber-500/10 text-amber-400 border-amber-500/25" // RANGING
+                    }`}>
+                      {sig.marketContext.regimeCategory} ({sig.marketContext.regime})
+                    </span>
+                  )}
+
+                  {/* Lorentzian Probability / Similarity */}
+                  {sig.strategyId === "lorentzian" && sig.marketContext?.probability !== undefined && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/25 rounded animate-pulse">
+                      Prob: {sig.marketContext.probability.toFixed(1)}%
+                    </span>
+                  )}
+
+                  {/* Bollinger Breakout Strength */}
+                  {sig.strategyId === "bollinger-breakout" && sig.marketContext?.breakoutStrength && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-pink-500/10 text-pink-400 border border-pink-500/25 rounded">
+                      Breakout: {(sig.marketContext.breakoutStrength.bodyRatio * 100).toFixed(0)}% (Vol {(sig.marketContext.breakoutStrength.volumeRatio).toFixed(1)}x)
+                    </span>
+                  )}
+
+                  {/* Donchian Breakout Strength */}
+                  {sig.strategyId === "donchian-breakout" && sig.marketContext?.breakoutStrength && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-pink-500/10 text-pink-400 border border-pink-500/25 rounded">
+                      Donchian Breakout: {(sig.marketContext.breakoutStrength.bodyRatio * 100).toFixed(0)}% (Vol {(sig.marketContext.breakoutStrength.volumeRatio).toFixed(1)}x)
+                    </span>
+                  )}
+
+                  {/* Rally Base Drop Zone */}
+                  {sig.strategyId === "rally-base-drop" && sig.marketContext?.zoneData && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 border rounded ${
+                      sig.marketContext.zoneData.type === "SUPPLY"
+                        ? "bg-red-500/10 text-red-400 border-red-500/25"
+                        : "bg-green-500/10 text-green-400 border-green-500/25"
+                    }`}>
+                      Zone: {sig.marketContext.zoneData.type} (${sig.marketContext.zoneData.low.toFixed(1)}-${sig.marketContext.zoneData.high.toFixed(1)})
+                    </span>
+                  )}
+
+                  {/* SR Sweep Metadata */}
+                  {sig.strategyId === "sr-sweep" && sig.marketContext?.sweepMetadata && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded">
+                      Sweep: ${sig.marketContext.sweepMetadata.sweepPrice.toFixed(1)} (RSI {sig.marketContext.sweepMetadata.rsi.toFixed(1)})
+                    </span>
+                  )}
+
+                  {/* Grid Range Width / Midpoint Proximity */}
+                  {sig.strategyId === "grid" && sig.marketContext?.volatilityState?.currentWidth !== undefined && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-500/10 text-purple-400 border border-purple-500/25 rounded">
+                      Range Width: {(sig.marketContext.volatilityState.currentWidth * 100).toFixed(2)}%
+                    </span>
+                  )}
+
+                  {/* Bollinger Reversion */}
+                  {sig.strategyId === "bollinger-reversion" && sig.marketContext?.volatilityState?.currentWidth !== undefined && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 rounded">
+                      BB Reversion: {(sig.marketContext.volatilityState.currentWidth * 100).toFixed(2)}% Width
+                    </span>
+                  )}
+
+                  {/* Short Term Reversal */}
+                  {sig.strategyId === "short-term-reversal" && sig.marketContext?.momentum !== undefined && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded">
+                      Mom12: {Number(sig.marketContext.momentum).toFixed(2)}
+                    </span>
+                  )}
+
+                  {/* Dow Factor MFI RSI */}
+                  {sig.strategyId === "dow-mfi-rsi" && sig.marketContext?.dowStructure && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/25 rounded">
+                      Dow: {sig.marketContext.dowStructure} (MFI {Number(sig.marketContext.mfi || 50).toFixed(0)})
+                    </span>
+                  )}
                 </div>
 
                 {/* Reasoning text */}

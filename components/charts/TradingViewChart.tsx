@@ -45,6 +45,149 @@ interface TradeOverlay {
   width: number;
 }
 
+interface ZoneOverlay {
+  id: string;
+  type: "SUPPLY" | "DEMAND";
+  top: number;
+  height: number;
+  startX: number;
+  width: number;
+  freshness: boolean;
+  priceRange: string;
+}
+
+interface SweepOverlay {
+  id: string;
+  type: "HIGH_SWEEP" | "LOW_SWEEP";
+  price: number;
+  y: number;
+  startX: number;
+  width: number;
+  timeLabel: string;
+}
+
+const ZoneOverlayView = ({ overlay }: { overlay: ZoneOverlay }) => {
+  const { type, top, height, startX, width, freshness, priceRange } = overlay;
+  const isSupply = type === "SUPPLY";
+  const color = isSupply ? "239, 68, 68" : "34, 197, 94"; // RGB
+
+  return (
+    <div
+      className="absolute border-t border-b border-l pointer-events-none z-10 transition-opacity duration-300"
+      style={{
+        top: `${top}px`,
+        left: `${startX}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        backgroundColor: freshness ? `rgba(${color}, 0.05)` : `rgba(${color}, 0.015)`,
+        borderColor: freshness ? `rgba(${color}, 0.25)` : `rgba(${color}, 0.08)`,
+        borderStyle: freshness ? "solid" : "dashed",
+      }}
+    >
+      <div 
+        className={`absolute top-1 left-2 text-[8px] font-black px-1.5 py-0.5 rounded leading-none select-none ${
+          isSupply 
+            ? "bg-red-950/95 text-red-400 border border-red-500/20" 
+            : "bg-green-950/95 text-green-400 border border-green-500/20"
+        }`}
+        style={{ opacity: freshness ? 0.75 : 0.4 }}
+      >
+        {type} {freshness ? "FRESH" : "MITIGATED"} ({priceRange})
+      </div>
+    </div>
+  );
+};
+
+const SweepOverlayView = ({ overlay }: { overlay: SweepOverlay }) => {
+  const { type, price, y, startX, width, timeLabel } = overlay;
+  const isHigh = type === "HIGH_SWEEP";
+  const sweepColor = isHigh ? "#ec4899" : "#10b981"; // Pink vs Emerald
+
+  return (
+    <div
+      className="absolute pointer-events-none z-10 flex items-center"
+      style={{
+        top: `${y}px`,
+        left: `${startX}px`,
+        width: `${width}px`,
+        borderTop: `1.5px dotted ${sweepColor}`,
+      }}
+    >
+      <div
+        className="bg-black/90 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase flex items-center gap-1 shadow-md -translate-y-1/2 select-none"
+        style={{ borderColor: `${sweepColor}40`, color: sweepColor }}
+      >
+        <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: sweepColor }}></span>
+        SWEEP {isHigh ? "HIGH" : "LOW"} @ ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({timeLabel})
+      </div>
+    </div>
+  );
+}
+
+interface SwingOverlay {
+  id: string;
+  type: "HIGH" | "LOW";
+  price: number;
+  x: number;
+  y: number;
+}
+
+interface ExhaustionOverlay {
+  id: string;
+  type: "LONG" | "SHORT";
+  price: number;
+  x: number;
+  y: number;
+  strategy: string;
+}
+
+const SwingOverlayView = ({ overlay }: { overlay: SwingOverlay }) => {
+  const { type, price, x, y } = overlay;
+  const isHigh = type === "HIGH";
+  const color = isHigh ? "text-amber-400" : "text-cyan-400";
+  const bg = isHigh ? "bg-amber-950/90 border-amber-500/20" : "bg-cyan-950/90 border-cyan-500/20";
+
+  return (
+    <div
+      className="absolute pointer-events-none z-10 select-none -translate-x-1/2 -translate-y-1/2"
+      style={{
+        left: `${x}px`,
+        top: `${y}px`,
+      }}
+    >
+      <div className={`px-1.5 py-0.5 rounded border text-[9px] font-black uppercase shadow-md flex flex-col items-center ${bg} ${color}`}>
+        <span>{isHigh ? "SH" : "SL"}</span>
+        <span className="text-[7px] text-muted-foreground/80">${price.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+      </div>
+    </div>
+  );
+};
+
+const ExhaustionOverlayView = ({ overlay }: { overlay: ExhaustionOverlay }) => {
+  const { type, strategy, x, y } = overlay;
+  const isLong = type === "LONG";
+  const color = isLong ? "bg-emerald-500 shadow-emerald-500/50" : "bg-rose-500 shadow-rose-500/50";
+  const textColor = isLong ? "text-emerald-400" : "text-rose-400";
+  const border = isLong ? "border-emerald-500/30" : "border-rose-500/30";
+
+  return (
+    <div
+      className="absolute pointer-events-none z-20 flex flex-col items-center -translate-x-1/2 -translate-y-1/2 select-none"
+      style={{
+        left: `${x}px`,
+        top: `${y}px`,
+      }}
+    >
+      <div className={`w-3.5 h-3.5 rounded-full border-2 border-white/10 ${color} shadow-lg animate-pulse flex items-center justify-center`}>
+        <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+      </div>
+      <div className={`mt-1 bg-black/95 text-[7px] font-extrabold px-1 py-0.5 rounded border leading-none uppercase ${textColor} ${border} shadow-md`}>
+        {strategy}
+      </div>
+    </div>
+  );
+};
+
 interface ActivePosition {
   id: string;
   userId: string;
@@ -302,6 +445,15 @@ export default function TradingViewChart() {
   const [showEMA, setShowEMA] = useState(false);
   const [showSMA, setShowSMA] = useState(false);
   const [showBB, setShowBB] = useState(false);
+  const [showDonchian, setShowDonchian] = useState(false);
+  const [showZones, setShowZones] = useState(false);
+  const [showSweeps, setShowSweeps] = useState(false);
+  const [showSwings, setShowSwings] = useState(false);
+  const [showExhaustion, setShowExhaustion] = useState(false);
+  const [zoneOverlays, setZoneOverlays] = useState<ZoneOverlay[]>([]);
+  const [sweepOverlays, setSweepOverlays] = useState<SweepOverlay[]>([]);
+  const [swingOverlays, setSwingOverlays] = useState<SwingOverlay[]>([]);
+  const [exhaustionOverlays, setExhaustionOverlays] = useState<ExhaustionOverlay[]>([]);
 
   // Trade Events state for executions markers
   interface TradeEvent {
@@ -340,6 +492,10 @@ export default function TradingViewChart() {
   const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   
+  const donchianUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const donchianMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const donchianLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const volumeMASeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
@@ -358,6 +514,11 @@ export default function TradingViewChart() {
   const prevShowEMARef = useRef<boolean>(false);
   const prevShowSMARef = useRef<boolean>(false);
   const prevShowBBRef = useRef<boolean>(false);
+  const prevShowDonchianRef = useRef<boolean>(false);
+  const prevShowZonesRef = useRef<boolean>(false);
+  const prevShowSweepsRef = useRef<boolean>(false);
+  const prevShowSwingsRef = useRef<boolean>(false);
+  const prevShowExhaustionRef = useRef<boolean>(false);
   const isSyncingRef = useRef<boolean>(false);
   const prevIndicatorsRef = useRef<IndicatorValues | null>(null);
   const prevThemeRef = useRef<string | undefined>(resolvedTheme);
@@ -664,7 +825,191 @@ export default function TradingViewChart() {
     });
 
     setOverlays(newOverlays);
-  }, [chartReady, symbol, activePositions, closedTrades, candles, clientWidth, timeScaleTrigger, livePrice, tickerData]);
+
+    // 3. Supply/Demand Zones
+    // 3. Supply/Demand Zones
+    const newZoneOverlays: ZoneOverlay[] = [];
+    if (showZones && indicators?.structure?.zones) {
+      indicators.structure.zones.forEach((zone) => {
+        const zoneHighY = candleSeriesRef.current!.priceToCoordinate(zone.high);
+        const zoneLowY = candleSeriesRef.current!.priceToCoordinate(zone.low);
+        if (zoneHighY === null || zoneLowY === null) return;
+
+        const createdAtSeconds = Math.floor(zone.createdAtTime / 1000);
+        const startXVal = chart1Ref.current!.timeScale().timeToCoordinate(createdAtSeconds as UTCTimestamp);
+        let startX = startXVal !== null ? (startXVal as unknown as number) : 0;
+        if (startX < 0) startX = 0;
+        if (startX > chartWidth) startX = chartWidth;
+
+        const width = chartWidth - startX;
+        if (width <= 0) return;
+
+        newZoneOverlays.push({
+          id: zone.id,
+          type: zone.type,
+          top: Math.min(zoneHighY, zoneLowY),
+          height: Math.max(2, Math.abs(zoneHighY - zoneLowY)),
+          startX,
+          width,
+          freshness: zone.freshness,
+          priceRange: `${zone.low.toFixed(2)} - ${zone.high.toFixed(2)}`,
+        });
+      });
+    }
+    setZoneOverlays(newZoneOverlays);
+
+    // 4. Liquidity Sweeps
+    const newSweepOverlays: SweepOverlay[] = [];
+    if (showSweeps && indicators?.structure?.sweeps) {
+      indicators.structure.sweeps.forEach((sweep, idx) => {
+        if (!sweep.highSwept && !sweep.lowSwept) return;
+
+        const isHigh = sweep.highSwept;
+        const price = isHigh ? sweep.highSweptPrice : sweep.lowSweptPrice;
+        const y = candleSeriesRef.current!.priceToCoordinate(price);
+        if (y === null) return;
+
+        const timeSeconds = Math.floor(sweep.time / 1000);
+        const startXVal = chart1Ref.current!.timeScale().timeToCoordinate(timeSeconds as UTCTimestamp);
+        if (startXVal === null) return;
+
+        let startX = startXVal as unknown as number;
+        if (startX < 0) startX = 0;
+        if (startX > chartWidth) startX = chartWidth;
+
+        const width = chartWidth - startX;
+        if (width <= 0) return;
+
+        newSweepOverlays.push({
+          id: `sweep-${idx}-${isHigh ? "high" : "low"}-${sweep.time}`,
+          type: isHigh ? "HIGH_SWEEP" : "LOW_SWEEP",
+          price,
+          y,
+          startX,
+          width,
+          timeLabel: new Date(sweep.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+        });
+      });
+    }
+    setSweepOverlays(newSweepOverlays);
+
+    // 5. Swing points
+    const newSwingOverlays: SwingOverlay[] = [];
+    if (showSwings && indicators?.structure?.swings) {
+      indicators.structure.swings.forEach((swing, idx) => {
+        const y = candleSeriesRef.current!.priceToCoordinate(swing.price);
+        if (y === null) return;
+
+        const timeSeconds = Math.floor(swing.timestamp / 1000);
+        const xVal = chart1Ref.current!.timeScale().timeToCoordinate(timeSeconds as UTCTimestamp);
+        if (xVal === null) return;
+
+        const x = xVal as unknown as number;
+        if (x < 0 || x > chartWidth) return;
+
+        newSwingOverlays.push({
+          id: `swing-${idx}-${swing.type}-${swing.timestamp}`,
+          type: swing.type,
+          price: swing.price,
+          x,
+          y,
+        });
+      });
+    }
+    setSwingOverlays(newSwingOverlays);
+
+    // 6. Exhaustion Reversions
+    const newExhaustionOverlays: ExhaustionOverlay[] = [];
+    if (showExhaustion && indicators) {
+      const len = candles.length;
+      for (let i = 20; i < len; i++) {
+        const c = candles[i];
+        
+        const bbUpper = indicators.bbUpper?.[i];
+        const bbLower = indicators.bbLower?.[i];
+        const bbMiddle = indicators.bbMiddle?.[i];
+        const rsi = indicators.rsi?.[i];
+        const adx = indicators.adx?.[i] ?? 20;
+        const atr = indicators.atr?.[i] ?? (c.close * 0.015);
+        const sma50 = indicators.sma50?.[i];
+        const momentum = indicators.momentum?.[i] ?? 0;
+        const prevMomentum = indicators.momentum?.[i - 1] ?? 0;
+
+        if (bbUpper === undefined || bbLower === undefined || bbMiddle === undefined || rsi === undefined || sma50 === undefined) {
+          continue;
+        }
+
+        const high = c.high;
+        const low = c.low;
+        const open = c.open;
+        const close = c.close;
+        const range = high - low || 1;
+        const upperWickRatio = (high - Math.max(open, close)) / range;
+        const lowerWickRatio = (Math.min(open, close) - low) / range;
+
+        const bbWidth = (bbUpper - bbLower) / bbMiddle;
+        const prevBbUpper = indicators.bbUpper?.[i - 1] ?? bbUpper;
+        const prevBbLower = indicators.bbLower?.[i - 1] ?? bbLower;
+        const prevBbMiddle = indicators.bbMiddle?.[i - 1] ?? bbMiddle;
+        const prevBbWidth = (prevBbUpper - prevBbLower) / prevBbMiddle;
+        const isVolatilityStabilizing = bbWidth < prevBbWidth * 1.15;
+
+        const isRanging = adx < 25;
+
+        // BB Reversion
+        const bbLong = isRanging && (close < bbLower || low < bbLower * 1.001) && rsi < 30 && ((lowerWickRatio > 0.35 && close > bbLower) || (close > open && lowerWickRatio > 0.25)) && isVolatilityStabilizing;
+        const bbShort = isRanging && (close > bbUpper || high > bbUpper * 0.999) && rsi > 70 && ((upperWickRatio > 0.35 && close < bbUpper) || (close < open && upperWickRatio > 0.25)) && isVolatilityStabilizing;
+
+        // ST Reversal
+        const strLong = rsi < 30 && momentum < -1.5 * atr && momentum > prevMomentum && low <= sma50 * 1.005 && close >= sma50 * 0.99;
+        const strShort = rsi > 70 && momentum > 1.5 * atr && momentum < prevMomentum && (close >= sma50 * 1.015 || close >= sma50 + 1.5 * atr);
+
+        let type: "LONG" | "SHORT" | null = null;
+        let strategy = "";
+        let price = c.close;
+
+        if (bbLong) {
+          type = "LONG";
+          strategy = "BB Reversion";
+          price = c.low - 0.2 * atr;
+        } else if (strLong) {
+          type = "LONG";
+          strategy = "ST Reversal";
+          price = c.low - 0.2 * atr;
+        } else if (bbShort) {
+          type = "SHORT";
+          strategy = "BB Reversion";
+          price = c.high + 0.2 * atr;
+        } else if (strShort) {
+          type = "SHORT";
+          strategy = "ST Reversal";
+          price = c.high + 0.2 * atr;
+        }
+
+        if (type) {
+          const y = candleSeriesRef.current!.priceToCoordinate(price);
+          if (y === null) continue;
+
+          const timeSeconds = Math.floor(c.time / 1000);
+          const xVal = chart1Ref.current!.timeScale().timeToCoordinate(timeSeconds as UTCTimestamp);
+          if (xVal === null) continue;
+
+          const x = xVal as unknown as number;
+          if (x < 0 || x > chartWidth) continue;
+
+          newExhaustionOverlays.push({
+            id: `exh-${i}-${type}-${c.time}`,
+            type,
+            price,
+            x,
+            y,
+            strategy,
+          });
+        }
+      }
+    }
+    setExhaustionOverlays(newExhaustionOverlays);
+  }, [chartReady, symbol, activePositions, closedTrades, candles, clientWidth, timeScaleTrigger, livePrice, tickerData, showZones, showSweeps, showSwings, showExhaustion, indicators]);
 
   useEffect(() => {
     updateOverlays();
@@ -773,6 +1118,28 @@ export default function TradingViewChart() {
       title: "BB Lower",
     });
     bbLowerSeriesRef.current = bbLowerSeries;
+
+    const donchianUpperSeries = chart1.addSeries(LineSeries, {
+      color: "rgba(244, 63, 94, 0.6)",
+      lineWidth: 1,
+      title: "Donchian Upper",
+    });
+    donchianUpperSeriesRef.current = donchianUpperSeries;
+
+    const donchianMiddleSeries = chart1.addSeries(LineSeries, {
+      color: "rgba(244, 63, 94, 0.3)",
+      lineWidth: 1,
+      lineStyle: 2,
+      title: "Donchian Middle",
+    });
+    donchianMiddleSeriesRef.current = donchianMiddleSeries;
+
+    const donchianLowerSeries = chart1.addSeries(LineSeries, {
+      color: "rgba(244, 63, 94, 0.6)",
+      lineWidth: 1,
+      title: "Donchian Lower",
+    });
+    donchianLowerSeriesRef.current = donchianLowerSeries;
 
     // Add Volume series on the main chart (using separate y-axis overlays)
     const volumeSeries = chart1.addSeries(HistogramSeries, {
@@ -1066,7 +1433,12 @@ export default function TradingViewChart() {
     const isVisibilityToggled = 
       showEMA !== prevShowEMARef.current ||
       showSMA !== prevShowSMARef.current ||
-      showBB !== prevShowBBRef.current;
+      showBB !== prevShowBBRef.current ||
+      showDonchian !== prevShowDonchianRef.current ||
+      showZones !== prevShowZonesRef.current ||
+      showSweeps !== prevShowSweepsRef.current ||
+      showSwings !== prevShowSwingsRef.current ||
+      showExhaustion !== prevShowExhaustionRef.current;
 
     const isIndicatorsLoaded = !prevIndicatorsRef.current && !!indicators;
 
@@ -1086,6 +1458,11 @@ export default function TradingViewChart() {
     prevShowEMARef.current = showEMA;
     prevShowSMARef.current = showSMA;
     prevShowBBRef.current = showBB;
+    prevShowDonchianRef.current = showDonchian;
+    prevShowZonesRef.current = showZones;
+    prevShowSweepsRef.current = showSweeps;
+    prevShowSwingsRef.current = showSwings;
+    prevShowExhaustionRef.current = showExhaustion;
     prevIndicatorsRef.current = indicators;
 
     const createLineData = (arr: number[]): LineData[] => {
@@ -1196,6 +1573,19 @@ export default function TradingViewChart() {
           }
         }
 
+        // Plot Donchian channels
+        if (donchianUpperSeriesRef.current && donchianMiddleSeriesRef.current && donchianLowerSeriesRef.current) {
+          if (showDonchian && indicators.structure?.donchian) {
+            donchianUpperSeriesRef.current.setData(createLineData(indicators.structure.donchian.upper));
+            donchianMiddleSeriesRef.current.setData(createLineData(indicators.structure.donchian.middle));
+            donchianLowerSeriesRef.current.setData(createLineData(indicators.structure.donchian.lower));
+          } else {
+            donchianUpperSeriesRef.current.setData([]);
+            donchianMiddleSeriesRef.current.setData([]);
+            donchianLowerSeriesRef.current.setData([]);
+          }
+        }
+
         // Plot Volume MA
         if (volumeMASeriesRef.current && indicators.volumeMA) {
           volumeMASeriesRef.current.setData(createLineData(indicators.volumeMA));
@@ -1294,6 +1684,12 @@ export default function TradingViewChart() {
             updateLine(bbLowerSeriesRef, indicators.bbLower);
           }
 
+          if (showDonchian && indicators.structure?.donchian) {
+            updateLine(donchianUpperSeriesRef, indicators.structure.donchian.upper);
+            updateLine(donchianMiddleSeriesRef, indicators.structure.donchian.middle);
+            updateLine(donchianLowerSeriesRef, indicators.structure.donchian.lower);
+          }
+
           updateLine(volumeMASeriesRef, indicators.volumeMA);
           updateLine(rsiSeriesRef, indicators.rsi);
           updateLine(macdLineSeriesRef, indicators.macdLine);
@@ -1336,7 +1732,7 @@ export default function TradingViewChart() {
         isSyncingRef.current = false;
       }, 50);
     }
-  }, [candles, indicators, showEMA, showSMA, showBB, symbol, timeframe, chartReady, tradeEvents, resolvedTheme]);
+  }, [candles, indicators, showEMA, showSMA, showBB, showDonchian, showZones, showSweeps, showSwings, showExhaustion, symbol, timeframe, chartReady, tradeEvents, resolvedTheme]);
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex flex-col h-auto w-full shadow-sm" ref={containerRef}>
@@ -1386,6 +1782,41 @@ export default function TradingViewChart() {
             >
               {showBB ? <Eye size={12} /> : <EyeOff size={12} />}
               <span>Bollinger</span>
+            </button>
+            <button
+              onClick={() => setShowDonchian(!showDonchian)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${showDonchian ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+            >
+              {showDonchian ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span>Donchian</span>
+            </button>
+            <button
+              onClick={() => setShowZones(!showZones)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${showZones ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+            >
+              {showZones ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span>S/D Zones</span>
+            </button>
+            <button
+              onClick={() => setShowSweeps(!showSweeps)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${showSweeps ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+            >
+              {showSweeps ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span>Sweeps</span>
+            </button>
+            <button
+              onClick={() => setShowSwings(!showSwings)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${showSwings ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+            >
+              {showSwings ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span>Swings</span>
+            </button>
+            <button
+              onClick={() => setShowExhaustion(!showExhaustion)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${showExhaustion ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+            >
+              {showExhaustion ? <Eye size={12} /> : <EyeOff size={12} />}
+              <span>Exhaustion</span>
             </button>
           </div>
 
@@ -1445,6 +1876,26 @@ export default function TradingViewChart() {
           {/* Active / Closed Position Overlay Renderers */}
           {chartReady && overlays.map((overlay) => (
             <TradeOverlayView key={overlay.id} overlay={overlay} chartWidth={clientWidth - 90} />
+          ))}
+
+          {/* Supply/Demand Zone Overlay Renderers */}
+          {chartReady && showZones && zoneOverlays.map((zone) => (
+            <ZoneOverlayView key={zone.id} overlay={zone} />
+          ))}
+
+          {/* Liquidity Sweep Overlay Renderers */}
+          {chartReady && showSweeps && sweepOverlays.map((sweep) => (
+            <SweepOverlayView key={sweep.id} overlay={sweep} />
+          ))}
+
+          {/* Swing High/Low Text Overlays */}
+          {chartReady && showSwings && swingOverlays.map((swing) => (
+            <SwingOverlayView key={swing.id} overlay={swing} />
+          ))}
+
+          {/* Exhaustion Reversion Marker Overlays */}
+          {chartReady && showExhaustion && exhaustionOverlays.map((exh) => (
+            <ExhaustionOverlayView key={exh.id} overlay={exh} />
           ))}
         </div>
         

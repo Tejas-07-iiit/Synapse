@@ -4,6 +4,7 @@ import { strategyRegistry } from "./registry";
 import { StrategyRunner } from "./strategy-runner";
 import { SignalPriorityEngine } from "./signal-priority";
 import { RegimeEngine, MarketRegime } from "./regime-engine";
+import { StructureEngine } from "./structure-engine";
 
 // Custom type for engine run callback/store hooks
 export type EngineRunCallback = (
@@ -44,6 +45,12 @@ class StrategyEngine {
       adx: indicators.adx.slice(0, length),
       supportLevels: indicators.supportLevels.slice(0, length),
       resistanceLevels: indicators.resistanceLevels.slice(0, length),
+      donchianUpper: indicators.donchianUpper?.slice(0, length),
+      donchianLower: indicators.donchianLower?.slice(0, length),
+      donchianMiddle: indicators.donchianMiddle?.slice(0, length),
+      mfi: indicators.mfi?.slice(0, length),
+      momentum: indicators.momentum?.slice(0, length),
+      structure: indicators.structure,
     };
   }
 
@@ -57,8 +64,8 @@ class StrategyEngine {
     ticker: TickerInfo | null,
     isClosed: boolean,
     allTimeframesCachedIndicators?: Record<string, IndicatorValues>
-  ): Promise<StrategySignal[]> {
-    if (candles.length === 0) return [];
+  ): Promise<{ signals: StrategySignal[]; indicators: IndicatorValues }> {
+    if (candles.length === 0) return { signals: [], indicators: {} as IndicatorValues };
 
     const sym = symbol.toUpperCase();
     const tf = timeframe.toLowerCase();
@@ -77,6 +84,13 @@ class StrategyEngine {
       strategyIndicators = this.sliceIndicators(indicators, strategyCandles.length);
     }
 
+    // 2.5 Calculate centralized market structure details
+    const structure = StructureEngine.calculate(sym, tf, strategyCandles, strategyIndicators);
+    indicators.structure = structure;
+    if (strategyIndicators !== indicators) {
+      strategyIndicators.structure = structure;
+    }
+
     // 3. Classify market regime
     const context: StrategyContext = {
       symbol: sym,
@@ -85,6 +99,7 @@ class StrategyEngine {
       ticker,
       indicators: strategyIndicators,
       historicalIndicators: allTimeframesCachedIndicators,
+      structure,
     };
     
     const regime = RegimeEngine.classify(context);
@@ -148,7 +163,7 @@ class StrategyEngine {
       console.error(`[Engine] Failed to log indicator snapshot to DB:`, err)
     );
 
-    return prioritizedSignals;
+    return { signals: prioritizedSignals, indicators };
   }
 
   /**

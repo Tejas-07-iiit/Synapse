@@ -75,15 +75,19 @@ class MarketEngine {
     // we only need to sync the active candles and indicators in the store for the UI chart.
     if (isSymbolChangeOnly) {
       const latestState = useMarketStore.getState();
-      const cachedCandles = latestState.allCandles[sym] || [];
-      const cachedIndicators = latestState.allIndicators[sym] || null;
-      const cachedAnalytics = latestState.allAnalytics[sym] || null;
-      useMarketStore.setState({
-        candles: cachedCandles,
-        indicators: cachedIndicators,
-        analytics: cachedAnalytics,
-      });
-      return;
+      const tfKey = `${sym}_${tf}`;
+      const cachedCandles = latestState.allCandles[tfKey] || latestState.allCandles[sym] || [];
+      const cachedIndicators = latestState.allIndicators[tfKey] || latestState.allIndicators[sym] || null;
+      const cachedAnalytics = latestState.allAnalytics[tfKey] || latestState.allAnalytics[sym] || null;
+
+      if (cachedCandles.length > 0 && cachedAnalytics) {
+        useMarketStore.setState({
+          candles: cachedCandles,
+          indicators: cachedIndicators,
+          analytics: cachedAnalytics,
+        });
+        return;
+      }
     }
 
     // Otherwise, we do a full initialization of all supported symbols for the timeframe
@@ -124,9 +128,11 @@ class MarketEngine {
 
       // 2. Load the active candles and indicators of the selected symbol for UI chart
       const latestState = useMarketStore.getState();
-      const activeCandles = latestState.allCandles[`${sym}_${tf}`] || latestState.allCandles[sym] || [];
-      const activeIndicators = latestState.allIndicators[`${sym}_${tf}`] || latestState.allIndicators[sym] || null;
-      const activeAnalytics = latestState.allAnalytics[`${sym}_${tf}`] || latestState.allAnalytics[sym] || null;
+      const tfKey = `${sym}_${tf}`;
+      const activeCandles = latestState.allCandles[tfKey] || latestState.allCandles[sym] || [];
+      const activeIndicators = latestState.allIndicators[tfKey] || latestState.allIndicators[sym] || null;
+      const activeAnalytics = latestState.allAnalytics[tfKey] || latestState.allAnalytics[sym] || null;
+
       useMarketStore.setState({
         candles: activeCandles,
         indicators: activeIndicators,
@@ -276,13 +282,10 @@ class MarketEngine {
 
     console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
-    const signals = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
+    const { signals, indicators: currentIndicators } = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
 
     const marketStore = useMarketStore.getState();
     const signalStore = useSignalStore.getState();
-
-    // Fetch computed indicators from cache
-    const currentIndicators = useMarketStore.getState().allIndicators[tfKey] || null;
 
     if (currentIndicators) {
       // 2. Generate standard market analytics metadata using the helper

@@ -15,7 +15,6 @@ import {
   Award, 
   AlertCircle, 
   X, 
-  CheckCircle2,
   Clock,
   ArrowUpRight,
   ArrowDownRight
@@ -555,8 +554,28 @@ export default function TradeHistoryPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-muted-foreground font-medium">
-                            {trade.strategyName}
+                          <td className="px-5 py-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                              trade.strategyName.includes("Lorentzian")
+                                ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                : trade.strategyName.includes("Bollinger") || trade.strategyName.includes("Donchian")
+                                ? "bg-pink-500/10 text-pink-500 border-pink-500/20"
+                                : trade.strategyName.includes("Grid") || trade.strategyName.includes("Sweep") || trade.strategyName.includes("SR Sweep")
+                                ? "bg-purple-500/10 text-purple-500 border-purple-500/20"
+                                : trade.strategyName.includes("Momentum")
+                                ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
+                                : trade.strategyName.includes("Mean Reversion")
+                                ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                : trade.strategyName.includes("Defensive")
+                                ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                                : trade.strategyName.includes("Rally Base Drop")
+                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                : trade.strategyName.includes("Reversal") || trade.strategyName.includes("Reversion") || trade.strategyName.includes("Dow Factor")
+                                ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+                                : "bg-secondary text-muted-foreground border-border"
+                            }`}>
+                              {trade.strategyName}
+                            </span>
                           </td>
                           <td className="px-5 py-4 text-right font-semibold">
                             ${trade.entryPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
@@ -701,8 +720,28 @@ export default function TradeHistoryPage() {
               <div className="grid grid-cols-1 gap-6 pt-2">
                 <div className="bg-secondary/20 border border-border rounded-xl p-4 flex flex-col justify-between space-y-3">
                   <div>
-                    <span className="text-[10px] font-black uppercase text-muted-foreground block">Strategy Profile</span>
-                    <span className="font-extrabold text-sm text-foreground">{selectedTrade.strategyName}</span>
+                    <span className="text-[10px] font-black uppercase text-muted-foreground block mb-1">Strategy Profile</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                      selectedTrade.strategyName.includes("Lorentzian")
+                        ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                        : selectedTrade.strategyName.includes("Bollinger") || selectedTrade.strategyName.includes("Donchian")
+                        ? "bg-pink-500/10 text-pink-500 border-pink-500/20"
+                        : selectedTrade.strategyName.includes("Grid") || selectedTrade.strategyName.includes("Sweep") || selectedTrade.strategyName.includes("SR Sweep")
+                        ? "bg-purple-500/10 text-purple-500 border-purple-500/20"
+                        : selectedTrade.strategyName.includes("Momentum")
+                        ? "bg-indigo-500/10 text-indigo-500 border-indigo-500/20"
+                        : selectedTrade.strategyName.includes("Mean Reversion")
+                        ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                        : selectedTrade.strategyName.includes("Defensive")
+                        ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                        : selectedTrade.strategyName.includes("Rally Base Drop")
+                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        : selectedTrade.strategyName.includes("Reversal") || selectedTrade.strategyName.includes("Reversion") || selectedTrade.strategyName.includes("Dow Factor")
+                        ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+                        : "bg-secondary text-muted-foreground border-border"
+                    }`}>
+                      {selectedTrade.strategyName}
+                    </span>
                   </div>
                   <div className="flex gap-2 text-[10px]">
                     <div className="bg-secondary border border-border px-2 py-0.5 rounded text-muted-foreground">

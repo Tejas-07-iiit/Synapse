@@ -38,6 +38,50 @@ export interface IndicatorValues {
   adx: number[];
   supportLevels: number[];
   resistanceLevels: number[];
+  donchianUpper?: number[];
+  donchianLower?: number[];
+  donchianMiddle?: number[];
+  mfi?: number[];
+  momentum?: number[];
+  structure?: MarketStructureData;
+}
+
+export interface SwingPoint {
+  index: number;
+  price: number;
+  type: "HIGH" | "LOW";
+  timestamp: number;
+}
+
+export interface SupplyDemandZone {
+  id: string;
+  type: "SUPPLY" | "DEMAND";
+  high: number;
+  low: number;
+  volumeSpike: boolean;
+  departureStrength: number;
+  freshness: boolean;
+  reactionCount: number;
+  createdAtIndex: number;
+  createdAtTime: number;
+}
+
+export interface MarketStructureData {
+  donchian: {
+    upper: number[];
+    lower: number[];
+    middle: number[];
+  };
+  swings: SwingPoint[];
+  zones: SupplyDemandZone[];
+  sweeps: {
+    time: number;
+    highSwept: boolean;
+    lowSwept: boolean;
+    highSweptPrice: number;
+    lowSweptPrice: number;
+  }[];
+  dowStructure: "BULLISH" | "BEARISH" | "RANGING";
 }
 
 export interface StrategyContext {
@@ -47,6 +91,7 @@ export interface StrategyContext {
   ticker: TickerInfo | null;
   indicators: IndicatorValues;
   historicalIndicators?: Record<string, IndicatorValues>; // symbol/timeframe -> indicators mapping for multi-timeframe confirmation
+  structure?: MarketStructureData;
 }
 
 export interface StrategySignal {
@@ -73,13 +118,54 @@ export interface StrategySignal {
     adx?: number;
     support?: number;
     resistance?: number;
-    [key: string]: number | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+  };
+  marketContext?: {
+    regime: string;
+    regimeCategory: string;
+    volatilityState: {
+      currentWidth: number;
+      avgWidth: number;
+      isExpanding: boolean;
+      atr: number;
+    };
+    breakoutStrength: {
+      bbWidth: number;
+      prevBbWidth: number;
+      bodyRatio: number;
+      volumeRatio: number;
+      upperWickRatio: number;
+      lowerWickRatio: number;
+    };
+    featureVector?: number[];
+    probability?: number;
+    zoneData?: {
+      id: string;
+      type: "SUPPLY" | "DEMAND";
+      high: number;
+      low: number;
+      freshness: boolean;
+      reactionCount: number;
+      departureStrength: number;
+    };
+    sweepMetadata?: {
+      sweepPrice: number;
+      rangeHigh: number;
+      rangeLow: number;
+      rangeMidpoint: number;
+      rsi: number;
+    };
+    mfi?: number;
+    momentum?: number;
+    dowStructure?: string;
   };
   timestamp: number;
   blocked?: boolean;
   blockReason?: string;
   activePositionId?: string;
 }
+
 
 export interface TradingStrategy {
   id: string;

@@ -10,6 +10,8 @@ import { calculateVolumeMA } from "./volume";
 import { calculateStochRSI } from "./stoch-rsi";
 import { calculateADX } from "./adx";
 import { calculateSupportResistance } from "./sr-levels";
+import { calculateMFI } from "./mfi";
+import { calculateMomentum } from "./momentum";
 
 // Caching and Memoization layer
 interface IndicatorCacheEntry {
@@ -97,6 +99,11 @@ function createEmptyIndicators(): IndicatorValues {
     adx: [],
     supportLevels: [],
     resistanceLevels: [],
+    donchianUpper: [],
+    donchianLower: [],
+    donchianMiddle: [],
+    mfi: [],
+    momentum: [],
   };
 }
 
@@ -121,11 +128,18 @@ function copyIndicatorValues(src: IndicatorValues): IndicatorValues {
     adx: [...src.adx],
     supportLevels: [...src.supportLevels],
     resistanceLevels: [...src.resistanceLevels],
+    donchianUpper: src.donchianUpper ? [...src.donchianUpper] : [],
+    donchianLower: src.donchianLower ? [...src.donchianLower] : [],
+    donchianMiddle: src.donchianMiddle ? [...src.donchianMiddle] : [],
+    mfi: src.mfi ? [...src.mfi] : [],
+    momentum: src.momentum ? [...src.momentum] : [],
   };
 }
 
 function computeFullIndicators(candles: Candle[]): IndicatorValues {
   const closes = candles.map((c) => c.close);
+  const highs = candles.map((c) => c.high);
+  const lows = candles.map((c) => c.low);
 
   const ema12 = calculateEMA(closes, 12);
   const ema26 = calculateEMA(closes, 26);
@@ -143,6 +157,28 @@ function computeFullIndicators(candles: Candle[]): IndicatorValues {
   const { stochRsiK, stochRsiD } = calculateStochRSI(rsi, 14, 3, 3);
   const adx = calculateADX(candles, 14);
   const { supportLevels, resistanceLevels } = calculateSupportResistance(candles, 5);
+
+  const mfi = calculateMFI(candles, 14);
+  const momentum = calculateMomentum(closes, 12);
+
+  // Donchian Channels (20)
+  const donchianUpper: number[] = new Array(closes.length).fill(0);
+  const donchianLower: number[] = new Array(closes.length).fill(0);
+  const donchianMiddle: number[] = new Array(closes.length).fill(0);
+
+  for (let i = 0; i < closes.length; i++) {
+    if (i < 19) {
+      donchianUpper[i] = highs[i];
+      donchianLower[i] = lows[i];
+      donchianMiddle[i] = (highs[i] + lows[i]) / 2;
+    } else {
+      const windowHighs = highs.slice(i - 19, i + 1);
+      const windowLows = lows.slice(i - 19, i + 1);
+      donchianUpper[i] = Math.max(...windowHighs);
+      donchianLower[i] = Math.min(...windowLows);
+      donchianMiddle[i] = (donchianUpper[i] + donchianLower[i]) / 2;
+    }
+  }
 
   return {
     ema12,
@@ -164,5 +200,10 @@ function computeFullIndicators(candles: Candle[]): IndicatorValues {
     adx,
     supportLevels,
     resistanceLevels,
+    donchianUpper,
+    donchianLower,
+    donchianMiddle,
+    mfi,
+    momentum,
   };
 }

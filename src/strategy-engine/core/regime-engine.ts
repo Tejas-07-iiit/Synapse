@@ -101,4 +101,31 @@ export class RegimeEngine {
     // E. Default sideways ranging channel
     return "Ranging";
   }
+
+  public static getRegimeCategory(context: StrategyContext): "TRENDING" | "RANGING" | "BREAKOUT" | "LIQUIDITY_SWEEP" | "ACCUMULATION" | "DISTRIBUTION" {
+    // 1. Check if a liquidity sweep has occurred on the latest closed candle
+    const { candles, structure } = context;
+    if (candles.length > 0 && structure?.sweeps) {
+      const lastIdx = candles.length - 1;
+      const currentSweep = structure.sweeps[lastIdx];
+      if (currentSweep && (currentSweep.lowSwept || currentSweep.highSwept)) {
+        return "LIQUIDITY_SWEEP";
+      }
+    }
+
+    const classification = this.classify(context);
+    if (classification === "Bullish Trend" || classification === "Bearish Trend") {
+      return "TRENDING";
+    }
+    if (classification === "Breakout") {
+      return "BREAKOUT";
+    }
+    if (classification === "Accumulation") {
+      return "ACCUMULATION";
+    }
+    if (classification === "Distribution") {
+      return "DISTRIBUTION";
+    }
+    return "RANGING";
+  }
 }

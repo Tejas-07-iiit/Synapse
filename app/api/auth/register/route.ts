@@ -76,6 +76,25 @@ export async function POST(req: NextRequest) {
         username: username.toLowerCase(),
         email: email.toLowerCase(),
         passwordHash,
+        wallet: {
+          create: {
+            balance: 10000.0,
+            totalDeposited: 10000.0,
+            totalWithdrawn: 0.0,
+            realizedPnl: 0.0,
+          }
+        },
+        settings: {
+          create: {
+            autoTrading: false,
+            riskPerTradePct: 2.0,
+            maxOpenTrades: 3,
+            defaultSlPct: 1.5,
+            defaultTpPct: 3.0,
+            prefTimeframe: "15m",
+            prefSymbol: "BTCUSDT",
+          }
+        }
       },
       select: {
         id: true,

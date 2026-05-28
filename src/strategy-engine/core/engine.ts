@@ -16,10 +16,35 @@ export type EngineRunCallback = (
 
 class StrategyEngine {
   private callbacks: Set<EngineRunCallback> = new Set();
+  private signalLocks: Set<string> = new Set();
 
   public registerCallback(cb: EngineRunCallback) {
     this.callbacks.add(cb);
     return () => this.callbacks.delete(cb);
+  }
+
+  private sliceIndicators(indicators: IndicatorValues, length: number): IndicatorValues {
+    return {
+      ema12: indicators.ema12.slice(0, length),
+      ema26: indicators.ema26.slice(0, length),
+      ema20: indicators.ema20.slice(0, length),
+      sma50: indicators.sma50.slice(0, length),
+      rsi: indicators.rsi.slice(0, length),
+      macdLine: indicators.macdLine.slice(0, length),
+      signalLine: indicators.signalLine.slice(0, length),
+      macdHist: indicators.macdHist.slice(0, length),
+      bbUpper: indicators.bbUpper.slice(0, length),
+      bbMiddle: indicators.bbMiddle.slice(0, length),
+      bbLower: indicators.bbLower.slice(0, length),
+      atr: indicators.atr.slice(0, length),
+      vwap: indicators.vwap.slice(0, length),
+      volumeMA: indicators.volumeMA.slice(0, length),
+      stochRsiK: indicators.stochRsiK.slice(0, length),
+      stochRsiD: indicators.stochRsiD.slice(0, length),
+      adx: indicators.adx.slice(0, length),
+      supportLevels: indicators.supportLevels.slice(0, length),
+      resistanceLevels: indicators.resistanceLevels.slice(0, length),
+    };
   }
 
   /**
@@ -30,6 +55,7 @@ class StrategyEngine {
     timeframe: string,
     candles: Candle[],
     ticker: TickerInfo | null,
+    isClosed: boolean,
     allTimeframesCachedIndicators?: Record<string, IndicatorValues>
   ): Promise<StrategySignal[]> {
     if (candles.length === 0) return [];
@@ -40,19 +66,30 @@ class StrategyEngine {
     // 1. Calculate memoized indicators
     const indicators = calculateAllIndicators(sym, tf, candles);
 
-    // 2. Classify market regime
+    // 2. Setup the strategy evaluation context
+    // If not closed (e.g. during initial REST fetch), the very last candle is the current ticking candle.
+    // We should only run strategies on closed candles to avoid noise/spam.
+    let strategyCandles = candles;
+    let strategyIndicators = indicators;
+
+    if (!isClosed && candles.length >= 2) {
+      strategyCandles = candles.slice(0, -1);
+      strategyIndicators = this.sliceIndicators(indicators, strategyCandles.length);
+    }
+
+    // 3. Classify market regime
     const context: StrategyContext = {
       symbol: sym,
       timeframe: tf,
-      candles,
+      candles: strategyCandles,
       ticker,
-      indicators,
+      indicators: strategyIndicators,
       historicalIndicators: allTimeframesCachedIndicators,
     };
     
     const regime = RegimeEngine.classify(context);
 
-    // 3. Evaluate all registered strategies
+    // 4. Evaluate all registered strategies
     const rawSignals: StrategySignal[] = [];
     const activeStrategies = strategyRegistry.getStrategies();
 
@@ -64,9 +101,21 @@ class StrategyEngine {
         (!strategy.timeframe && !strategy.timeframes);
 
       if (supportsSymbol && supportsTimeframe) {
+        const lastCandleTime = strategyCandles[strategyCandles.length - 1]?.time || 0;
+        const lockKey = `${sym}_${tf}_${strategy.id}_${lastCandleTime}`;
+        if (this.signalLocks.has(lockKey)) {
+          continue;
+        }
+
         const { signal, latencyMs } = StrategyRunner.run(strategy, context);
         
         if (signal) {
+          this.signalLocks.add(lockKey);
+          if (this.signalLocks.size > 10000) {
+            const firstKey = this.signalLocks.values().next().value;
+            if (firstKey) this.signalLocks.delete(firstKey);
+          }
+
           rawSignals.push(signal);
           
           // Background database logging for auditing strategy runs

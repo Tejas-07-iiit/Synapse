@@ -59,52 +59,8 @@ export function calculateAllIndicators(
 
   // Case 1: Intra-candle tick update (same time, last candle values changed)
   if (candles.length === cachedCandles.length && lastIncoming.time === lastCached.time) {
-    // Make copies of cached indicator arrays to avoid mutating the cache directly
-    const updatedIndicators = copyIndicatorValues(cachedIndicators);
-    const lastIdx = candles.length - 1;
-
-    // Recalculate indicators at the last index
-    const closes = candles.map((c) => c.close);
-    
-    // Recalculating the tail of EMAs, SMAs, etc.
-    const ema12Full = calculateEMA(closes, 12);
-    const ema26Full = calculateEMA(closes, 26);
-    const ema20Full = calculateEMA(closes, 20);
-    const sma50Full = calculateSMA(closes, 50);
-    const rsiFull = calculateRSI(closes, 14);
-    const macdFull = calculateMACD(closes, 12, 26, 9);
-    const bbFull = calculateBollingerBands(closes, 20, 2);
-    const atrFull = calculateATR(candles, 14);
-    const vwapFull = calculateVWAP(candles);
-    const volumeMAFull = calculateVolumeMA(candles, 20);
-
-    // New indicators calculation
-    const stochRsiFull = calculateStochRSI(rsiFull, 14, 3, 3);
-    const adxFull = calculateADX(candles, 14);
-    const srFull = calculateSupportResistance(candles, 5);
-
-    updatedIndicators.ema12[lastIdx] = ema12Full[lastIdx];
-    updatedIndicators.ema26[lastIdx] = ema26Full[lastIdx];
-    updatedIndicators.ema20[lastIdx] = ema20Full[lastIdx];
-    updatedIndicators.sma50[lastIdx] = sma50Full[lastIdx];
-    updatedIndicators.rsi[lastIdx] = rsiFull[lastIdx];
-    updatedIndicators.macdLine[lastIdx] = macdFull.macdLine[lastIdx];
-    updatedIndicators.signalLine[lastIdx] = macdFull.signalLine[lastIdx];
-    updatedIndicators.macdHist[lastIdx] = macdFull.macdHist[lastIdx];
-    updatedIndicators.bbUpper[lastIdx] = bbFull.upper[lastIdx];
-    updatedIndicators.bbMiddle[lastIdx] = bbFull.middle[lastIdx];
-    updatedIndicators.bbLower[lastIdx] = bbFull.lower[lastIdx];
-    updatedIndicators.atr[lastIdx] = atrFull[lastIdx];
-    updatedIndicators.vwap[lastIdx] = vwapFull[lastIdx];
-    updatedIndicators.volumeMA[lastIdx] = volumeMAFull[lastIdx];
-    
-    updatedIndicators.stochRsiK[lastIdx] = stochRsiFull.stochRsiK[lastIdx];
-    updatedIndicators.stochRsiD[lastIdx] = stochRsiFull.stochRsiD[lastIdx];
-    updatedIndicators.adx[lastIdx] = adxFull[lastIdx];
-    updatedIndicators.supportLevels[lastIdx] = srFull.supportLevels[lastIdx];
-    updatedIndicators.resistanceLevels[lastIdx] = srFull.resistanceLevels[lastIdx];
-
-    return updatedIndicators;
+    // Return cached indicators as-is (copied) to prevent heavy indicator calculations on ticks!
+    return copyIndicatorValues(cachedIndicators);
   }
 
   // Case 2: Incremental candle closed (incoming candle is new)

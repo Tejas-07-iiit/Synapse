@@ -9,9 +9,16 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
-  const isDashboardPage = pathname.startsWith("/dashboard");
+  
+  // Protect all internal application pages
+  const isProtectedPage = 
+    pathname.startsWith("/dashboard") || 
+    pathname.startsWith("/trade-history") || 
+    pathname.startsWith("/portfolio") || 
+    pathname.startsWith("/market-intelligence") || 
+    pathname.startsWith("/settings");
 
-  if (isDashboardPage) {
+  if (isProtectedPage) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -47,5 +54,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", "/trade-history/:path*", "/portfolio/:path*", "/market-intelligence/:path*", "/settings/:path*", "/login", "/register"],
 };

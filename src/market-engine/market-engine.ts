@@ -16,9 +16,8 @@ class MarketEngine {
   private activeTimeframe: string = "15m";
   private unsubscribeWsCandles: (() => void) | null = null;
   private unsubscribeWsTicker: (() => void) | null = null;
-  private recalcTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private initializedTimeframe: string = "";
-  private static readonly RECALC_THROTTLE_MS = 1500; // Throttle intra-candle updates to 1.5s
+  private lastCandleOpenTime: Map<string, number> = new Map();
 
   constructor() {
     // Auto initialize strategy engine setups on instantiation
@@ -28,12 +27,19 @@ class MarketEngine {
     strategyEngine.registerCallback((symbol, timeframe, regime, signals, indicators) => {
       const marketStore = useMarketStore.getState();
       const sym = symbol.toUpperCase();
+      const tf = timeframe.toLowerCase();
+      const tfKey = `${sym}_${tf}`;
       
       // Update store cache
-      marketStore.setIndicatorsForSymbol(sym, indicators);
+      marketStore.setIndicatorsForSymbol(tfKey, indicators);
       
-      // If it's the active symbol, update the active indicators
-      if (sym === this.activeSymbol) {
+      // Preserve backward compatibility for watchlist row
+      if (tf === this.activeTimeframe) {
+        marketStore.setIndicatorsForSymbol(sym, indicators);
+      }
+      
+      // If it's the active symbol and active timeframe, update the active indicators
+      if (sym === this.activeSymbol && tf === this.activeTimeframe) {
         useMarketStore.setState({
           indicators,
         });
@@ -87,33 +93,40 @@ class MarketEngine {
     try {
       // Unsubscribe from previous streams if timeframe has changed
       if (this.initializedTimeframe && this.initializedTimeframe !== tf) {
-        const oldStreams = coinsList.map(s => `${s.toLowerCase()}@kline_${this.initializedTimeframe}`);
+        const oldStreams = coinsList.flatMap(s => [
+          `${s.toLowerCase()}@kline_5m`,
+          `${s.toLowerCase()}@kline_15m`,
+          `${s.toLowerCase()}@kline_${this.initializedTimeframe}`
+        ]);
         marketWsService.unsubscribe(oldStreams);
       }
 
       this.initializedTimeframe = tf;
 
       // 1. Fetch historical candles for all coins from REST and compute initial indicators
+      const timeframesToLoad = new Set<string>(["5m", "15m", tf]);
       for (const coin of coinsList) {
-        let candles = marketCache.get(coin, tf);
-        if (!candles) {
-          candles = await fetchHistoricalCandles(coin, tf, 1000);
-          marketCache.set(coin, tf, candles);
+        for (const t of timeframesToLoad) {
+          let candles = marketCache.get(coin, t);
+          if (!candles) {
+            candles = await fetchHistoricalCandles(coin, t, 1000);
+            marketCache.set(coin, t, candles);
+          }
+
+          // Store in the symbol-level cache
+          useMarketStore.getState().setCandlesForSymbol(coin, t, candles);
+
+          // Run initial calculation (with isClosed = false since the last candle is incomplete/open)
+          const ticker = useMarketStore.getState().tickerData[coin] || null;
+          await this.recalculate(coin, t, candles, ticker, false);
         }
-
-        // Store in the symbol-level cache
-        useMarketStore.getState().setCandlesForSymbol(coin, candles);
-
-        // Run initial calculation
-        const ticker = useMarketStore.getState().tickerData[coin] || null;
-        await this.recalculate(coin, tf, candles, ticker);
       }
 
       // 2. Load the active candles and indicators of the selected symbol for UI chart
       const latestState = useMarketStore.getState();
-      const activeCandles = latestState.allCandles[sym] || [];
-      const activeIndicators = latestState.allIndicators[sym] || null;
-      const activeAnalytics = latestState.allAnalytics[sym] || null;
+      const activeCandles = latestState.allCandles[`${sym}_${tf}`] || latestState.allCandles[sym] || [];
+      const activeIndicators = latestState.allIndicators[`${sym}_${tf}`] || latestState.allIndicators[sym] || null;
+      const activeAnalytics = latestState.allAnalytics[`${sym}_${tf}`] || latestState.allAnalytics[sym] || null;
       useMarketStore.setState({
         candles: activeCandles,
         indicators: activeIndicators,
@@ -129,7 +142,11 @@ class MarketEngine {
       this.registerWebSocketCallbacks();
 
       // 5. Subscribe to kline streams for ALL symbols simultaneously
-      const streams = coinsList.map(s => `${s.toLowerCase()}@kline_${tf}`);
+      const streams = coinsList.flatMap(s => [
+        `${s.toLowerCase()}@kline_5m`,
+        `${s.toLowerCase()}@kline_15m`,
+        `${s.toLowerCase()}@kline_${tf}`
+      ]);
       marketWsService.subscribe(streams);
 
       useMarketStore.getState().setLoading(false);
@@ -156,67 +173,88 @@ class MarketEngine {
 
         // Forward ticker updates to paper trading engine to check SL/TP executions for all positions
         PaperTradingEngine.updatePrices(symUpper, ticker.price);
-
-        const candles = store.allCandles[symUpper] || [];
-        if (candles.length > 0) {
-          this.throttledRecalculate(symUpper, this.activeTimeframe, candles, ticker);
-        }
+        
+        // Note: We DO NOT recalculate indicators or strategies on price ticks anymore.
+        // This dramatically saves CPU/RAM. We only evaluate on candle close.
       });
     }
 
     if (!this.unsubscribeWsCandles) {
       this.unsubscribeWsCandles = marketWsService.registerCandleCallback((symbol, tf, candle, isClosed) => {
-        if (tf.toLowerCase() !== this.activeTimeframe) {
-          return;
-        }
-
         const store = useMarketStore.getState();
         const symUpper = symbol.toUpperCase();
+        const tfLower = tf.toLowerCase();
 
-        // Update the symbol-specific candle cache
-        store.updateLastCandleForSymbol(symUpper, candle, isClosed);
-        const updatedCandles = store.allCandles[symUpper] || [];
+        // 1. Update the symbol-specific candle cache
+        store.updateLastCandleForSymbol(symUpper, tfLower, candle, isClosed);
 
-        // If it's the active symbol, update the active candles for UI
-        if (symUpper === this.activeSymbol) {
+        // 2. If it's the active symbol and timeframe, update the active candles for UI
+        if (symUpper === this.activeSymbol && tfLower === this.activeTimeframe) {
           store.updateLastCandle(candle, isClosed);
         }
 
-        // On candle close, recalculate immediately and refresh cache
-        if (isClosed) {
-          marketCache.set(symUpper, tf, updatedCandles);
-          const ticker = store.tickerData[symUpper] || null;
-          this.recalculate(symUpper, tf, updatedCandles, ticker);
-          return;
+        // 3. Centralized Candle Lifecycle management
+        const key = `${symUpper}_${tfLower}`;
+        const openTime = candle.time;
+        const prevOpenTime = this.lastCandleOpenTime.get(key);
+
+        if (!prevOpenTime) {
+          this.lastCandleOpenTime.set(key, openTime);
+          this.onCandleOpen(symUpper, tfLower, candle);
+        } else if (openTime > prevOpenTime) {
+          this.lastCandleOpenTime.set(key, openTime);
+          this.onCandleOpen(symUpper, tfLower, candle);
+        } else {
+          this.onCandleUpdate(symUpper, tfLower, candle);
         }
 
-        // Intra-candle update - throttled
-        const ticker = store.tickerData[symUpper] || null;
-        this.throttledRecalculate(symUpper, tf, updatedCandles, ticker);
+        if (isClosed) {
+          this.onCandleClose(symUpper, tfLower, candle);
+        }
       });
     }
   }
 
-  /**
-   * Throttled recalculate for real-time price ticks.
-   */
-  private throttledRecalculate(
-    symbol: string,
-    timeframe: string,
-    candles: Candle[],
-    ticker: TickerInfo | null
-  ) {
-    const sym = symbol.toUpperCase();
-    if (this.recalcTimers.has(sym)) return;
+  private onCandleOpen(_symbol: string, _timeframe: string, _candle: Candle) {
+    // console.log(`[CandleLifecycle] 🟢 Candle Opened for ${symbol} (${timeframe}) at open time ${candle.time}`);
+  }
 
-    const timer = setTimeout(async () => {
-      this.recalcTimers.delete(sym);
-      const latestCandles = useMarketStore.getState().allCandles[sym] || candles;
-      const latestTicker = useMarketStore.getState().tickerData[sym] || ticker;
-      await this.recalculate(sym, timeframe, latestCandles, latestTicker);
-    }, MarketEngine.RECALC_THROTTLE_MS);
+  private onCandleUpdate(_symbol: string, _timeframe: string, _candle: Candle) {
+    // console.log(`[CandleLifecycle] 🟡 Candle Updated for ${symbol} (${timeframe})`);
+  }
 
-    this.recalcTimers.set(sym, timer);
+  private onCandleClose(symbol: string, timeframe: string, candle: Candle) {
+    console.log(`[CandleLifecycle] 🔴 Candle Closed for ${symbol} (${timeframe})`);
+    
+    if (timeframe === "5m") {
+      this.on5mCandleClose(symbol, candle);
+    } else if (timeframe === "15m") {
+      this.on15mCandleClose(symbol, candle);
+    } else {
+      this.onOtherCandleClose(symbol, timeframe, candle);
+    }
+  }
+
+  private async on5mCandleClose(symbol: string, _candle: Candle) {
+    const store = useMarketStore.getState();
+    const updatedCandles = store.allCandles[`${symbol}_5m`] || [];
+    const ticker = store.tickerData[symbol] || null;
+    await this.recalculate(symbol, "5m", updatedCandles, ticker, true);
+  }
+
+  private async on15mCandleClose(symbol: string, _candle: Candle) {
+    const store = useMarketStore.getState();
+    const updatedCandles = store.allCandles[`${symbol}_15m`] || [];
+    const ticker = store.tickerData[symbol] || null;
+    await this.recalculate(symbol, "15m", updatedCandles, ticker, true);
+  }
+
+  private async onOtherCandleClose(symbol: string, timeframe: string, _candle: Candle) {
+    const store = useMarketStore.getState();
+    const tfLower = timeframe.toLowerCase();
+    const updatedCandles = store.allCandles[`${symbol}_${tfLower}`] || [];
+    const ticker = store.tickerData[symbol] || null;
+    await this.recalculate(symbol, tfLower, updatedCandles, ticker, true);
   }
 
   /**
@@ -227,22 +265,24 @@ class MarketEngine {
     symbol: string,
     timeframe: string,
     candles: Candle[],
-    ticker: TickerInfo | null
+    ticker: TickerInfo | null,
+    isClosed: boolean
   ) {
     if (candles.length === 0) return;
 
     const sym = symbol.toUpperCase();
     const tf = timeframe.toLowerCase();
+    const tfKey = `${sym}_${tf}`;
 
-    console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym}`);
+    console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
-    const signals = await strategyEngine.processTick(sym, tf, candles, ticker);
+    const signals = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
 
     const marketStore = useMarketStore.getState();
     const signalStore = useSignalStore.getState();
 
     // Fetch computed indicators from cache
-    const currentIndicators = useMarketStore.getState().allIndicators[sym] || null;
+    const currentIndicators = useMarketStore.getState().allIndicators[tfKey] || null;
 
     if (currentIndicators) {
       // 2. Generate standard market analytics metadata using the helper
@@ -260,11 +300,17 @@ class MarketEngine {
       const analytics = calculateMarketAnalytics(sym, legacyCandles, legacyIndicators);
       
       // Update marketStore caches
-      marketStore.setIndicatorsForSymbol(sym, currentIndicators);
-      marketStore.setAnalyticsForSymbol(sym, analytics as unknown as MarketAnalytics);
+      marketStore.setIndicatorsForSymbol(tfKey, currentIndicators);
+      marketStore.setAnalyticsForSymbol(tfKey, analytics as unknown as MarketAnalytics);
 
-      // If it's the active symbol, update the active indicators and analytics for UI rendering
-      if (sym === this.activeSymbol) {
+      // Preserve backward compatibility for watchlist row
+      if (tf === this.activeTimeframe) {
+        marketStore.setIndicatorsForSymbol(sym, currentIndicators);
+        marketStore.setAnalyticsForSymbol(sym, analytics as unknown as MarketAnalytics);
+      }
+
+      // If it's the active symbol and active timeframe, update the active indicators and analytics for UI rendering
+      if (sym === this.activeSymbol && tf === this.activeTimeframe) {
         useMarketStore.setState({
           indicators: currentIndicators,
           analytics: analytics as unknown as MarketAnalytics,
@@ -379,15 +425,16 @@ class MarketEngine {
    * Cleanup connections and timers.
    */
   public destroy() {
-    this.recalcTimers.forEach((timer) => clearTimeout(timer));
-    this.recalcTimers.clear();
-
     const marketStore = useMarketStore.getState();
     const coinsList = marketStore.supportedSymbols.length > 0
       ? marketStore.supportedSymbols
       : ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 
-    const streams = coinsList.map(s => `${s.toLowerCase()}@kline_${this.activeTimeframe}`);
+    const streams = coinsList.flatMap(s => [
+      `${s.toLowerCase()}@kline_5m`,
+      `${s.toLowerCase()}@kline_15m`,
+      `${s.toLowerCase()}@kline_${this.activeTimeframe}`
+    ]);
     marketWsService.unsubscribe(streams);
 
     if (this.unsubscribeWsTicker) {

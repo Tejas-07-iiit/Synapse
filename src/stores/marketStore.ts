@@ -51,8 +51,8 @@ interface MarketState {
   setAnalytics: (analytics: MarketAnalytics | null) => void;
   setIndicatorsForSymbol: (symbol: string, indicators: IndicatorValues) => void;
   setAnalyticsForSymbol: (symbol: string, analytics: MarketAnalytics) => void;
-  setCandlesForSymbol: (symbol: string, candles: Candle[]) => void;
-  updateLastCandleForSymbol: (symbol: string, candle: Candle, isClosed: boolean) => void;
+  setCandlesForSymbol: (symbol: string, timeframe: string, candles: Candle[]) => void;
+  updateLastCandleForSymbol: (symbol: string, timeframe: string, candle: Candle, isClosed: boolean) => void;
   updateTicker: (symbol: string, ticker: TickerInfo) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -106,23 +106,42 @@ export const useMarketStore = create<MarketState>((set) => ({
         [symbol.toUpperCase()]: analytics,
       },
     })),
-  setCandlesForSymbol: (symbol, candles) =>
-    set((state) => ({
-      allCandles: {
-        ...state.allCandles,
-        [symbol.toUpperCase()]: [...candles],
-      },
-    })),
-  updateLastCandleForSymbol: (symbol, candle, isClosed) =>
+  setCandlesForSymbol: (symbol, timeframe, candles) =>
     set((state) => {
       const sym = symbol.toUpperCase();
-      const currentCandles = state.allCandles[sym] ? [...state.allCandles[sym]] : [];
+      const tf = timeframe.toLowerCase();
+      const cacheKey = `${sym}_${tf}`;
+      const updatedAllCandles = {
+        ...state.allCandles,
+        [cacheKey]: [...candles],
+      };
+      
+      const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
+      if (isCurrentlyActive) {
+        updatedAllCandles[sym] = [...candles];
+      }
+
+      return {
+        allCandles: updatedAllCandles,
+      };
+    }),
+  updateLastCandleForSymbol: (symbol, timeframe, candle, _isClosed) =>
+    set((state) => {
+      const sym = symbol.toUpperCase();
+      const tf = timeframe.toLowerCase();
+      const cacheKey = `${sym}_${tf}`;
+      const currentCandles = state.allCandles[cacheKey] ? [...state.allCandles[cacheKey]] : [];
       if (currentCandles.length === 0) {
+        const updatedAllCandles = {
+          ...state.allCandles,
+          [cacheKey]: [candle],
+        };
+        const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
+        if (isCurrentlyActive) {
+          updatedAllCandles[sym] = [candle];
+        }
         return {
-          allCandles: {
-            ...state.allCandles,
-            [sym]: [candle],
-          },
+          allCandles: updatedAllCandles,
         };
       }
 
@@ -136,11 +155,18 @@ export const useMarketStore = create<MarketState>((set) => ({
         }
       }
 
+      const updatedAllCandles = {
+        ...state.allCandles,
+        [cacheKey]: currentCandles,
+      };
+
+      const isCurrentlyActive = sym === state.selectedSymbol && tf === state.timeframe;
+      if (isCurrentlyActive) {
+        updatedAllCandles[sym] = currentCandles;
+      }
+
       return {
-        allCandles: {
-          ...state.allCandles,
-          [sym]: currentCandles,
-        },
+        allCandles: updatedAllCandles,
       };
     }),
   updateTicker: (symbol, ticker) =>

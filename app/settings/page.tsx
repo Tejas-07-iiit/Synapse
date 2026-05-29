@@ -89,7 +89,7 @@ export default function SettingsPage() {
       settings.fetchSettings(user.id);
       wallet.fetchWallet(user.id);
     }
-  }, [isAuthenticated, authLoading, router, user?.id, settings, wallet]);
+  }, [isAuthenticated, authLoading, router, user?.id, settings.fetchSettings, wallet.fetchWallet]);
 
   useEffect(() => {
     if (!settings.loading && !settings.error) {

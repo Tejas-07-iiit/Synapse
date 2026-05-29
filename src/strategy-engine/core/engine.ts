@@ -15,9 +15,20 @@ export type EngineRunCallback = (
   indicators: IndicatorValues
 ) => void;
 
+export interface SignalsDbHandler {
+  logStrategyRun: (data: any) => Promise<any>;
+  logSignals: (signals: any[]) => Promise<any>;
+  logIndicatorSnapshot: (data: any) => Promise<any>;
+}
+
 class StrategyEngine {
   private callbacks: Set<EngineRunCallback> = new Set();
   private signalLocks: Set<string> = new Set();
+  private dbHandler: SignalsDbHandler | null = null;
+
+  public registerDbHandler(handler: SignalsDbHandler) {
+    this.dbHandler = handler;
+  }
 
   public registerCallback(cb: EngineRunCallback) {
     this.callbacks.add(cb);
@@ -176,6 +187,10 @@ class StrategyEngine {
     result: string,
     durationMs: number
   ) {
+    if (this.dbHandler) {
+      this.dbHandler.logStrategyRun({ strategyId, symbol, timeframe, result, durationMs }).catch(() => {});
+      return;
+    }
     try {
       await fetch("/api/signals", {
         method: "POST",
@@ -194,6 +209,10 @@ class StrategyEngine {
    * Log generated signals to the postgres audit log.
    */
   private async logSignalsToDb(signals: StrategySignal[]) {
+    if (this.dbHandler) {
+      this.dbHandler.logSignals(signals).catch(() => {});
+      return;
+    }
     try {
       await fetch("/api/signals", {
         method: "POST",
@@ -217,6 +236,10 @@ class StrategyEngine {
     timestamp: number,
     indicators: IndicatorValues
   ) {
+    if (this.dbHandler) {
+      this.dbHandler.logIndicatorSnapshot({ symbol, timeframe, timestamp, indicators }).catch(() => {});
+      return;
+    }
     try {
       await fetch("/api/signals", {
         method: "POST",

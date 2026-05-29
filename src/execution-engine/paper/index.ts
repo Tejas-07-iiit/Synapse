@@ -3,7 +3,20 @@ import { RiskEngine } from "../risk";
 import { useWalletStore } from "@/src/stores/walletStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
 
+export interface DbClientHandler {
+  fetchActivePositions: (userId: string) => Promise<any[]>;
+  openPosition: (data: any) => Promise<any>;
+  updatePosition: (id: string, currentPrice: number, pnl: number) => Promise<any>;
+  closePosition: (data: any) => Promise<any>;
+  fetchWallet: (userId: string) => Promise<any>;
+}
+
 export class PaperTradingEngine {
+  private static dbHandler: DbClientHandler | null = null;
+
+  public static registerDbHandler(handler: DbClientHandler) {
+    this.dbHandler = handler;
+  }
   private static positions: Map<string, VirtualPosition> = new Map(); // positionId -> Position
   private static lastDbUpdate: Map<string, number> = new Map(); // positionId -> timestamp
   private static executionLocks: Set<string> = new Set(); // Mutex for concurrent symbol processing
@@ -14,31 +27,42 @@ export class PaperTradingEngine {
    */
   public static async loadActivePositions(userId: string) {
     try {
-      const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
-      const body = await res.json();
-      
-      if (body.success && Array.isArray(body.positions)) {
-        this.positions.clear();
-        for (const pos of body.positions) {
-          this.positions.set(pos.id, {
-            id: pos.id,
-            userId: pos.userId,
-            symbol: pos.symbol,
-            direction: pos.direction as "LONG" | "SHORT",
-            entryPrice: pos.entryPrice,
-            currentPrice: pos.currentPrice,
-            quantity: pos.quantity,
-            stopLoss: pos.stopLoss,
-            takeProfit: pos.takeProfit,
-            leverage: pos.leverage,
-            pnl: pos.pnl,
-            status: "OPEN",
-            openedAt: new Date(pos.openedAt).getTime(),
-            closedAt: null,
-          });
+      let positionsList: any[] = [];
+      if (this.dbHandler) {
+        positionsList = await this.dbHandler.fetchActivePositions(userId);
+      } else {
+        const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
+        const body = await res.json();
+        if (body.success && Array.isArray(body.positions)) {
+          positionsList = body.positions;
         }
-        console.log(`[PaperTrading] Loaded ${body.positions.length} active positions from database.`);
       }
+      
+      // Clear only this user's positions from memory cache to avoid conflicts in multi-user daemon mode
+      for (const [id, pos] of this.positions.entries()) {
+        if (pos.userId === userId) {
+          this.positions.delete(id);
+        }
+      }
+      for (const pos of positionsList) {
+        this.positions.set(pos.id, {
+          id: pos.id,
+          userId: pos.userId,
+          symbol: pos.symbol,
+          direction: pos.direction as "LONG" | "SHORT",
+          entryPrice: pos.entryPrice,
+          currentPrice: pos.currentPrice,
+          quantity: pos.quantity,
+          stopLoss: pos.stopLoss,
+          takeProfit: pos.takeProfit,
+          leverage: pos.leverage,
+          pnl: pos.pnl,
+          status: "OPEN",
+          openedAt: new Date(pos.openedAt).getTime(),
+          closedAt: null,
+        });
+      }
+      console.log(`[PaperTrading] Loaded ${positionsList.length} active positions from database.`);
     } catch (e) {
       console.error("[PaperTrading] Failed to load open positions from DB:", e);
     }
@@ -76,14 +100,18 @@ export class PaperTradingEngine {
       if (now - lastUpdate > 10000) {
         this.lastDbUpdate.set(pos.id, now);
         console.log(`[SLTP_MONITOR] Symbol: ${sym} | Price: $${currentPrice.toFixed(2)} | Pos ID: ${pos.id} | Entry: $${pos.entryPrice.toFixed(2)} | SL: ${pos.stopLoss ? pos.stopLoss.toFixed(2) : "None"} | TP: ${pos.takeProfit ? pos.takeProfit.toFixed(2) : "None"} | Current PnL: $${pos.pnl.toFixed(2)}`);
-        fetch("/api/positions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "update",
-            data: { id: pos.id, currentPrice, pnl: pos.pnl },
-          }),
-        }).catch(() => {});
+        if (this.dbHandler) {
+          this.dbHandler.updatePosition(pos.id, currentPrice, pos.pnl).catch(() => {});
+        } else {
+          fetch("/api/positions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "update",
+              data: { id: pos.id, currentPrice, pnl: pos.pnl },
+            }),
+          }).catch(() => {});
+        }
       }
 
       // Check Stop Loss & Take Profit exits
@@ -238,31 +266,45 @@ export class PaperTradingEngine {
 
       try {
         console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
-        // Save position to DB via API
-        const res = await fetch("/api/positions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({  
-            action: "open",
-            data: {
-              userId,
-              symbol: sym,
-              direction,
-              entryPrice: price,
-              quantity: qty,
-              stopLoss,
-              takeProfit,
-              leverage,
-            },
-          }),
-        });
+        let dbPos: any = null;
+        if (this.dbHandler) {
+          dbPos = await this.dbHandler.openPosition({
+            userId,
+            symbol: sym,
+            direction,
+            entryPrice: price,
+            quantity: qty,
+            stopLoss,
+            takeProfit,
+            leverage,
+          });
+        } else {
+          // Save position to DB via API
+          const res = await fetch("/api/positions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({  
+              action: "open",
+              data: {
+                userId,
+                symbol: sym,
+                direction,
+                entryPrice: price,
+                quantity: qty,
+                stopLoss,
+                takeProfit,
+                leverage,
+              },
+            }),
+          });
 
-        const body = await res.json();
-        if (!body.success) {
-          throw new Error(body.error || "Failed to open position");
+          const body = await res.json();
+          if (!body.success) {
+            throw new Error(body.error || "Failed to open position");
+          }
+          dbPos = body.position;
         }
 
-        const dbPos = body.position;
         console.log(`[TRADE_CREATED] Trade successfully saved in DB. Position ID: ${dbPos.id}`);
 
         const position: VirtualPosition = {
@@ -286,7 +328,9 @@ export class PaperTradingEngine {
         console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
         
         // Update store balance to keep in sync
-        useWalletStore.getState().fetchWallet(userId).catch(() => {});
+        if (typeof window !== "undefined") {
+          useWalletStore.getState().fetchWallet(userId).catch(() => {});
+        }
 
         return position;
       } catch (err) {
@@ -332,34 +376,53 @@ export class PaperTradingEngine {
 
     try {
       console.log(`[DB_WRITE] Dispatching position close transaction to database for ID: ${positionId}`);
-      // Close position in DB via API
-      const res = await fetch("/api/positions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "close",
-          data: {
-            id: positionId,
-            exitPrice,
-            pnl: pos.pnl,
-            closedAt,
-            openedAt: pos.openedAt,
-            userId: pos.userId,
-            symbol: pos.symbol,
-            direction: pos.direction,
-            entryPrice: pos.entryPrice,
-            quantity: pos.quantity,
-            stopLoss: pos.stopLoss,
-            takeProfit: pos.takeProfit,
-            leverage: pos.leverage,
-            reason,
-          },
-        }),
-      });
+      if (this.dbHandler) {
+        await this.dbHandler.closePosition({
+          id: positionId,
+          exitPrice,
+          pnl: pos.pnl,
+          closedAt,
+          openedAt: pos.openedAt,
+          userId: pos.userId,
+          symbol: pos.symbol,
+          direction: pos.direction,
+          entryPrice: pos.entryPrice,
+          quantity: pos.quantity,
+          stopLoss: pos.stopLoss,
+          takeProfit: pos.takeProfit,
+          leverage: pos.leverage,
+          reason,
+        });
+      } else {
+        // Close position in DB via API
+        const res = await fetch("/api/positions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "close",
+            data: {
+              id: positionId,
+              exitPrice,
+              pnl: pos.pnl,
+              closedAt,
+              openedAt: pos.openedAt,
+              userId: pos.userId,
+              symbol: pos.symbol,
+              direction: pos.direction,
+              entryPrice: pos.entryPrice,
+              quantity: pos.quantity,
+              stopLoss: pos.stopLoss,
+              takeProfit: pos.takeProfit,
+              leverage: pos.leverage,
+              reason,
+            },
+          }),
+        });
 
-      const body = await res.json();
-      if (!body.success) {
-        throw new Error(body.error || "Failed to close position");
+        const body = await res.json();
+        if (!body.success) {
+          throw new Error(body.error || "Failed to close position");
+        }
       }
 
       this.positions.delete(positionId);
@@ -380,7 +443,7 @@ export class PaperTradingEngine {
       console.log(`[COOLDOWN_APPLIED] Added ${cooldownMinutes}m cooldown for ${pos.symbol}.`);
 
       // Update store balance to keep in sync
-      if (pos.userId) {
+      if (pos.userId && typeof window !== "undefined") {
         useWalletStore.getState().fetchWallet(pos.userId).catch(() => {});
       }
 

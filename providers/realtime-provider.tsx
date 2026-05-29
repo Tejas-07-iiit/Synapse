@@ -6,6 +6,7 @@ import { useMarketStore } from "@/src/stores/marketStore";
 import { fetch24hTickers } from "@/services/market/ticker";
 import { TickerInfo } from "@/src/strategy-engine/types";
 import { marketEngine } from "@/src/market-engine/market-engine";
+import { useAuthStore } from "@/store/useAuthStore";
 
 /**
  * Global provider to ensure the WebSocket connection is established once
@@ -17,6 +18,8 @@ export const RealtimeProvider = ({ children }: { children: React.ReactNode }) =>
   const setSupportedSymbols = useMarketStore((state) => state.setSupportedSymbols);
   const selectedSymbol = useMarketStore((state) => state.selectedSymbol);
   const timeframe = useMarketStore((state) => state.timeframe);
+  const user = useAuthStore((state) => state.user);
+  const authLoading = useAuthStore((state) => state.isLoading);
 
   // 1. Initialize supported symbols list from environment variables
   useEffect(() => {
@@ -72,8 +75,9 @@ export const RealtimeProvider = ({ children }: { children: React.ReactNode }) =>
     // It should stay alive for the duration of the app session.
   }, [supportedSymbols]);
 
-  // 3. Keep market engine synced with active symbol and timeframe
+  // 3. Keep market engine synced with active symbol, timeframe, and auth state
   useEffect(() => {
+    if (authLoading) return;
     if (!selectedSymbol || !timeframe) return;
 
     const startEngine = async () => {
@@ -85,7 +89,7 @@ export const RealtimeProvider = ({ children }: { children: React.ReactNode }) =>
     };
 
     startEngine();
-  }, [selectedSymbol, timeframe]);
+  }, [selectedSymbol, timeframe, authLoading, user?.id]);
 
   return <>{children}</>;
 };

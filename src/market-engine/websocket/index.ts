@@ -31,7 +31,7 @@ export type TickerCallback = (symbol: string, ticker: TickerInfo) => void;
 export type CandleCallback = (symbol: string, interval: string, candle: Candle, isClosed: boolean) => void;
 
 class WebSocketService {
-  private socket: WebSocket | null = null;
+  private socket: any = null;
   private reconnectDelay = 2000;
   private maxReconnectDelay = 30000;
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -53,10 +53,17 @@ class WebSocketService {
     return () => this.candleCallbacks.delete(cb);
   }
 
-  public connect() {
-    if (typeof window === "undefined") return;
+  private getWSConstructor() {
+    if (typeof window !== "undefined") {
+      return WebSocket;
+    }
+    return eval('require("ws")');
+  }
 
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+  public connect() {
+    const WS = this.getWSConstructor();
+
+    if (this.socket && (this.socket.readyState === WS.OPEN || this.socket.readyState === WS.CONNECTING)) {
       return;
     }
 
@@ -72,7 +79,7 @@ class WebSocketService {
         store.setWsStatus("RECONNECTING");
       }
 
-      this.socket = new WebSocket("wss://stream.binance.com:9443/ws");
+      this.socket = new WS("wss://stream.binance.com:9443/ws");
 
       this.socket.onopen = () => {
         console.log("[WS-Engine] Binance Market WebSocket open.");
@@ -146,7 +153,8 @@ class WebSocketService {
       }
     });
 
-    if (streamsToSubscribe.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
+    const WS = this.getWSConstructor();
+    if (streamsToSubscribe.length > 0 && this.socket && this.socket.readyState === WS.OPEN) {
       const payload = {
         method: "SUBSCRIBE",
         params: streamsToSubscribe,
@@ -173,7 +181,8 @@ class WebSocketService {
       }
     });
 
-    if (streamsToUnsubscribe.length > 0 && this.socket && this.socket.readyState === WebSocket.OPEN) {
+    const WS = this.getWSConstructor();
+    if (streamsToUnsubscribe.length > 0 && this.socket && this.socket.readyState === WS.OPEN) {
       const payload = {
         method: "UNSUBSCRIBE",
         params: streamsToUnsubscribe,
@@ -193,8 +202,9 @@ class WebSocketService {
     store.setWsConnectionState(false);
     store.setWsStatus("DISCONNECTED");
 
+    const WS = this.getWSConstructor();
     if (this.socket) {
-      if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+      if (this.socket.readyState === WS.OPEN || this.socket.readyState === WS.CONNECTING) {
         this.socket.close();
       }
       this.socket = null;
@@ -202,9 +212,10 @@ class WebSocketService {
   }
 
   private resubscribeActiveStreams() {
+    const WS = this.getWSConstructor();
     const streams = Array.from(this.activeStreams.keys());
     if (streams.length === 0) return;
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+    if (this.socket && this.socket.readyState === WS.OPEN) {
       const payload = {
         method: "SUBSCRIBE",
         params: streams,

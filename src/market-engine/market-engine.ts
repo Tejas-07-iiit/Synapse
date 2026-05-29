@@ -110,7 +110,16 @@ class MarketEngine {
 
       this.initializedTimeframe = tf;
 
-      // 1. Fetch historical candles for all coins from REST and compute initial indicators
+      // 1. MUST LOAD ACTIVE POSITIONS FIRST TO PREVENT BLIND EXECUTION
+      const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
+      try {
+        await PaperTradingEngine.loadActivePositions(targetUserId);
+        console.log(`[BOOT] Active positions loaded successfully.`);
+      } catch (err) {
+        console.error(`[BOOT] Failed to load active positions. Halting autonomous execution on boot.`, err);
+      }
+
+      // 2. Fetch historical candles for all coins from REST and compute initial indicators
       const timeframesToLoad = new Set<string>(["5m", "15m", tf]);
       for (const coin of coinsList) {
         for (const t of timeframesToLoad) {
@@ -123,13 +132,13 @@ class MarketEngine {
           // Store in the symbol-level cache
           useMarketStore.getState().setCandlesForSymbol(coin, t, candles);
 
-          // Run initial calculation (with isClosed = false since the last candle is incomplete/open)
+          // Run initial calculation (with isClosed = false, isHistoricalBackfill = true)
           const ticker = useMarketStore.getState().tickerData[coin] || null;
-          await this.recalculate(coin, t, candles, ticker, false);
+          await this.recalculate(coin, t, candles, ticker, false, true);
         }
       }
 
-      // 2. Load the active candles and indicators of the selected symbol for UI chart
+      // 3. Load the active candles and indicators of the selected symbol for UI chart
       const latestState = useMarketStore.getState();
       const tfKey = `${sym}_${tf}`;
       const activeCandles = latestState.allCandles[tfKey] || latestState.allCandles[sym] || [];
@@ -141,10 +150,6 @@ class MarketEngine {
         indicators: activeIndicators,
         analytics: activeAnalytics,
       });
-
-      // 3. Load active paper positions
-      const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
-      PaperTradingEngine.loadActivePositions(targetUserId).catch(() => {});
 
       // 4. Connect WebSocket & register callbacks
       marketWsService.connect();
@@ -275,7 +280,8 @@ class MarketEngine {
     timeframe: string,
     candles: Candle[],
     ticker: TickerInfo | null,
-    isClosed: boolean
+    isClosed: boolean,
+    isHistoricalBackfill: boolean = false
   ) {
     if (candles.length === 0) return;
 
@@ -283,7 +289,10 @@ class MarketEngine {
     const tf = timeframe.toLowerCase();
     const tfKey = `${sym}_${tf}`;
 
-    console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
+    if (!isHistoricalBackfill) {
+        console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
+    }
+    
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
     const { signals, indicators: currentIndicators } = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
 
@@ -322,6 +331,17 @@ class MarketEngine {
           analytics: analytics as unknown as MarketAnalytics,
         });
       }
+    }
+
+    // BLOCK LIVE EXECUTION IF THIS IS A HISTORICAL BACKFILL WARMUP
+    if (isHistoricalBackfill) {
+       // We still update indicators, but we don't dispatch trades
+       return;
+    }
+
+    // ONLY ALLOW AUTONOMOUS EXECUTION ON CONFIRMED CANDLE CLOSES
+    if (!isClosed) {
+        return;
     }
 
     // 3. Update signalStore with new prioritized signals

@@ -6,6 +6,8 @@ import { useSettingsStore } from "@/src/stores/settingsStore";
 export class PaperTradingEngine {
   private static positions: Map<string, VirtualPosition> = new Map(); // positionId -> Position
   private static lastDbUpdate: Map<string, number> = new Map(); // positionId -> timestamp
+  private static executionLocks: Set<string> = new Set(); // Mutex for concurrent symbol processing
+  private static symbolCooldowns: Map<string, number> = new Map(); // symbol -> cooldown expiry timestamp
 
   /**
    * Initializes virtual positions by loading any open ones from the database on startup.
@@ -128,140 +130,173 @@ export class PaperTradingEngine {
   ): Promise<VirtualPosition | null> {
     const sym = symbol.toUpperCase();
 
-    console.log(`[PAPER_TRADING] Attempting to open position: ${direction} ${sym} @ $${price}`);
-
-    // Check if position already exists for symbol in memory
-    let alreadyOpen = Array.from(this.positions.values()).some(
-      (p) => p.symbol === sym && p.status === "OPEN" && p.userId === userId
-    );
-
-    if (alreadyOpen) {
-      console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
-      console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+    // 1. ACQUIRE MUTEX LOCK
+    if (this.executionLocks.has(sym)) {
+      console.log(`[MUTEX_LOCK] Execution already in progress for ${sym}. Rejecting concurrent attempt.`);
       return null;
     }
+    this.executionLocks.add(sym);
 
-    // Double-check database via API call to be absolutely sure
     try {
-      const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
-      const body = await res.json();
-      if (body.success && Array.isArray(body.positions)) {
-        const dbOpen = body.positions.some(
-          (p: { symbol: string; status: string }) => p.symbol === sym && p.status === "OPEN"
-        );
-        if (dbOpen) {
-          alreadyOpen = true;
-          console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
-          console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
-          return null;
+      console.log(`[PAPER_TRADING] Attempting to open position: ${direction} ${sym} @ $${price}`);
+
+      // 1.5 CHECK COOLDOWN
+      const cooldownExpiry = this.symbolCooldowns.get(sym) || 0;
+      if (Date.now() < cooldownExpiry) {
+        const remainingSeconds = Math.ceil((cooldownExpiry - Date.now()) / 1000);
+        console.log(`[COOLDOWN_ACTIVE] ${sym} is in cooldown. Execution blocked. Remaining: ${remainingSeconds}s.`);
+        return null;
+      }
+
+      // Check if position already exists for symbol in memory
+      let alreadyOpen = Array.from(this.positions.values()).some(
+        (p) => p.symbol === sym && p.status === "OPEN" && p.userId === userId
+      );
+
+      if (alreadyOpen) {
+        console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+        console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+        return null;
+      }
+
+      // Double-check database via API call to be absolutely sure
+      try {
+        const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
+        const body = await res.json();
+        if (body.success && Array.isArray(body.positions)) {
+          const dbOpen = body.positions.some(
+            (p: { symbol: string; status: string }) => p.symbol === sym && p.status === "OPEN"
+          );
+          if (dbOpen) {
+            alreadyOpen = true;
+            console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+            console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+            return null;
+          }
         }
-      }
-    } catch (e) {
-      console.warn("[PaperTradingEngine] Database position lock check failed, proceeding with in-memory state:", e);
-    }
-
-    console.log(`[TRADE_ALLOWED] No active position found for ${sym}`);
-
-    let qty = 0;
-    let orderValueUsdt = 0;
-
-    const wallet = useWalletStore.getState();
-    const settings = useSettingsStore.getState();
-
-    if (sizeUsdt === null) {
-      orderValueUsdt = wallet.balance * (settings.riskPerTradePct / 100) * leverage;
-    } else {
-      orderValueUsdt = sizeUsdt;
-    }
-    
-    console.log(`[POSITION_SIZING] Wallet balance: $${wallet.balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
-
-    if (orderValueUsdt <= 0 || isNaN(orderValueUsdt)) {
-      console.log(`[POSITION_REJECTED] Invalid position size calculated: $${orderValueUsdt.toFixed(2)}. Aborting.`);
-      return null;
-    }
-
-    qty = orderValueUsdt / price;
-
-    if (qty <= 0 || isNaN(qty)) {
-      console.log(`[POSITION_REJECTED] Invalid quantity calculated: ${qty}. Aborting.`);
-      return null;
-    }
-    
-    // Validate order against risk manager
-    const dummyOrder: VirtualOrder = {
-      id: "risk-check",
-      symbol: sym,
-      direction,
-      type: "MARKET",
-      price,
-      quantity: qty,
-      timestamp: Date.now(),
-      status: "PENDING",
-    };
-
-    const riskResult = RiskEngine.validateOrder(dummyOrder, this.getOpenPositions().length, alreadyOpen);
-    if (!riskResult.allowed) {
-      return null;
-    }
-
-    try {
-      console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
-      // Save position to DB via API
-      const res = await fetch("/api/positions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({  
-          action: "open",
-          data: {
-            userId,
-            symbol: sym,
-            direction,
-            entryPrice: price,
-            quantity: qty,
-            stopLoss,
-            takeProfit,
-            leverage,
-          },
-        }),
-      });
-
-      const body = await res.json();
-      if (!body.success) {
-        throw new Error(body.error || "Failed to open position");
+      } catch (e) {
+        console.warn("[PaperTradingEngine] Database position lock check failed, proceeding with in-memory state:", e);
       }
 
-      const dbPos = body.position;
-      console.log(`[TRADE_CREATED] Trade successfully saved in DB. Position ID: ${dbPos.id}`);
+      console.log(`[TRADE_ALLOWED] No active position found for ${sym}`);
 
-      const position: VirtualPosition = {
-        id: dbPos.id,
-        userId: dbPos.userId,
-        symbol: dbPos.symbol,
-        direction: dbPos.direction as "LONG" | "SHORT",
-        entryPrice: dbPos.entryPrice,
-        currentPrice: dbPos.currentPrice,
-        quantity: dbPos.quantity,
-        stopLoss: dbPos.stopLoss,
-        takeProfit: dbPos.takeProfit,
-        leverage: dbPos.leverage,
-        pnl: dbPos.pnl,
-        status: "OPEN",
-        openedAt: new Date(dbPos.openedAt).getTime(),
-        closedAt: null,
+      let qty = 0;
+      let orderValueUsdt = 0;
+
+      const wallet = useWalletStore.getState();
+      const settings = useSettingsStore.getState();
+
+      if (sizeUsdt === null) {
+        orderValueUsdt = wallet.balance * (settings.riskPerTradePct / 100) * leverage;
+      } else {
+        orderValueUsdt = sizeUsdt;
+      }
+      
+      console.log(`[POSITION_SIZING] Wallet balance: $${wallet.balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
+
+      if (orderValueUsdt <= 0 || isNaN(orderValueUsdt)) {
+        console.log(`[POSITION_REJECTED] Invalid position size calculated: $${orderValueUsdt.toFixed(2)}. Aborting.`);
+        return null;
+      }
+
+      qty = orderValueUsdt / price;
+
+      if (qty <= 0 || isNaN(qty)) {
+        console.log(`[POSITION_REJECTED] Invalid quantity calculated: ${qty}. Aborting.`);
+        return null;
+      }
+      
+      // Calculate available balance (Balance - Margin Used)
+      const usedMargin = Array.from(this.positions.values())
+        .filter(p => p.status === "OPEN")
+        .reduce((sum, p) => sum + (p.entryPrice * p.quantity) / p.leverage, 0);
+
+      const availableBalance = wallet.balance - usedMargin;
+
+      // Validate order against risk manager
+      const dummyOrder: VirtualOrder = {
+        id: "risk-check",
+        symbol: sym,
+        direction,
+        type: "MARKET",
+        price,
+        quantity: qty,
+        timestamp: Date.now(),
+        status: "PENDING",
       };
 
-      this.positions.set(position.id, position);
-      console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
-      
-      // Update store balance to keep in sync
-      useWalletStore.getState().fetchWallet(userId).catch(() => {});
+      const riskResult = RiskEngine.validateOrder(
+        dummyOrder, 
+        this.getOpenPositions().length, 
+        alreadyOpen,
+        leverage,
+        availableBalance
+      );
+      if (!riskResult.allowed) {
+        return null;
+      }
 
-      return position;
-    } catch (err) {
-      console.log(`[POSITION_REJECTED] Database write failed: ${err}`);
-      console.error("[PaperTrading] Failed to open position in DB:", err);
-      return null;
+      try {
+        console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
+        // Save position to DB via API
+        const res = await fetch("/api/positions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({  
+            action: "open",
+            data: {
+              userId,
+              symbol: sym,
+              direction,
+              entryPrice: price,
+              quantity: qty,
+              stopLoss,
+              takeProfit,
+              leverage,
+            },
+          }),
+        });
+
+        const body = await res.json();
+        if (!body.success) {
+          throw new Error(body.error || "Failed to open position");
+        }
+
+        const dbPos = body.position;
+        console.log(`[TRADE_CREATED] Trade successfully saved in DB. Position ID: ${dbPos.id}`);
+
+        const position: VirtualPosition = {
+          id: dbPos.id,
+          userId: dbPos.userId,
+          symbol: dbPos.symbol,
+          direction: dbPos.direction as "LONG" | "SHORT",
+          entryPrice: dbPos.entryPrice,
+          currentPrice: dbPos.currentPrice,
+          quantity: dbPos.quantity,
+          stopLoss: dbPos.stopLoss,
+          takeProfit: dbPos.takeProfit,
+          leverage: dbPos.leverage,
+          pnl: dbPos.pnl,
+          status: "OPEN",
+          openedAt: new Date(dbPos.openedAt).getTime(),
+          closedAt: null,
+        };
+
+        this.positions.set(position.id, position);
+        console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
+        
+        // Update store balance to keep in sync
+        useWalletStore.getState().fetchWallet(userId).catch(() => {});
+
+        return position;
+      } catch (err) {
+        console.log(`[POSITION_REJECTED] Database write failed: ${err}`);
+        console.error("[PaperTrading] Failed to open position in DB:", err);
+        return null;
+      }
+    } finally {
+      // 2. ALWAYS RELEASE MUTEX LOCK
+      this.executionLocks.delete(sym);
     }
   }
 
@@ -277,10 +312,12 @@ export class PaperTradingEngine {
     const pos = this.positions.get(positionId);
     if (!pos || pos.status === "CLOSED") return false;
 
+    // SYNCHRONOUSLY MARK AS CLOSED TO PREVENT WEBSOCKET TICK RACE CONDITIONS
+    pos.status = "CLOSED";
+
     console.log(`[PAPER_TRADING] Closing position ${positionId} for ${pos.symbol} at exit price $${exitPrice} (Reason: ${reason})`);
 
     const closedAt = Date.now();
-    pos.status = "CLOSED";
     pos.closedAt = closedAt;
     pos.currentPrice = exitPrice;
 
@@ -288,9 +325,9 @@ export class PaperTradingEngine {
     const entryVal = pos.entryPrice * pos.quantity;
     const exitVal = exitPrice * pos.quantity;
     if (pos.direction === "LONG") {
-      pos.pnl = (exitVal - entryVal) * pos.leverage;
+      pos.pnl = exitVal - entryVal;
     } else {
-      pos.pnl = (entryVal - exitVal) * pos.leverage;
+      pos.pnl = entryVal - exitVal;
     }
 
     try {
@@ -328,6 +365,20 @@ export class PaperTradingEngine {
       this.positions.delete(positionId);
       console.log(`[POSITION_CLOSED] ✅ Closed position: ${pos.direction} ${pos.symbol} at $${exitPrice} (${reason}). PnL: $${pos.pnl.toFixed(2)}`);
       
+      // APPLY COOLDOWN
+      let cooldownMinutes = 15; // default
+      if (reason === "STOP_LOSS" || reason === "STOPPED" || reason === "SL HIT") {
+        cooldownMinutes = 30;
+      } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
+        cooldownMinutes = 5;
+      } else if (reason === "MANUAL") {
+        cooldownMinutes = 10;
+      }
+      
+      const cooldownMs = cooldownMinutes * 60 * 1000;
+      this.symbolCooldowns.set(pos.symbol, Date.now() + cooldownMs);
+      console.log(`[COOLDOWN_APPLIED] Added ${cooldownMinutes}m cooldown for ${pos.symbol}.`);
+
       // Update store balance to keep in sync
       if (pos.userId) {
         useWalletStore.getState().fetchWallet(pos.userId).catch(() => {});

@@ -94,8 +94,8 @@ export default function MarketCards() {
       const currentVal = currentPrice * pos.quantity;
       
       const pnl = isLong 
-        ? (currentVal - entryVal) * leverage
-        : (entryVal - currentVal) * leverage;
+        ? currentVal - entryVal
+        : entryVal - currentVal;
       
       total += pnl;
     });

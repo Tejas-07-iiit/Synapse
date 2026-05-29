@@ -145,8 +145,8 @@ export default function PortfolioPage() {
       const posMargin = (entryPrice * quantity) / leverage;
       
       const pnl = isLong 
-        ? (currentPrice - entryPrice) * quantity * leverage
-        : (entryPrice - currentPrice) * quantity * leverage;
+        ? (currentPrice - entryPrice) * quantity
+        : (entryPrice - currentPrice) * quantity;
         
       const roi = isLong
         ? ((currentPrice - entryPrice) / entryPrice) * 100 * leverage

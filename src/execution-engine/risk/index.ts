@@ -9,12 +9,13 @@ export class RiskEngine {
   public static validateOrder(
     order: VirtualOrder,
     activePositionsCount: number,
-    alreadyOpenForSymbol?: boolean,
+    alreadyOpenForSymbol: boolean,
+    leverage: number,
+    availableBalance: number
   ): { allowed: boolean; reason?: string } {
     const settings = useSettingsStore.getState();
-    const wallet = useWalletStore.getState();
 
-    console.log(`[RISK_ENGINE] Validating order: ${order.direction} ${order.symbol} @ $${order.price} | Qty: ${order.quantity} | Active Positions: ${activePositionsCount}`);
+    console.log(`[RISK_ENGINE] Validating order: ${order.direction} ${order.symbol} @ $${order.price} | Qty: ${order.quantity} | Leverage: ${leverage}x | Available: $${availableBalance.toFixed(2)}`);
 
     // 0.5. Symbol lock check
     if (alreadyOpenForSymbol) {
@@ -51,23 +52,18 @@ export class RiskEngine {
       };
     }
 
-    // 2. Limit trade size based on risk % and wallet balance
+    // 2. Limit trade size based on risk % and available balance (Margin check)
     const orderValueUsdt = order.price * order.quantity;
+    const requiredMargin = orderValueUsdt / leverage;
     
-    // Fallback logic if balance is 0 but we want to allow testing, though realistically
-    // if balance is < orderValueUsdt, it should fail.
-    if (orderValueUsdt > wallet.balance) {
-      const reason = `Insufficient Balance: Order size ($${orderValueUsdt.toFixed(2)}) exceeds available balance ($${wallet.balance.toFixed(2)}).`;
+    if (requiredMargin > availableBalance) {
+      const reason = `Insufficient Margin: Required margin ($${requiredMargin.toFixed(2)}) exceeds available balance ($${availableBalance.toFixed(2)}).`;
       console.log(`[POSITION_REJECTED] Risk Engine rejection: ${reason}`);
       return {
         allowed: false,
         reason,
       };
     }
-
-    // A strict risk engine would limit the size to `maxAllowedSize` strictly.
-    // For now we just enforce that the size doesn't exceed wallet balance, 
-    // and ideally the sizing function already calculated it based on risk.
 
     console.log(`[RISK_ENGINE] Order approved by Risk Engine.`);
     return { allowed: true };

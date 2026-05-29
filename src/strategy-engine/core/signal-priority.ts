@@ -2,7 +2,7 @@ import { StrategySignal } from "../types";
 import { StrategyEvaluator } from "./evaluator";
 
 export class SignalPriorityEngine {
-  private static readonly CONFIDENCE_THRESHOLD = 55; // Suppress signals with confidence lower than 55%
+  private static readonly CONFIDENCE_THRESHOLD = 75; // Suppress signals with confidence lower than 75%
 
   /**
    * Processes, ranks, suppresses, and resolves conflicts among signals.

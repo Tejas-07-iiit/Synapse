@@ -36,6 +36,24 @@ export async function POST(request: Request) {
 
       await ensureUserExists(userId);
 
+      // DATABASE-LEVEL POSITION LOCK
+      // Ensure no open position already exists for this symbol and user
+      const existingOpen = await prisma.position.findFirst({
+        where: {
+          userId,
+          symbol,
+          status: "OPEN",
+        },
+      });
+
+      if (existingOpen) {
+        console.warn(`[API-Positions] Blocked duplicate position creation for ${symbol} (User: ${userId})`);
+        return NextResponse.json(
+          { success: false, error: `An open position already exists for ${symbol}` },
+          { status: 409 } // Conflict
+        );
+      }
+
       const dbPos = await prisma.position.create({
         data: {
           userId,

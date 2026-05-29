@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { Eye, EyeOff, Clock, Activity, Zap } from "lucide-react";
+import { Clock, Activity, Zap } from "lucide-react";
 import { useMarketStore } from "@/store/market/useMarketStore";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -89,7 +89,7 @@ const TradeZoneOverlay = ({
       "--tpHeight": `${tpHeight}px`,
       "--slTop": `${slTop}px`,
       "--slHeight": `${slHeight}px`,
-    } as any);
+    } as React.CSSProperties & Record<string, string | number>);
   }, [chartApi, seriesApi, overlay]);
 
   useEffect(() => {
@@ -159,7 +159,15 @@ export default function TradingViewChart() {
 
   const [showEMA, setShowEMA] = useState(true);
   const [showSMA, setShowSMA] = useState(true);
-  const [hoverData, setHoverData] = useState<any>(null);
+  const [hoverData, setHoverData] = useState<{
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    ema?: number;
+    sma?: number;
+  } | null>(null);
   const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
   
   // APIs for Overlays
@@ -236,8 +244,8 @@ export default function TradingViewChart() {
         text: `ENTRY @ ${entryPrice.toLocaleString()}`,
       });
 
-      let pnl = isLong ? (currentPrice - entryPrice) * pos.quantity : (entryPrice - currentPrice) * pos.quantity;
-      let roi = (pnl / (entryPrice * pos.quantity)) * 100;
+      const pnl = isLong ? (currentPrice - entryPrice) * pos.quantity : (entryPrice - currentPrice) * pos.quantity;
+      const roi = (pnl / (entryPrice * pos.quantity)) * 100;
 
       o.push({
         id: pos.id,
@@ -294,7 +302,15 @@ export default function TradingViewChart() {
     return { markers: m, priceLines: p, overlays: o };
   }, [symbol, activePositions, tickerData, candles, activeSignals]);
 
-  const handleCrosshairMove = useCallback((data: any) => {
+  const handleCrosshairMove = useCallback((data: {
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    ema?: number;
+    sma?: number;
+  } | null) => {
     setHoverData(data);
   }, []);
 

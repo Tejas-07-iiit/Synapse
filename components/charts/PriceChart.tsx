@@ -163,14 +163,14 @@ export function PriceChart({
     // EMA Series
     const emaSeries = chart.addSeries(LineSeries, {
       color: "#3b82f6",
-      lineWidth: 1.5,
+      lineWidth: 2,
       visible: showEMA,
     });
 
     // SMA Series
     const smaSeries = chart.addSeries(LineSeries, {
       color: "#eab308",
-      lineWidth: 1.5,
+      lineWidth: 2,
       visible: showSMA,
     });
 
@@ -189,16 +189,16 @@ export function PriceChart({
         return;
       }
 
-      const candleData = param.seriesData.get(candleSeries) as any;
-      const volumeData = param.seriesData.get(volumeSeries) as any;
-      const emaData = param.seriesData.get(emaSeries) as any;
-      const smaData = param.seriesData.get(smaSeries) as any;
+      const candleData = param.seriesData.get(candleSeries) as { open: number; high: number; low: number; close: number } | undefined;
+      const volumeData = param.seriesData.get(volumeSeries) as { value: number } | undefined;
+      const emaData = param.seriesData.get(emaSeries) as { value: number } | undefined;
+      const smaData = param.seriesData.get(smaSeries) as { value: number } | undefined;
 
       onCrosshairMove({
-        open: candleData.open,
-        high: candleData.high,
-        low: candleData.low,
-        close: candleData.close,
+        open: candleData?.open ?? 0,
+        high: candleData?.high ?? 0,
+        low: candleData?.low ?? 0,
+        close: candleData?.close ?? 0,
         volume: volumeData ? volumeData.value : 0,
         ema: emaData ? emaData.value : undefined,
         sma: smaData ? smaData.value : undefined,
@@ -304,7 +304,7 @@ export function PriceChart({
               time: toTime(sorted[i].time),
               value: val,
             };
-          }).filter(Boolean) as any[];
+          }).filter(Boolean) as { time: Time; value: number }[];
         };
 
         if (indicators.ema20) emaSeriesRef.current?.setData(createLineData(indicators.ema20));

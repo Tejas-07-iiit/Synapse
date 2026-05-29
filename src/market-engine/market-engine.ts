@@ -200,7 +200,7 @@ class MarketEngine {
         const tfLower = tf.toLowerCase();
 
         // 1. Update the symbol-specific candle cache
-        store.updateLastCandleForSymbol(symUpper, tfLower, candle, isClosed);
+        store.updateLastCandleForSymbol(symUpper, tfLower, candle);
 
         // 2. If it's the active symbol and timeframe, update the active candles for UI
         if (symUpper === this.activeSymbol && tfLower === this.activeTimeframe) {
@@ -214,56 +214,56 @@ class MarketEngine {
 
         if (!prevOpenTime) {
           this.lastCandleOpenTime.set(key, openTime);
-          this.onCandleOpen(symUpper, tfLower, candle);
+          this.onCandleOpen();
         } else if (openTime > prevOpenTime) {
           this.lastCandleOpenTime.set(key, openTime);
-          this.onCandleOpen(symUpper, tfLower, candle);
+          this.onCandleOpen();
         } else {
-          this.onCandleUpdate(symUpper, tfLower, candle);
+          this.onCandleUpdate();
         }
 
         if (isClosed) {
-          this.onCandleClose(symUpper, tfLower, candle);
+          this.onCandleClose(symUpper, tfLower);
         }
       });
     }
   }
 
-  private onCandleOpen(_symbol: string, _timeframe: string, _candle: Candle) {
-    // console.log(`[CandleLifecycle] 🟢 Candle Opened for ${symbol} (${timeframe}) at open time ${candle.time}`);
+  private onCandleOpen() {
+    // Candle Opened
+  }
+ 
+  private onCandleUpdate() {
+    // Candle Updated
   }
 
-  private onCandleUpdate(_symbol: string, _timeframe: string, _candle: Candle) {
-    // console.log(`[CandleLifecycle] 🟡 Candle Updated for ${symbol} (${timeframe})`);
-  }
-
-  private onCandleClose(symbol: string, timeframe: string, candle: Candle) {
+  private onCandleClose(symbol: string, timeframe: string) {
     console.log(`[CandleLifecycle] 🔴 Candle Closed for ${symbol} (${timeframe})`);
     
     if (timeframe === "5m") {
-      this.on5mCandleClose(symbol, candle);
+      this.on5mCandleClose(symbol);
     } else if (timeframe === "15m") {
-      this.on15mCandleClose(symbol, candle);
+      this.on15mCandleClose(symbol);
     } else {
-      this.onOtherCandleClose(symbol, timeframe, candle);
+      this.onOtherCandleClose(symbol, timeframe);
     }
   }
 
-  private async on5mCandleClose(symbol: string, _candle: Candle) {
+  private async on5mCandleClose(symbol: string) {
     const store = useMarketStore.getState();
     const updatedCandles = store.allCandles[`${symbol}_5m`] || [];
     const ticker = store.tickerData[symbol] || null;
     await this.recalculate(symbol, "5m", updatedCandles, ticker, true);
   }
-
-  private async on15mCandleClose(symbol: string, _candle: Candle) {
+ 
+  private async on15mCandleClose(symbol: string) {
     const store = useMarketStore.getState();
     const updatedCandles = store.allCandles[`${symbol}_15m`] || [];
     const ticker = store.tickerData[symbol] || null;
     await this.recalculate(symbol, "15m", updatedCandles, ticker, true);
   }
-
-  private async onOtherCandleClose(symbol: string, timeframe: string, _candle: Candle) {
+ 
+  private async onOtherCandleClose(symbol: string, timeframe: string) {
     const store = useMarketStore.getState();
     const tfLower = timeframe.toLowerCase();
     const updatedCandles = store.allCandles[`${symbol}_${tfLower}`] || [];

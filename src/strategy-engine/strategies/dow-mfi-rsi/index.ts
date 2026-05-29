@@ -16,7 +16,6 @@ export class DowFactorMFIRSIStrategy implements TradingStrategy {
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators, structure } = context;
     const lastIdx = candles.length - 1;
-    const close = candles[lastIdx].close;
     const volume = candles[lastIdx].volume;
 
     const rsi = indicators.rsi[lastIdx];

@@ -125,7 +125,6 @@ export class StructureEngine {
         
         // Base consolidation area: 4 candles prior to breakout
         const baseStart = i - 4;
-        const baseEnd = i - 1;
         const baseHigh = Math.max(...highs.slice(baseStart, i));
         const baseLow = Math.min(...lows.slice(baseStart, i));
 

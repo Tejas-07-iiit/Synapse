@@ -14,7 +14,7 @@ export class RallyBaseDropStrategy implements TradingStrategy {
   public indicatorsRequired = ["atr", "volumeMA"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number; zone?: SupplyDemandZone } {
-    const { candles, indicators, structure } = context;
+    const { candles, structure } = context;
     const reasoning: string[] = [];
 
     if (!structure || !structure.zones || structure.zones.length === 0) {
@@ -27,8 +27,6 @@ export class RallyBaseDropStrategy implements TradingStrategy {
     const open = candles[lastIdx].open;
     const high = candles[lastIdx].high;
     const low = candles[lastIdx].low;
-    const volume = candles[lastIdx].volume;
-    const volumeMA = indicators.volumeMA?.[lastIdx] || 1;
 
     // Candle characteristics
     const range = high - low || 1;

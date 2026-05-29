@@ -1,6 +1,5 @@
 import { VirtualOrder } from "../types";
 import { useSettingsStore } from "@/src/stores/settingsStore";
-import { useWalletStore } from "@/src/stores/walletStore";
 
 export class RiskEngine {
   /**

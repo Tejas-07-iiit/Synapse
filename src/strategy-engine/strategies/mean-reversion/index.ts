@@ -17,8 +17,6 @@ export class MeanReversionStrategy implements TradingStrategy {
     const lastIdx = candles.length - 1;
     const close = candles[lastIdx].close;
     const rsiLast = indicators.rsi[lastIdx];
-    const rsiPrev = lastIdx > 0 ? indicators.rsi[lastIdx - 1] : 50;
-    const atr = indicators.atr[lastIdx] || (close * 0.015);
     const ema20 = indicators.ema20[lastIdx] || close;
     const sma50 = indicators.sma50[lastIdx] || close;
     const macdHist = indicators.macdHist[lastIdx] || 0;

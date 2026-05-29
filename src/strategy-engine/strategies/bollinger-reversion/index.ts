@@ -39,7 +39,6 @@ export class BollingerReversionStrategy implements TradingStrategy {
 
     // Candle wicks for rejection checks
     const range = high - low || 1;
-    const body = Math.abs(close - open);
     const upperWick = high - Math.max(open, close);
     const lowerWick = Math.min(open, close) - low;
     const upperWickRatio = upperWick / range;
@@ -132,7 +131,6 @@ export class BollingerReversionStrategy implements TradingStrategy {
     const lastSwingLow = swingLows.length > 0 ? swingLows[swingLows.length - 1].price : low;
 
     const bbMiddle = indicators.bbMiddle[lastIdx] || close;
-    const ema20 = indicators.ema20?.[lastIdx] || bbMiddle;
 
     if (direction === "LONG") {
       stopLoss = Math.min(low, lastSwingLow) - 0.2 * atr;

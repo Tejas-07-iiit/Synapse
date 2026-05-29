@@ -52,7 +52,7 @@ interface MarketState {
   setIndicatorsForSymbol: (symbol: string, indicators: IndicatorValues) => void;
   setAnalyticsForSymbol: (symbol: string, analytics: MarketAnalytics) => void;
   setCandlesForSymbol: (symbol: string, timeframe: string, candles: Candle[]) => void;
-  updateLastCandleForSymbol: (symbol: string, timeframe: string, candle: Candle, isClosed: boolean) => void;
+  updateLastCandleForSymbol: (symbol: string, timeframe: string, candle: Candle) => void;
   updateTicker: (symbol: string, ticker: TickerInfo) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -143,7 +143,7 @@ export const useMarketStore = create<MarketState>((set) => ({
         ...(isCurrentlyActive ? { candles: [...candles] } : {})
       };
     }),
-  updateLastCandleForSymbol: (symbol, timeframe, candle, _isClosed) =>
+  updateLastCandleForSymbol: (symbol, timeframe, candle) =>
     set((state) => {
       const sym = symbol.toUpperCase();
       const tf = timeframe.toLowerCase();

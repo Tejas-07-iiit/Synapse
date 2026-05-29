@@ -86,7 +86,6 @@ export default function MarketCards() {
     let total = 0;
     activePositions.forEach((pos) => {
       const livePrice = tickerData[pos.symbol]?.price || pos.currentPrice || pos.entryPrice;
-      const leverage = pos.leverage || 1;
       const isLong = pos.direction === "LONG";
       
       const currentPrice = livePrice;

@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       name: "token",
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to false to support deployments over HTTP (like EC2 public IPs/DNS without SSL)
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24, // 1 day

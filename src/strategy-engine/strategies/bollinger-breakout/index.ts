@@ -28,7 +28,6 @@ export class BollingerBreakoutStrategy implements TradingStrategy {
     const adxLast = indicators.adx[lastIdx];
     const adxPrev = lastIdx > 0 ? indicators.adx[lastIdx - 1] : 20;
     const volumeMA = indicators.volumeMA[lastIdx] || 1;
-    const atr = indicators.atr[lastIdx] || (close * 0.015);
 
     // Calculate Bollinger Band width
     const bbWidth = bbMiddle > 0 ? (bbUpper - bbLower) / bbMiddle : 0;

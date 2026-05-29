@@ -4,7 +4,6 @@ import React from "react";
 import { 
   LayoutDashboard, 
   TrendingUp, 
-  Cpu, 
   Briefcase, 
   Settings,
   LineChart,

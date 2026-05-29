@@ -68,6 +68,18 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true);
     setLastSync(new Date().toLocaleTimeString());
+    const checkPing = async () => {
+      const start = Date.now();
+      try {
+        await fetch("https://api.binance.com/api/v3/ping");
+        setPingLatency(Date.now() - start);
+      } catch {
+        setPingLatency(null);
+      }
+    };
+    checkPing();
+    const interval = setInterval(checkPing, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -77,7 +89,7 @@ export default function SettingsPage() {
       settings.fetchSettings(user.id);
       wallet.fetchWallet(user.id);
     }
-  }, [isAuthenticated, authLoading, router, user?.id]);
+  }, [isAuthenticated, authLoading, router, user?.id, settings, wallet]);
 
   useEffect(() => {
     if (!settings.loading && !settings.error) {
@@ -91,7 +103,7 @@ export default function SettingsPage() {
         prefSymbol: settings.prefSymbol,
       });
     }
-  }, [settings.autoTrading, settings.riskPerTradePct, settings.maxOpenTrades, settings.defaultSlPct, settings.defaultTpPct, settings.prefTimeframe, settings.prefSymbol, settings.loading]);
+  }, [settings.autoTrading, settings.riskPerTradePct, settings.maxOpenTrades, settings.defaultSlPct, settings.defaultTpPct, settings.prefTimeframe, settings.prefSymbol, settings.loading, settings.error]);
 
   // Load UI-only settings from localStorage on mount
   useEffect(() => {
@@ -146,7 +158,7 @@ export default function SettingsPage() {
         setResetSuccess(true);
         setTimeout(() => setResetSuccess(false), 2000);
       } catch (err) {
-        console.error("Failed to reset wallet");
+        console.error("Failed to reset wallet:", err);
       }
     }
   };
@@ -488,6 +500,15 @@ export default function SettingsPage() {
                       >
                         <Key size={12} />
                         Update Password
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetWallet}
+                        className="w-full py-2 bg-yellow-500/10 hover:bg-yellow-600/20 border border-yellow-500/20 text-yellow-600 rounded-xl font-bold uppercase tracking-wider text-[10px] transition duration-200 cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <RotateCcw size={12} />
+                        {resetSuccess ? "Wallet Reset Successful!" : "Reset Paper Wallet ($10k)"}
                       </button>
 
                       <button

@@ -16,7 +16,6 @@ export class DefensiveStrategy implements TradingStrategy {
     const { candles, indicators } = context;
     const lastIdx = candles.length - 1;
     const close = candles[lastIdx].close;
-    const open = candles[lastIdx].open;
     const high = candles[lastIdx].high;
     const low = candles[lastIdx].low;
     const rsiLast = indicators.rsi[lastIdx];

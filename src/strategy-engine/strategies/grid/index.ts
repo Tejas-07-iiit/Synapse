@@ -25,16 +25,13 @@ export class GridStrategy implements TradingStrategy {
     const macdHist = indicators.macdHist[lastIdx];
     const prevMacdHist = lastIdx > 0 ? indicators.macdHist[lastIdx - 1] : 0;
     const adxLast = indicators.adx[lastIdx];
-    const atr = indicators.atr[lastIdx] || (close * 0.015);
 
     let direction: "LONG" | "SHORT" | "HOLD" = "HOLD";
     const reasoning: string[] = [];
 
-    // Calculate local Support and Resistance over last 15 candles
     const last15 = candles.slice(-15);
     const support = Math.min(...last15.map((c) => c.low));
     const resistance = Math.max(...last15.map((c) => c.high));
-    const midpoint = (support + resistance) / 2;
     const rangeWidth = (resistance - support) / close;
 
     // Volatility Filter and Trend Filter (ADX)

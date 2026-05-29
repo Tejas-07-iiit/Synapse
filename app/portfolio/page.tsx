@@ -254,19 +254,18 @@ export default function PortfolioPage() {
       ? totalExposure / portfolioStats.totalValue
       : 1;
 
+    const maxDrawdown = portfolioStats.realizedPnl >= 0
+      ? 0
+      : (Math.abs(portfolioStats.realizedPnl) / portfolioStats.totalDeposited) * 100;
+
     return {
       marginRatio,
       exposureLevel,
       riskColor,
       effectiveLeverage,
-      maxDrawdown: realizedPnlToDrawdown(portfolioStats.realizedPnl)
+      maxDrawdown
     };
   }, [portfolioStats]);
-
-  function realizedPnlToDrawdown(pnl: number) {
-    if (pnl >= 0) return 0;
-    return (Math.abs(pnl) / portfolioStats.totalDeposited) * 100;
-  }
 
   // Recent activity log generator
   const recentActivities = useMemo(() => {

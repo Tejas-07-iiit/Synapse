@@ -72,7 +72,6 @@ export class LorentzianStrategy implements TradingStrategy {
     const lastIdx = candles.length - 1;
     const close = candles[lastIdx].close;
     const adxLast = indicators.adx[lastIdx];
-    const atr = indicators.atr[lastIdx] || (close * 0.015);
 
     let direction: "LONG" | "SHORT" | "HOLD" = "HOLD";
     const reasoning: string[] = [];

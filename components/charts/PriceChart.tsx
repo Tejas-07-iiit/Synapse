@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   createChart,
   CandlestickSeries,
@@ -57,7 +57,6 @@ interface PriceChartProps {
 }
 
 export function PriceChart({
-  symbol,
   candles,
   indicators,
   markers = [],
@@ -219,8 +218,10 @@ export function PriceChart({
       onChartReady(chart, candleSeries);
     }
 
+    const currentPriceLines = priceLinesRef.current;
+
     return () => {
-      priceLinesRef.current.clear();
+      currentPriceLines.clear();
       markersPluginRef.current?.detach();
       markersPluginRef.current = null;
       chart.remove();
@@ -232,6 +233,7 @@ export function PriceChart({
       volumeMASeriesRef.current = null;
       dataHydratedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

@@ -22,9 +22,9 @@ export class RegimeEngine {
     const price = candles[lastIdx].close;
     
     // 1. Calculate Bollinger Bands width and average width
-    const bbUpper = indicators.bbUpper[lastIdx];
-    const bbLower = indicators.bbLower[lastIdx];
-    const bbMiddle = indicators.bbMiddle[lastIdx];
+    const bbUpper = indicators.bbUpper?.[lastIdx];
+    const bbLower = indicators.bbLower?.[lastIdx];
+    const bbMiddle = indicators.bbMiddle?.[lastIdx];
     
     let currentWidth = 0.05;
     let avgWidth = 0.05;
@@ -35,9 +35,9 @@ export class RegimeEngine {
       let count = 0;
       const start = Math.max(0, lastIdx - 20);
       for (let i = start; i <= lastIdx; i++) {
-        const u = indicators.bbUpper[i];
-        const l = indicators.bbLower[i];
-        const m = indicators.bbMiddle[i];
+        const u = indicators.bbUpper?.[i];
+        const l = indicators.bbLower?.[i];
+        const m = indicators.bbMiddle?.[i];
         if (u && l && m) {
           widthSum += (u - l) / m;
           count++;
@@ -47,22 +47,22 @@ export class RegimeEngine {
     }
 
     // 2. Check EMA Slope over last 5 candles
-    const ema20Last = indicators.ema20[lastIdx];
-    const ema20Prev = indicators.ema20[Math.max(0, lastIdx - 5)] ?? ema20Last;
+    const ema20Last = indicators.ema20?.[lastIdx];
+    const ema20Prev = indicators.ema20?.[Math.max(0, lastIdx - 5)] ?? ema20Last;
     const emaSlope = ema20Last ? (ema20Last - ema20Prev) / ema20Last : 0;
 
     // 3. Volume confirmation
     const volume = candles[lastIdx].volume;
-    const volumeMA = indicators.volumeMA[lastIdx] ?? 0;
+    const volumeMA = indicators.volumeMA?.[lastIdx] ?? 0;
     const isVolumeExpanding = volumeMA > 0 && volume > volumeMA * 1.5;
 
     // 4. RSI metrics
-    const rsi = indicators.rsi[lastIdx] ?? 50;
-    const rsiPrev = indicators.rsi[Math.max(0, lastIdx - 3)] ?? rsi;
+    const rsi = indicators.rsi?.[lastIdx] ?? 50;
+    const rsiPrev = indicators.rsi?.[Math.max(0, lastIdx - 3)] ?? rsi;
 
     // 5. MACD metrics
-    const macdHist = indicators.macdHist[lastIdx] ?? 0;
-    const macdHistPrev = indicators.macdHist[Math.max(0, lastIdx - 3)] ?? macdHist;
+    const macdHist = indicators.macdHist?.[lastIdx] ?? 0;
+    const macdHistPrev = indicators.macdHist?.[Math.max(0, lastIdx - 3)] ?? macdHist;
 
     // Classification Decision Tree
     
@@ -77,7 +77,7 @@ export class RegimeEngine {
     }
 
     // C. Trends
-    const sma50 = indicators.sma50[lastIdx];
+    const sma50 = indicators.sma50?.[lastIdx];
     if (ema20Last && sma50) {
       if (price > ema20Last && ema20Last > sma50 && emaSlope > 0.0005) {
         return "Bullish Trend";

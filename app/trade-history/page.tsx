@@ -97,6 +97,69 @@ interface UnifiedTrade {
   indicatorSnapshot?: any | null;
 }
 
+interface FilterDropdownProps {
+  label: string;
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (val: string) => void;
+}
+
+function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div ref={dropdownRef} className="relative flex flex-col gap-1 min-w-[130px]">
+      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">{label}</span>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] hover:bg-[#1e293b]/70 transition duration-150 h-9"
+      >
+        <span className="truncate">{selectedOption.label}</span>
+        <span className="ml-1 text-[9px] text-[#e2e8f0]/60">▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-[100%] left-0 z-40 mt-1.5 w-full min-w-[150px] bg-[#0f172a] border border-[#1e293b] rounded-[10px] shadow-xl overflow-hidden py-1 max-h-60 overflow-y-auto">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 text-xs font-semibold transition duration-150 ${
+                  isSelected 
+                    ? "bg-[#2563eb] text-white" 
+                    : "text-[#e2e8f0] hover:bg-[#1e293b]"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TradeHistoryPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
@@ -114,6 +177,9 @@ export default function TradeHistoryPage() {
   const [selectedStrategyFilter, setSelectedStrategyFilter] = useState("ALL");
   const [selectedDirectionFilter, setSelectedDirectionFilter] = useState("ALL");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("ALL");
+  const [selectedDateFilter, setSelectedDateFilter] = useState("ALL");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -238,39 +304,6 @@ export default function TradeHistoryPage() {
     return list.sort((a, b) => b.openedAt.getTime() - a.openedAt.getTime());
   }, [activePositions, closedTrades, tickerData]);
 
-  // Derived Statistics
-  const stats = useMemo(() => {
-    const closed = unifiedTrades.filter(t => t.status !== "OPEN");
-    const total = closed.length;
-    const wins = closed.filter(t => t.pnl > 0).length;
-    const losses = closed.filter(t => t.pnl <= 0).length;
-    const winRate = total > 0 ? (wins / total) * 100 : 0;
-    const lossRate = total > 0 ? (losses / total) * 100 : 0;
-    
-    const totalPnl = unifiedTrades.reduce((sum, t) => sum + t.pnl, 0);
-    const avgRoi = total > 0 ? closed.reduce((sum, t) => sum + t.roi, 0) / total : 0;
-
-    let bestTrade = closed.length > 0 ? closed[0] : null;
-    let worstTrade = closed.length > 0 ? closed[0] : null;
-
-    closed.forEach((t) => {
-      if (bestTrade && t.pnl > bestTrade.pnl) bestTrade = t;
-      if (worstTrade && t.pnl < worstTrade.pnl) worstTrade = t;
-    });
-
-    return {
-      totalTrades: unifiedTrades.length,
-      closedTradesCount: total,
-      activeTradesCount: unifiedTrades.filter(t => t.status === "OPEN").length,
-      winRate,
-      lossRate,
-      totalPnl,
-      avgRoi,
-      bestTrade,
-      worstTrade
-    };
-  }, [unifiedTrades]);
-
   // Unique Strategies and Coins for Filter Lists
   const filterOptions = useMemo(() => {
     const coins = Array.from(new Set(unifiedTrades.map((t) => t.symbol)));
@@ -290,15 +323,95 @@ export default function TradeHistoryPage() {
         statusMatch = trade.status === selectedStatusFilter;
       }
 
+      // Date range filtering preset checks
+      let dateMatch = true;
+      if (selectedDateFilter !== "ALL") {
+        const now = new Date();
+        const tradeDate = new Date(trade.openedAt);
+
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        
+        if (selectedDateFilter === "TODAY") {
+          dateMatch = tradeDate >= startOfToday;
+        } else if (selectedDateFilter === "YESTERDAY") {
+          const endOfYesterday = new Date(startOfToday.getTime() - 1);
+          dateMatch = tradeDate >= startOfYesterday && tradeDate <= endOfYesterday;
+        } else if (selectedDateFilter === "LAST_7") {
+          const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+          dateMatch = tradeDate >= sevenDaysAgo;
+        } else if (selectedDateFilter === "LAST_30") {
+          const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+          dateMatch = tradeDate >= thirtyDaysAgo;
+        } else if (selectedDateFilter === "THIS_MONTH") {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          dateMatch = tradeDate >= startOfMonth;
+        } else if (selectedDateFilter === "LAST_MONTH") {
+          const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+          dateMatch = tradeDate >= startOfLastMonth && tradeDate <= endOfLastMonth;
+        } else if (selectedDateFilter === "THIS_YEAR") {
+          const startOfYear = new Date(now.getFullYear(), 0, 1);
+          dateMatch = tradeDate >= startOfYear;
+        } else if (selectedDateFilter === "LAST_YEAR") {
+          const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
+          const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+          dateMatch = tradeDate >= startOfLastYear && tradeDate <= endOfLastYear;
+        } else if (selectedDateFilter === "CUSTOM") {
+          if (startDate) {
+            const start = new Date(startDate);
+            dateMatch = dateMatch && tradeDate >= start;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            dateMatch = dateMatch && tradeDate <= end;
+          }
+        }
+      }
+
       const searchMatch = 
         searchQuery === "" ||
         trade.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
         trade.strategyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         trade.id.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return coinMatch && strategyMatch && directionMatch && statusMatch && searchMatch;
+      return coinMatch && strategyMatch && directionMatch && statusMatch && dateMatch && searchMatch;
     });
-  }, [unifiedTrades, selectedSymbolFilter, selectedStrategyFilter, selectedDirectionFilter, selectedStatusFilter, searchQuery]);
+  }, [unifiedTrades, selectedSymbolFilter, selectedStrategyFilter, selectedDirectionFilter, selectedStatusFilter, selectedDateFilter, startDate, endDate, searchQuery]);
+
+  // Derived Statistics (Recalculated from filteredTrades list)
+  const stats = useMemo(() => {
+    const closed = filteredTrades.filter(t => t.status !== "OPEN");
+    const total = closed.length;
+    const wins = closed.filter(t => t.pnl > 0).length;
+    const losses = closed.filter(t => t.pnl <= 0).length;
+    const winRate = total > 0 ? (wins / total) * 100 : 0;
+    const lossRate = total > 0 ? (losses / total) * 100 : 0;
+    
+    const totalPnl = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const avgRoi = total > 0 ? closed.reduce((sum, t) => sum + t.roi, 0) / total : 0;
+
+    let bestTrade = closed.length > 0 ? closed[0] : null;
+    let worstTrade = closed.length > 0 ? closed[0] : null;
+
+    closed.forEach((t) => {
+      if (bestTrade && t.pnl > bestTrade.pnl) bestTrade = t;
+      if (worstTrade && t.pnl < worstTrade.pnl) worstTrade = t;
+    });
+
+    return {
+      totalTrades: filteredTrades.length,
+      closedTradesCount: total,
+      activeTradesCount: filteredTrades.filter(t => t.status === "OPEN").length,
+      winRate,
+      lossRate,
+      totalPnl,
+      avgRoi,
+      bestTrade,
+      worstTrade
+    };
+  }, [filteredTrades]);
 
   if (authLoading) {
     return (
@@ -442,85 +555,118 @@ export default function TradeHistoryPage() {
           </div>
 
           {/* Section 3: Filters Control Panel */}
-          <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col lg:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+            <div className="flex flex-wrap items-end gap-3 w-full">
               
               {/* Search Query Input */}
-              <div className="relative flex-1 sm:flex-initial min-w-[200px]">
-                <Search className="absolute left-3 top-2.5 text-muted-foreground" size={14} />
-                <input
-                  type="text"
-                  placeholder="Search symbol or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-secondary/40 border border-border text-xs rounded-xl focus:outline-none focus:border-primary text-foreground"
-                />
+              <div className="flex flex-col gap-1 min-w-[200px] flex-1 sm:flex-initial">
+                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">Search</span>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-muted-foreground" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search symbol or ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] hover:bg-[#1e293b]/70 transition duration-150 h-9"
+                  />
+                </div>
               </div>
 
               {/* Coin Symbol Filter */}
-              <div className="flex items-center gap-1.5 bg-secondary/40 border border-border px-2.5 py-1.5 rounded-xl text-xs">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Asset:</span>
-                <select
-                  value={selectedSymbolFilter}
-                  onChange={(e) => setSelectedSymbolFilter(e.target.value)}
-                  className="bg-transparent text-foreground border-none font-bold uppercase focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">ALL</option>
-                  {filterOptions.coins.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
+              <FilterDropdown
+                label="Asset"
+                value={selectedSymbolFilter}
+                options={[
+                  { label: "ALL", value: "ALL" },
+                  ...filterOptions.coins.map(c => ({ label: c, value: c }))
+                ]}
+                onChange={setSelectedSymbolFilter}
+              />
 
               {/* Strategy Filter */}
-              <div className="flex items-center gap-1.5 bg-secondary/40 border border-border px-2.5 py-1.5 rounded-xl text-xs">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Strategy:</span>
-                <select
-                  value={selectedStrategyFilter}
-                  onChange={(e) => setSelectedStrategyFilter(e.target.value)}
-                  className="bg-transparent text-foreground border-none font-bold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">ALL</option>
-                  {filterOptions.strategies.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
+              <FilterDropdown
+                label="Strategy"
+                value={selectedStrategyFilter}
+                options={[
+                  { label: "ALL", value: "ALL" },
+                  ...filterOptions.strategies.map(s => ({ label: s, value: s }))
+                ]}
+                onChange={setSelectedStrategyFilter}
+              />
 
               {/* Direction Filter */}
-              <div className="flex items-center gap-1.5 bg-secondary/40 border border-border px-2.5 py-1.5 rounded-xl text-xs">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Side:</span>
-                <select
-                  value={selectedDirectionFilter}
-                  onChange={(e) => setSelectedDirectionFilter(e.target.value)}
-                  className="bg-transparent text-foreground border-none font-bold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">ALL</option>
-                  <option value="LONG">LONG</option>
-                  <option value="SHORT">SHORT</option>
-                </select>
-              </div>
+              <FilterDropdown
+                label="Side"
+                value={selectedDirectionFilter}
+                options={[
+                  { label: "ALL", value: "ALL" },
+                  { label: "LONG", value: "LONG" },
+                  { label: "SHORT", value: "SHORT" }
+                ]}
+                onChange={setSelectedDirectionFilter}
+              />
 
               {/* Status Filter */}
-              <div className="flex items-center gap-1.5 bg-secondary/40 border border-border px-2.5 py-1.5 rounded-xl text-xs">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">Status:</span>
-                <select
-                  value={selectedStatusFilter}
-                  onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                  className="bg-transparent text-foreground border-none font-bold focus:outline-none cursor-pointer"
-                >
-                  <option value="ALL">ALL</option>
-                  <option value="OPEN">OPEN</option>
-                  <option value="CLOSED">CLOSED</option>
-                  <option value="STOPPED">STOPPED</option>
-                  <option value="TP HIT">TP HIT</option>
-                </select>
-              </div>
+              <FilterDropdown
+                label="Status"
+                value={selectedStatusFilter}
+                options={[
+                  { label: "ALL", value: "ALL" },
+                  { label: "OPEN", value: "OPEN" },
+                  { label: "CLOSED", value: "CLOSED" },
+                  { label: "STOPPED", value: "STOPPED" },
+                  { label: "TP HIT", value: "TP HIT" }
+                ]}
+                onChange={setSelectedStatusFilter}
+              />
 
-            </div>
-            
-            <div className="text-[10px] font-black uppercase text-muted-foreground self-end lg:self-auto">
-              Showing {filteredTrades.length} of {unifiedTrades.length} Records
+              {/* Date Range Filter */}
+              <FilterDropdown
+                label="Date Range"
+                value={selectedDateFilter}
+                options={[
+                  { label: "All Time", value: "ALL" },
+                  { label: "Today", value: "TODAY" },
+                  { label: "Yesterday", value: "YESTERDAY" },
+                  { label: "Last 7 Days", value: "LAST_7" },
+                  { label: "Last 30 Days", value: "LAST_30" },
+                  { label: "This Month", value: "THIS_MONTH" },
+                  { label: "Last Month", value: "LAST_MONTH" },
+                  { label: "This Year", value: "THIS_YEAR" },
+                  { label: "Last Year", value: "LAST_YEAR" },
+                  { label: "Custom Range", value: "CUSTOM" }
+                ]}
+                onChange={setSelectedDateFilter}
+              />
+
+              {/* Custom Date Pickers */}
+              {selectedDateFilter === "CUSTOM" && (
+                <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">Start Date</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-3 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] h-9 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-wider">End Date</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-3 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] h-9 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[10px] font-black uppercase text-muted-foreground self-end h-9 flex items-center ml-auto">
+                Showing {filteredTrades.length} of {unifiedTrades.length} Records
+              </div>
             </div>
           </div>
 
@@ -552,8 +698,8 @@ export default function TradeHistoryPage() {
                     </tr>
                   ) : filteredTrades.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-5 py-12 text-center text-muted-foreground">
-                        No trade records found matching selected filters.
+                      <td colSpan={10} className="px-5 py-12 text-center text-muted-foreground font-semibold">
+                        No trades found for selected filters
                       </td>
                     </tr>
                   ) : (

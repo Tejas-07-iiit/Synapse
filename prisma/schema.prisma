@@ -102,47 +102,63 @@ model MarketSnapshot {
 }
 
 model Position {
-  id           String    @id @default(uuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  symbol       String
-  direction    String    // LONG, SHORT
-  entryPrice   Float
-  currentPrice Float
-  quantity     Float
-  stopLoss     Float?
-  takeProfit   Float?
-  leverage     Int       @default(1)
-  pnl          Float     @default(0.0)
-  status       String    // OPEN, CLOSED
-  openedAt     DateTime  @default(now())
-  closedAt     DateTime?
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  symbol            String
+  direction         String    // LONG, SHORT
+  entryPrice        Float
+  currentPrice      Float
+  quantity          Float
+  stopLoss          Float?
+  takeProfit        Float?
+  leverage          Int       @default(1)
+  pnl               Float     @default(0.0)
+  status            String    // OPEN, CLOSED
+  openedAt          DateTime  @default(now())
+  closedAt          DateTime?
+  // Strategy intelligence fields
+  strategyId        String?
+  strategyName      String?
+  strategyCategory  String?
+  entryReason       String?
+  confidenceAtEntry Float?
+  marketRegime      String?
+  indicatorSnapshot Json?
 
   @@index([userId])
   @@index([symbol])
 }
 
 model Trade {
-  id            String    @id @default(uuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  symbol        String
-  strategyName  String
-  direction     String    // LONG, SHORT
-  entryPrice    Float
-  exitPrice     Float
-  currentPrice  Float?
-  stopLoss      Float?
-  takeProfit    Float?
-  quantity      Float     @default(0.0)
-  leverage      Int       @default(1)
-  pnl           Float
-  roi           Float     // ROI %
-  confidence    Float     // Confidence score used
-  status        String    // OPEN, CLOSED, STOPPED, TP HIT
-  openedAt      DateTime
-  closedAt      DateTime  @default(now())
-  executionType String    // PAPER, LIVE
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  symbol            String
+  strategyName      String
+  direction         String    // LONG, SHORT
+  entryPrice        Float
+  exitPrice         Float
+  currentPrice      Float?
+  stopLoss          Float?
+  takeProfit        Float?
+  quantity          Float     @default(0.0)
+  leverage          Int       @default(1)
+  pnl               Float
+  roi               Float     // ROI %
+  confidence        Float     // Confidence score used
+  status            String    // OPEN, CLOSED, STOPPED, TP HIT
+  openedAt          DateTime
+  closedAt          DateTime  @default(now())
+  executionType     String    // PAPER, LIVE
+  // Strategy intelligence fields
+  strategyId        String?
+  strategyCategory  String?
+  entryReason       String?
+  exitReason        String?
+  confidenceAtEntry Float?
+  marketRegime      String?
+  indicatorSnapshot Json?
 
   @@index([userId])
   @@index([symbol])

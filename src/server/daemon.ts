@@ -33,6 +33,13 @@ async function runDaemon() {
           leverage: data.leverage,
           pnl: 0.0,
           status: "OPEN",
+          strategyId: data.strategyId || null,
+          strategyName: data.strategyName || null,
+          strategyCategory: data.strategyCategory || null,
+          entryReason: data.entryReason || null,
+          confidenceAtEntry: data.confidenceAtEntry || null,
+          marketRegime: data.marketRegime || null,
+          indicatorSnapshot: data.indicatorSnapshot || null,
         },
       });
     },
@@ -57,6 +64,14 @@ async function runDaemon() {
         takeProfit,
         leverage,
         reason,
+        strategyId,
+        strategyName,
+        strategyCategory,
+        entryReason,
+        confidenceAtEntry,
+        marketRegime,
+        indicatorSnapshot,
+        exitReason,
       } = data;
 
       // Update position to CLOSED
@@ -72,7 +87,7 @@ async function runDaemon() {
 
       // Map reason to status
       let tradeStatus = "CLOSED";
-      if (reason === "STOP_LOSS" || reason === "STOPPED") {
+      if (reason === "STOP_LOSS" || reason === "STOPPED" || reason === "SL HIT") {
         tradeStatus = "STOPPED";
       } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
         tradeStatus = "TP HIT";
@@ -88,7 +103,15 @@ async function runDaemon() {
         data: {
           userId,
           symbol,
-          strategyName: "Central Engine",
+          strategyName: strategyName || "Central Engine",
+          strategyId: strategyId || null,
+          strategyCategory: strategyCategory || null,
+          entryReason: entryReason || null,
+          exitReason: exitReason || null,
+          confidenceAtEntry: confidenceAtEntry || null,
+          confidence: confidenceAtEntry || 0.8,
+          marketRegime: marketRegime || null,
+          indicatorSnapshot: indicatorSnapshot || null,
           direction,
           entryPrice,
           exitPrice,
@@ -99,7 +122,6 @@ async function runDaemon() {
           leverage,
           pnl,
           roi,
-          confidence: 0.8,
           status: tradeStatus,
           openedAt: new Date(openedAt),
           closedAt: new Date(closedAt),
@@ -309,7 +331,8 @@ async function runDaemon() {
               autoTrading: settings.autoTrading,
               maxOpenTrades: settings.maxOpenTrades,
               riskPerTradePct: settings.riskPerTradePct,
-            } // explicitSettings
+            }, // explicitSettings
+            sig // Pass signal context
           );
 
           if (position) {

@@ -93,7 +93,7 @@ class WebSocketService {
         this.startHeartbeat();
       };
 
-      this.socket.onmessage = (event) => {
+      this.socket.onmessage = (event: any) => {
         this.lastMessageTime = Date.now();
         try {
           const data = JSON.parse(event.data);
@@ -129,7 +129,7 @@ class WebSocketService {
         }
       };
 
-      this.socket.onerror = (err) => {
+      this.socket.onerror = (err: any) => {
         console.error("[WS-Engine] Binance Market WebSocket error:", err);
         store.setWsConnectionState(false, "WebSocket connection error");
       };

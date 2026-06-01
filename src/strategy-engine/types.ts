@@ -97,6 +97,7 @@ export interface StrategyContext {
 export interface StrategySignal {
   strategyId: string;
   strategyName: string;
+  strategyCategory?: string;
   symbol: string;
   timeframe: string;
   signalType: "LONG" | "SHORT" | "HOLD"; // Required in Phase 4
@@ -171,6 +172,7 @@ export interface TradingStrategy {
   id: string;
   name: string;
   description: string;
+  type?: string;
   timeframe?: string;            // Standard single timeframe representation
   timeframes?: string[];         // Array of timeframes for backward compatibility
   symbols?: string[];            // Active symbols

@@ -13,6 +13,14 @@ export interface VirtualPosition {
   status: "OPEN" | "CLOSED";
   openedAt: number;
   closedAt: number | null;
+  // Strategy intelligence fields
+  strategyId?: string;
+  strategyName?: string;
+  strategyCategory?: string;
+  entryReason?: string;
+  confidenceAtEntry?: number;
+  marketRegime?: string;
+  indicatorSnapshot?: any;
 }
 
 export interface VirtualOrder {

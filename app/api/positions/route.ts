@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const { action, data } = body;
 
     if (action === "open") {
-      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage } = data;
+      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage, strategyId, strategyName, strategyCategory, entryReason, confidenceAtEntry, marketRegime, indicatorSnapshot } = data;
 
       await ensureUserExists(userId);
 
@@ -67,6 +67,13 @@ export async function POST(request: Request) {
           leverage: leverage || 1,
           pnl: 0.0,
           status: "OPEN",
+          strategyId: strategyId || null,
+          strategyName: strategyName || null,
+          strategyCategory: strategyCategory || null,
+          entryReason: entryReason || null,
+          confidenceAtEntry: confidenceAtEntry || null,
+          marketRegime: marketRegime || null,
+          indicatorSnapshot: indicatorSnapshot || null,
         },
       });
 
@@ -124,12 +131,29 @@ export async function POST(request: Request) {
       const priceDiff = isLong ? (exitPrice - finalEntryPrice) : (finalEntryPrice - exitPrice);
       const roi = (priceDiff / finalEntryPrice) * 100 * finalLeverage;
 
+      const finalStrategyId = existingPos?.strategyId || data.strategyId || null;
+      const finalStrategyName = existingPos?.strategyName || data.strategyName || "Central Engine";
+      const finalStrategyCategory = existingPos?.strategyCategory || data.strategyCategory || null;
+      const finalEntryReason = existingPos?.entryReason || data.entryReason || null;
+      const finalConfidenceAtEntry = existingPos?.confidenceAtEntry || data.confidenceAtEntry || null;
+      const finalMarketRegime = existingPos?.marketRegime || data.marketRegime || null;
+      const finalIndicatorSnapshot = existingPos?.indicatorSnapshot || data.indicatorSnapshot || null;
+      const finalExitReason = data.exitReason || null;
+
       if (finalUserId) {
         await prisma.trade.create({
           data: {
             userId: finalUserId,
             symbol: finalSymbol,
-            strategyName: "Central Engine",
+            strategyId: finalStrategyId,
+            strategyName: finalStrategyName,
+            strategyCategory: finalStrategyCategory,
+            entryReason: finalEntryReason,
+            exitReason: finalExitReason,
+            confidenceAtEntry: finalConfidenceAtEntry,
+            confidence: finalConfidenceAtEntry || 0.8,
+            marketRegime: finalMarketRegime,
+            indicatorSnapshot: finalIndicatorSnapshot,
             direction: finalDirection,
             entryPrice: finalEntryPrice,
             exitPrice,
@@ -140,7 +164,6 @@ export async function POST(request: Request) {
             leverage: finalLeverage,
             pnl,
             roi,
-            confidence: 0.8, // Default confidence
             status: tradeStatus,
             openedAt: finalOpenedAt,
             closedAt: finalClosedAt,

@@ -131,11 +131,49 @@ export class SignalGenerator {
       };
     }
 
+    const STRATEGY_CATEGORIES: Record<string, string> = {
+      "ema-crossover": "Trend Following",
+      "rsi-reversal": "Reversal",
+      "macd-momentum": "Momentum",
+      "bollinger-breakout": "Breakout",
+      "mean-reversion": "Mean-Reversion",
+      "momentum": "Momentum",
+      "defensive": "Defensive",
+      "grid": "Grid",
+      "lorentzian": "Lorentzian",
+      "donchian-breakout": "Breakout",
+      "rally-base-drop": "SupplyDemand",
+      "sr-sweep": "LiquiditySweep",
+      "bollinger-reversion": "MeanReversion",
+      "short-term-reversal": "Reversal",
+      "dow-mfi-rsi": "Momentum",
+      "parabolic-rsi": "Momentum",
+      "range-breakout-high": "Breakout",
+      "residual-momentum": "Momentum",
+      "time-series-momentum": "Momentum",
+      "wavetrend": "Momentum",
+      "hash-ribbons": "Sentiment",
+      "news-fear-greed": "Sentiment",
+      "ema-cross-adx": "Trend Following",
+      "golden-cross": "Trend Following",
+      "heiken-ashi-swing": "Trend Following",
+      "hyper-supertrend": "Trend Following",
+      "ichimoku-cloud": "Trend Following",
+      "ma-crossover-var": "Trend Following",
+      "sma-trend-filter": "Trend Following",
+      "t3-nexus": "Trend Following",
+      "squeeze-momentum": "Volatility",
+      "volatility-regime": "Volatility",
+      "zeiierman-volatility": "Volatility",
+    };
+
     const strategyName = STRATEGY_NAMES[strategyId] || "AI Confluence Strategy";
+    const strategyCategory = STRATEGY_CATEGORIES[strategyId] || "Central Engine";
 
     return {
       strategyId,
       strategyName,
+      strategyCategory,
       signal,
       signalType: signal,
       confidence,

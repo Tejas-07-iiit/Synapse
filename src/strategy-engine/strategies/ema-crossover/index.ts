@@ -27,20 +27,12 @@ export class EMACrossoverStrategy implements TradingStrategy {
 
     const prevDiff = ema12Prev - ema26Prev;
 
-    if (ema12Last > ema26Last) {
+    if (ema12Last > ema26Last && prevDiff <= 0) {
       direction = "LONG";
-      if (prevDiff <= 0) {
-        reasoning.push(`Bullish Crossover: Fast EMA(12) crossed above Slow EMA(26) at $${candles[lastIdx].close.toFixed(2)}.`);
-      } else {
-        reasoning.push(`Bullish Trend: Fast EMA(12) remains above Slow EMA(26).`);
-      }
-    } else if (ema12Last < ema26Last) {
+      reasoning.push(`Bullish Crossover: Fast EMA(12) crossed above Slow EMA(26) at $${candles[lastIdx].close.toFixed(2)}.`);
+    } else if (ema12Last < ema26Last && prevDiff >= 0) {
       direction = "SHORT";
-      if (prevDiff >= 0) {
-        reasoning.push(`Bearish Crossover: Fast EMA(12) crossed below Slow EMA(26) at $${candles[lastIdx].close.toFixed(2)}.`);
-      } else {
-        reasoning.push(`Bearish Trend: Fast EMA(12) remains below Slow EMA(26).`);
-      }
+      reasoning.push(`Bearish Crossover: Fast EMA(12) crossed below Slow EMA(26) at $${candles[lastIdx].close.toFixed(2)}.`);
     }
 
     return { direction, reasoning };
@@ -59,7 +51,7 @@ export class EMACrossoverStrategy implements TradingStrategy {
 
   public generateSignal(context: StrategyContext): StrategySignal {
     const { direction, reasoning } = this.analyze(context);
-    const confidence = ConfidenceEngine.calculate(direction, context);
+    const confidence = ConfidenceEngine.calculate(direction, context, this.id);
 
     return SignalGenerator.createSignal(
       this.id,

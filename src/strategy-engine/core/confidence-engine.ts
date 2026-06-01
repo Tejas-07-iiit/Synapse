@@ -1,4 +1,41 @@
 import { StrategyContext } from "../types";
+import { RegimeEngine } from "./regime-engine";
+
+const STRATEGY_CATEGORIES: Record<string, string> = {
+  "ema-crossover": "Trend Following",
+  "rsi-reversal": "Reversal",
+  "macd-momentum": "Momentum",
+  "bollinger-breakout": "Breakout",
+  "mean-reversion": "Mean-Reversion",
+  "momentum": "Momentum",
+  "defensive": "Defensive",
+  "grid": "Grid",
+  "lorentzian": "Lorentzian",
+  "donchian-breakout": "Breakout",
+  "rally-base-drop": "SupplyDemand",
+  "sr-sweep": "LiquiditySweep",
+  "bollinger-reversion": "MeanReversion",
+  "short-term-reversal": "Reversal",
+  "dow-mfi-rsi": "Momentum",
+  "parabolic-rsi": "Momentum",
+  "range-breakout-high": "Breakout",
+  "residual-momentum": "Momentum",
+  "time-series-momentum": "Momentum",
+  "wavetrend": "Momentum",
+  "hash-ribbons": "Sentiment",
+  "news-fear-greed": "Sentiment",
+  "ema-cross-adx": "Trend Following",
+  "golden-cross": "Trend Following",
+  "heiken-ashi-swing": "Trend Following",
+  "hyper-supertrend": "Trend Following",
+  "ichimoku-cloud": "Trend Following",
+  "ma-crossover-var": "Trend Following",
+  "sma-trend-filter": "Trend Following",
+  "t3-nexus": "Trend Following",
+  "squeeze-momentum": "Volatility",
+  "volatility-regime": "Volatility",
+  "zeiierman-volatility": "Volatility",
+};
 
 export class ConfidenceEngine {
   /**
@@ -6,132 +43,138 @@ export class ConfidenceEngine {
    */
   public static calculate(
     direction: "LONG" | "SHORT" | "HOLD",
-    context: StrategyContext
+    context: StrategyContext,
+    strategyId?: string
   ): number {
     if (direction === "HOLD") return 0;
 
-    let score = 50; // Base starting score
-
-    const { candles, indicators, historicalIndicators } = context;
-    if (candles.length === 0) return score;
+    const { candles, indicators } = context;
+    if (candles.length === 0) return 50;
 
     const lastIdx = candles.length - 1;
     const price = candles[lastIdx].close;
 
-    // 1. EMA Alignment (EMA 20 vs SMA 50 vs Price)
-    const ema20 = indicators.ema20[lastIdx];
-    const sma50 = indicators.sma50[lastIdx];
+    let score = 0;
+
+    // 1. Trend Alignment (Max 25 pts)
+    let trendScore = 0;
+    const ema20 = indicators.ema20?.[lastIdx];
+    const sma50 = indicators.sma50?.[lastIdx];
     if (ema20 && sma50) {
       if (direction === "LONG") {
         if (price > ema20 && ema20 > sma50) {
-          score += 15; // Strong bullish trend alignment
-        } else if (price < ema20 || ema20 < sma50) {
-          score -= 10; // Conflicting trend
+          trendScore = 25; // Perfect trend alignment
+        } else if (price > ema20 || ema20 > sma50) {
+          trendScore = 12; // Partial alignment
         }
       } else if (direction === "SHORT") {
         if (price < ema20 && ema20 < sma50) {
-          score += 15; // Strong bearish trend alignment
-        } else if (price > ema20 || ema20 > sma50) {
-          score -= 10; // Conflicting trend
+          trendScore = 25; // Perfect trend alignment
+        } else if (price < ema20 || ema20 < sma50) {
+          trendScore = 12; // Partial alignment
         }
       }
     }
+    score += trendScore;
 
-    // 2. RSI Strength (overbought/oversold conditions supporting reversal, or trend support)
-    const rsi = indicators.rsi[lastIdx] ?? 50;
+    // 2. Momentum Alignment (Max 20 pts)
+    let momentumScore = 0;
+    const macdHist = indicators.macdHist?.[lastIdx] ?? 0;
+    const rsi = indicators.rsi?.[lastIdx] ?? 50;
+    const rsiPrev = lastIdx > 0 ? (indicators.rsi?.[lastIdx - 1] ?? 50) : 50;
+
     if (direction === "LONG") {
-      if (rsi < 35) {
-        score += 15; // Strong oversold buyer exhaustion
-      } else if (rsi > 70) {
-        score -= 15; // Overbought risk
-      } else if (rsi > 50) {
-        score += 5; // Bullish momentum
-      }
+      if (macdHist > 0) momentumScore += 10;
+      if (rsi > rsiPrev) momentumScore += 10;
     } else if (direction === "SHORT") {
-      if (rsi > 65) {
-        score += 15; // Strong overbought seller exhaustion
-      } else if (rsi < 30) {
-        score -= 15; // Oversold risk
-      } else if (rsi < 50) {
-        score += 5; // Bearish momentum
-      }
+      if (macdHist < 0) momentumScore += 10;
+      if (rsi < rsiPrev) momentumScore += 10;
     }
+    score += momentumScore;
 
-    // 3. MACD Agreement (MACD line vs signal line, and histogram sign)
-    const macdHist = indicators.macdHist[lastIdx] ?? 0;
-    if (direction === "LONG") {
-      if (macdHist > 0) {
-        score += 10; // Positive momentum confirmation
-      } else {
-        score -= 10; // Conflicting momentum
-      }
-    } else if (direction === "SHORT") {
-      if (macdHist < 0) {
-        score += 10; // Negative momentum confirmation
-      } else {
-        score -= 10; // Conflicting momentum
-      }
-    }
-
-    // 4. Volume Confirmation (Volume exceeding moving average)
+    // 3. Volume Confirmation (Max 15 pts)
+    let volumeScore = 0;
     const volume = candles[lastIdx].volume;
-    const volumeMA = indicators.volumeMA[lastIdx] ?? 0;
-    if (volumeMA > 0 && volume > volumeMA * 1.3) {
-      score += 10; // High volume confirmations support breakouts/reversals
-    }
-
-    // 5. Volatility (Check Bollinger Band width and ATR comparison)
-    const bbUpper = indicators.bbUpper[lastIdx];
-    const bbLower = indicators.bbLower[lastIdx];
-    const bbMiddle = indicators.bbMiddle[lastIdx];
-    const atr = indicators.atr[lastIdx] ?? 0;
-    
-    if (bbUpper && bbLower && bbMiddle && atr > 0) {
-      const bbWidth = (bbUpper - bbLower) / bbMiddle;
-      // If volatility is expanding (breakout scenario), boost confidence
-      if (bbWidth > 0.05) {
-        score += 5;
+    const volumeMA = indicators.volumeMA?.[lastIdx] ?? 0;
+    if (volumeMA > 0) {
+      if (volume > volumeMA * 1.5) {
+        volumeScore = 15; // Strong volume expansion
+      } else if (volume > volumeMA) {
+        volumeScore = 8;  // Moderate volume expansion
       }
     }
+    score += volumeScore;
 
-    // 6. Momentum acceleration (MACD histogram expanding in the signal direction)
-    const prevMacdHist = lastIdx > 0 ? (indicators.macdHist[lastIdx - 1] ?? 0) : 0;
-    if (direction === "LONG" && macdHist > prevMacdHist) {
-      score += 5;
-    } else if (direction === "SHORT" && macdHist < prevMacdHist) {
-      score += 5;
+    // 4. Regime Match (Max 20 pts)
+    let regimeScore = 0;
+    const regimeCategory = RegimeEngine.getRegimeCategory(context);
+    const category = strategyId ? (STRATEGY_CATEGORIES[strategyId] || "Central Engine") : "Central Engine";
+
+    const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
+    const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
+    const isBreakoutStrat = category === "Breakout" || category === "Volatility";
+    const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
+
+    if (regimeCategory === "TRENDING") {
+      if (isTrendingStrat) regimeScore = 20;
+      else if (category === "Lorentzian") regimeScore = 10;
+    } else if (regimeCategory === "RANGING" || regimeCategory === "ACCUMULATION" || regimeCategory === "DISTRIBUTION") {
+      if (isMeanReversionStrat) regimeScore = 20;
+      else if (category === "Lorentzian" || isTrendingStrat) regimeScore = 10;
+    } else if (regimeCategory === "BREAKOUT") {
+      if (isBreakoutStrat) regimeScore = 20;
+      else if (category === "Lorentzian") regimeScore = 10;
+    } else if (regimeCategory === "LIQUIDITY_SWEEP") {
+      if (isSweepStrat) regimeScore = 20;
+      else if (category === "Lorentzian") regimeScore = 10;
     }
+    score += regimeScore;
 
-    // 7. Candle Structure (Close relative to Open)
-    const open = candles[lastIdx].open;
-    const close = candles[lastIdx].close;
-    if (direction === "LONG" && close > open) {
-      score += 5; // Bullish candle
-    } else if (direction === "SHORT" && close < open) {
-      score += 5; // Bearish candle
-    }
+    // 5. Confirmation Indicators (Max 20 pts)
+    let confirmScore = 0;
+    const stochRsiK = indicators.stochRsiK?.[lastIdx];
+    const stochRsiD = indicators.stochRsiD?.[lastIdx];
+    const adx = indicators.adx?.[lastIdx] ?? 0;
 
-    // 8. Multi-timeframe Agreement (if other timeframes are calculated)
-    if (historicalIndicators) {
-      let mtfAgreements = 0;
-      let mtfTotal = 0;
-      for (const [, ind] of Object.entries(historicalIndicators)) {
-        if (ind.rsi && ind.rsi.length > 0) {
-          const tfRsi = ind.rsi[ind.rsi.length - 1];
-          const tfMacdHist = ind.macdHist[ind.macdHist.length - 1] ?? 0;
-          
-          if (direction === "LONG" && tfRsi > 45 && tfMacdHist > 0) {
-            mtfAgreements++;
-          } else if (direction === "SHORT" && tfRsi < 55 && tfMacdHist < 0) {
-            mtfAgreements++;
-          }
-          mtfTotal++;
+    const isTrendOrBreakout = isTrendingStrat || isBreakoutStrat;
+    const isRangeOrReversion = isMeanReversionStrat || isSweepStrat;
+
+    if (direction === "LONG") {
+      // Stochastic RSI confirmation
+      if (stochRsiK !== undefined && stochRsiD !== undefined) {
+        if (stochRsiK > stochRsiD || stochRsiK < 20) {
+          confirmScore += 10;
         }
+      } else {
+        confirmScore += 5; // Default fallback points
       }
-      if (mtfTotal > 0 && mtfAgreements / mtfTotal >= 0.5) {
-        score += 10; // Higher timeframe trend agreement
+      // ADX alignment
+      if (isTrendOrBreakout && adx > 25) {
+        confirmScore += 10;
+      } else if (isRangeOrReversion && adx < 20) {
+        confirmScore += 10;
+      } else if (adx >= 20 && adx <= 25) {
+        confirmScore += 5;
+      }
+    } else if (direction === "SHORT") {
+      // Stochastic RSI confirmation
+      if (stochRsiK !== undefined && stochRsiD !== undefined) {
+        if (stochRsiK < stochRsiD || stochRsiK > 80) {
+          confirmScore += 10;
+        }
+      } else {
+        confirmScore += 5;
+      }
+      // ADX alignment
+      if (isTrendOrBreakout && adx > 25) {
+        confirmScore += 10;
+      } else if (isRangeOrReversion && adx < 20) {
+        confirmScore += 10;
+      } else if (adx >= 20 && adx <= 25) {
+        confirmScore += 5;
       }
     }
+    score += confirmScore;
 
     // Clamp score strictly between 0 and 100
     return Math.min(100, Math.max(0, Math.round(score)));

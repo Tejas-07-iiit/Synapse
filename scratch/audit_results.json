@@ -1,0 +1,67 @@
+{
+  "phase1": {
+    "totalTrades": 1,
+    "winRate": 0,
+    "lossRate": 100,
+    "avgWinner": 0,
+    "avgLoser": -2.244122374479048,
+    "profitFactor": 0,
+    "expectancy": -2.244122374479048,
+    "avgHoldingTime": 1.8242,
+    "longTrades": 0,
+    "longWR": 0,
+    "shortTrades": 1,
+    "shortWR": 0,
+    "symbolPerf": [
+      {
+        "symbol": "BTCUSDT",
+        "count": 1,
+        "winRate": 0
+      },
+      {
+        "symbol": "ETHUSDT",
+        "count": 0,
+        "winRate": 0
+      },
+      {
+        "symbol": "SOLUSDT",
+        "count": 0,
+        "winRate": 0
+      }
+    ]
+  },
+  "phase2": [
+    {
+      "strategyName": "EMA Crossover Strategy",
+      "tradesExecuted": 1,
+      "winRate": 0,
+      "avgRoi": -0.2244122374478982,
+      "avgPnl": -2.244122374479048,
+      "profitFactor": 0
+    }
+  ],
+  "phase3": {
+    "avgConfExec": 0.85,
+    "avgConfWinners": 0,
+    "avgConfLosers": 0.85,
+    "highConfTrades": 0,
+    "highConfWR": 0
+  },
+  "phase4": {
+    "avgRR": 1.7777779133507343,
+    "avgSlPct": 0.22327280900100133,
+    "avgTpPct": 0.3969294684937572,
+    "stoppedTrades": 1
+  },
+  "phase5": {
+    "Bearish Trend": {
+      "total": 1,
+      "winners": 0,
+      "losers": 1
+    }
+  },
+  "phase8": {
+    "tradesPerDay": 1,
+    "days": 1
+  }
+}

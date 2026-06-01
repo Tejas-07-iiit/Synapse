@@ -23,20 +23,14 @@ export class RSIReversalStrategy implements TradingStrategy {
 
     // Reversal logic:
     // Oversold and beginning to bounce: RSI was below 30 and starts crossing up
-    if (rsiLast <= 30) {
+    if (rsiPrev <= 30 && rsiLast > 30) {
       direction = "LONG";
-      reasoning.push(`Oversold Reversal setup: RSI is deeply oversold at ${rsiLast.toFixed(1)} (<= 30).`);
-      if (rsiLast > rsiPrev) {
-        reasoning.push(`Oversold Bounce: RSI has started turning upward, indicating buying pressure starting to recover.`);
-      }
+      reasoning.push(`Oversold Reversal Crossover: RSI crossed above 30 from oversold levels (RSI: ${rsiLast.toFixed(1)}).`);
     } 
     // Overbought and beginning to slide: RSI was above 70 and starts crossing down
-    else if (rsiLast >= 70) {
+    else if (rsiPrev >= 70 && rsiLast < 70) {
       direction = "SHORT";
-      reasoning.push(`Overbought Correction setup: RSI is overbought at ${rsiLast.toFixed(1)} (>= 70).`);
-      if (rsiLast < rsiPrev) {
-        reasoning.push(`Overbought Pullback: RSI has started bending downward, indicating selling pressure starting to mount.`);
-      }
+      reasoning.push(`Overbought Reversal Crossover: RSI crossed below 70 from overbought levels (RSI: ${rsiLast.toFixed(1)}).`);
     } else {
       reasoning.push(`RSI is in neutral territory at ${rsiLast.toFixed(1)}.`);
     }
@@ -55,7 +49,7 @@ export class RSIReversalStrategy implements TradingStrategy {
 
   public generateSignal(context: StrategyContext): StrategySignal {
     const { direction, reasoning } = this.analyze(context);
-    const confidence = ConfidenceEngine.calculate(direction, context);
+    const confidence = ConfidenceEngine.calculate(direction, context, this.id);
 
     return SignalGenerator.createSignal(
       this.id,

@@ -24,6 +24,7 @@ export interface SignalsDbHandler {
 class StrategyEngine {
   private callbacks: Set<EngineRunCallback> = new Set();
   private signalLocks: Set<string> = new Set();
+  private lastEmittedSignals: Map<string, "LONG" | "SHORT"> = new Map();
   private dbHandler: SignalsDbHandler | null = null;
 
   public registerDbHandler(handler: SignalsDbHandler) {
@@ -140,6 +141,20 @@ class StrategyEngine {
           if (this.signalLocks.size > 10000) {
             const firstKey = this.signalLocks.values().next().value;
             if (firstKey) this.signalLocks.delete(firstKey);
+          }
+
+          // Central signal de-duplication
+          if (signal.signal !== "HOLD") {
+            const dupKey = `${strategy.id}_${sym}_${tf}`;
+            const lastSig = this.lastEmittedSignals.get(dupKey);
+            if (lastSig === signal.signal) {
+              signal.signal = "HOLD";
+              signal.signalType = "HOLD";
+              signal.confidence = 0;
+              signal.reasoning = [`Duplicate suppressed: same direction as last emitted signal (${lastSig})`];
+            } else {
+              this.lastEmittedSignals.set(dupKey, signal.signal);
+            }
           }
 
           rawSignals.push(signal);

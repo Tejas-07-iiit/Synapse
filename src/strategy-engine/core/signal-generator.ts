@@ -63,15 +63,37 @@ export class SignalGenerator {
       ? indicators.atr[lastIdx] 
       : (entry * 0.015); // Fallback: 1.5% of price
 
+    // Dynamic SL/TP based on regime and volatility
+    const bbUpper = indicators?.bbUpper?.[lastIdx] || 0;
+    const bbLower = indicators?.bbLower?.[lastIdx] || 0;
+    const bbMiddle = indicators?.bbMiddle?.[lastIdx] || 1;
+    const bbWidth = bbMiddle > 0 ? (bbUpper - bbLower) / bbMiddle : 0.05;
+
+    const classification = RegimeEngine.classify(context);
+
+    let slMultiplier = 1.5;
+    let tpMultiplier = 3.75; // 2.5x RR
+
+    if (classification === "Low Volatility" || bbWidth < 0.02) {
+      slMultiplier = 1.0;
+      tpMultiplier = 2.0; // 2.0x RR
+    } else if (classification === "High Volatility" || classification === "Breakout" || bbWidth > 0.08) {
+      slMultiplier = 2.0;
+      tpMultiplier = 6.0; // 3.0x RR
+    }
+
+    const slDistance = slMultiplier * atr;
+    const tpDistance = tpMultiplier * atr;
+
     let stopLoss = 0;
     let takeProfit = 0;
 
     if (signal === "LONG" && entry > 0) {
-      stopLoss = entry - 1.8 * atr;
-      takeProfit = entry + 3.2 * atr;
+      stopLoss = entry - slDistance;
+      takeProfit = entry + tpDistance;
     } else if (signal === "SHORT" && entry > 0) {
-      stopLoss = entry + 1.8 * atr;
-      takeProfit = entry - 3.2 * atr;
+      stopLoss = entry + slDistance;
+      takeProfit = entry - tpDistance;
     }
 
     // Capture standard indicators values to attach to the signal contract
@@ -93,17 +115,12 @@ export class SignalGenerator {
       const regime = RegimeEngine.classify(context);
       const regimeCategory = RegimeEngine.getRegimeCategory(context);
       
-      const bbUpper = indicators?.bbUpper?.[lastIdx] || 0;
-      const bbLower = indicators?.bbLower?.[lastIdx] || 0;
-      const bbMiddle = indicators?.bbMiddle?.[lastIdx] || 1;
-      const currentWidth = (bbUpper - bbLower) / bbMiddle;
-      
       const prevBbUpper = lastIdx > 0 ? (indicators?.bbUpper?.[lastIdx - 1] || bbUpper) : bbUpper;
       const prevBbLower = lastIdx > 0 ? (indicators?.bbLower?.[lastIdx - 1] || bbLower) : bbLower;
       const prevBbMiddle = lastIdx > 0 ? (indicators?.bbMiddle?.[lastIdx - 1] || bbMiddle) : bbMiddle;
       const prevBbWidth = (prevBbUpper - prevBbLower) / (prevBbMiddle || 1);
 
-      const isExpanding = currentWidth > prevBbWidth;
+      const isExpanding = bbWidth > prevBbWidth;
 
       const volumeMA = indicators?.volumeMA?.[lastIdx] || 1;
       const candleRange = high - low || 1;
@@ -115,13 +132,13 @@ export class SignalGenerator {
         regime,
         regimeCategory,
         volatilityState: {
-          currentWidth,
+          currentWidth: bbWidth,
           avgWidth: prevBbWidth,
           isExpanding,
           atr,
         },
         breakoutStrength: {
-          bbWidth: currentWidth,
+          bbWidth,
           prevBbWidth,
           bodyRatio,
           volumeRatio: volumeMA > 0 ? volume / volumeMA : 1,
@@ -169,6 +186,23 @@ export class SignalGenerator {
 
     const strategyName = STRATEGY_NAMES[strategyId] || "AI Confluence Strategy";
     const strategyCategory = STRATEGY_CATEGORIES[strategyId] || "Central Engine";
+
+    // Enforce Minimum Risk-to-Reward Ratio of 1.5
+    if (signal !== "HOLD" && stopLoss > 0 && takeProfit > 0) {
+      const risk = Math.abs(entry - stopLoss);
+      const reward = Math.abs(takeProfit - entry);
+      if (risk > 0) {
+        const rr = reward / risk;
+        if (rr < 1.5) {
+          if (signal === "LONG") {
+            takeProfit = entry + risk * 1.5;
+          } else {
+            takeProfit = entry - risk * 1.5;
+          }
+          reasoning.push(`Take Profit adjusted to enforce minimum 1.5x Risk-to-Reward ratio.`);
+        }
+      }
+    }
 
     return {
       strategyId,

@@ -4,6 +4,7 @@ import { PaperTradingEngine } from "../execution-engine/paper";
 import { strategyEngine } from "../strategy-engine/core/engine";
 import { marketWsService } from "../market-engine/websocket";
 import { useMarketStore } from "../stores/marketStore";
+import { PerformanceWeightingEngine } from "../strategy-engine/core/performance-weighting";
 
 const prisma = new PrismaClient();
 
@@ -137,6 +138,9 @@ async function runDaemon() {
           realizedPnl: { increment: pnl },
         },
       });
+
+      // Recalculate strategy weights in background
+      PerformanceWeightingEngine.updatePerformanceScores().catch(() => {});
     },
     fetchWallet: async (userId: string) => {
       return prisma.wallet.findUnique({
@@ -352,6 +356,9 @@ async function runDaemon() {
     await PaperTradingEngine.loadActivePositions(u.id);
   }
   console.log(`[Daemon] Sync complete. In-memory active positions: ${PaperTradingEngine.getOpenPositions().length}`);
+ 
+  // Initialize Strategy Performance Weights from DB trade history
+  await PerformanceWeightingEngine.updatePerformanceScores();
 
   // 5. BOOT ENGINE LOOP
   const coinsList = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];

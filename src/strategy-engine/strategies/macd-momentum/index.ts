@@ -38,20 +38,6 @@ export class MACDMomentumStrategy implements TradingStrategy {
       direction = "SHORT";
       reasoning.push(`MACD Bearish Crossover: MACD line crossed below the signal line.`);
     }
-    // Histogram momentum confirmations
-    else if (macdHistLast > 0) {
-      direction = "LONG";
-      reasoning.push(`MACD Bullish Momentum: Histogram remains positive at ${macdHistLast.toFixed(2)}.`);
-      if (macdHistLast > macdHistPrev) {
-        reasoning.push(`Momentum is expanding upwards.`);
-      }
-    } else if (macdHistLast < 0) {
-      direction = "SHORT";
-      reasoning.push(`MACD Bearish Momentum: Histogram remains negative at ${macdHistLast.toFixed(2)}.`);
-      if (macdHistLast < macdHistPrev) {
-        reasoning.push(`Momentum is expanding downwards.`);
-      }
-    }
 
     return { direction, reasoning };
   }
@@ -69,7 +55,7 @@ export class MACDMomentumStrategy implements TradingStrategy {
 
   public generateSignal(context: StrategyContext): StrategySignal {
     const { direction, reasoning } = this.analyze(context);
-    const confidence = ConfidenceEngine.calculate(direction, context);
+    const confidence = ConfidenceEngine.calculate(direction, context, this.id);
 
     return SignalGenerator.createSignal(
       this.id,

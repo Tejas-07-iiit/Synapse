@@ -131,6 +131,15 @@ export async function POST(request: Request) {
       const priceDiff = isLong ? (exitPrice - finalEntryPrice) : (finalEntryPrice - exitPrice);
       const roi = (priceDiff / finalEntryPrice) * 100 * finalLeverage;
 
+      const finalQuantity = data.quantity || existingPos?.quantity || 0;
+      const entryValue = finalEntryPrice * finalQuantity;
+      const exitValue = exitPrice * finalQuantity;
+      const entryFee = entryValue * 0.001;
+      const exitFee = exitValue * 0.001;
+      const totalFees = entryFee + exitFee;
+      const grossPnl = pnl;
+      const netPnl = grossPnl - totalFees;
+
       const finalStrategyId = existingPos?.strategyId || data.strategyId || null;
       const finalStrategyName = existingPos?.strategyName || data.strategyName || "Central Engine";
       const finalStrategyCategory = existingPos?.strategyCategory || data.strategyCategory || null;
@@ -160,7 +169,7 @@ export async function POST(request: Request) {
             currentPrice: exitPrice,
             stopLoss: finalStopLoss,
             takeProfit: finalTakeProfit,
-            quantity: data.quantity || existingPos?.quantity || 0,
+            quantity: finalQuantity,
             leverage: finalLeverage,
             pnl,
             roi,
@@ -168,6 +177,12 @@ export async function POST(request: Request) {
             openedAt: finalOpenedAt,
             closedAt: finalClosedAt,
             executionType: "PAPER",
+            entryFee,
+            exitFee,
+            totalFees,
+            grossPnl,
+            netPnl,
+            feeRate: 0.001,
           },
         });
 
@@ -175,8 +190,8 @@ export async function POST(request: Request) {
         await prisma.wallet.update({
           where: { userId: finalUserId },
           data: {
-            balance: { increment: pnl },
-            realizedPnl: { increment: pnl },
+            balance: { increment: netPnl },
+            realizedPnl: { increment: netPnl },
           }
         });
       }

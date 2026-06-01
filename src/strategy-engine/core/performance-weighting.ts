@@ -53,14 +53,14 @@ export class PerformanceWeightingEngine {
           continue;
         }
 
-        const wins = strategyTrades.filter((t) => t.pnl > 0).length;
+        const wins = strategyTrades.filter((t) => (t.netPnl ?? t.pnl) > 0).length;
         const losses = totalTrades - wins;
         const winRate = wins / totalTrades;
-        const netPnL = strategyTrades.reduce((sum, t) => sum + t.pnl, 0);
+        const netPnL = strategyTrades.reduce((sum, t) => sum + (t.netPnl ?? t.pnl), 0);
         const averageRoi = strategyTrades.reduce((sum, t) => sum + t.roi, 0) / totalTrades;
 
-        const grossProfit = strategyTrades.filter((t) => t.pnl > 0).reduce((sum, t) => sum + t.pnl, 0);
-        const grossLoss = strategyTrades.filter((t) => t.pnl <= 0).reduce((sum, t) => sum + Math.abs(t.pnl), 0);
+        const grossProfit = strategyTrades.filter((t) => (t.netPnl ?? t.pnl) > 0).reduce((sum, t) => sum + (t.netPnl ?? t.pnl), 0);
+        const grossLoss = strategyTrades.filter((t) => (t.netPnl ?? t.pnl) <= 0).reduce((sum, t) => sum + Math.abs(t.netPnl ?? t.pnl), 0);
         const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? 3.0 : 1.0);
 
         // Performance Penalty / Bonus calculation
@@ -79,7 +79,7 @@ export class PerformanceWeightingEngine {
         let last50WinRate = winRate;
         if (totalTrades >= 50) {
           const last50Trades = strategyTrades.slice(0, 50);
-          const last50Wins = last50Trades.filter((t) => t.pnl > 0).length;
+          const last50Wins = last50Trades.filter((t) => (t.netPnl ?? t.pnl) > 0).length;
           last50WinRate = last50Wins / 50;
         }
         const isQuarantined = (totalTrades >= 50 && last50WinRate < 0.30) || (netPnL < -200);

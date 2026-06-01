@@ -68,6 +68,12 @@ interface DbTrade {
   confidenceAtEntry?: number | null;
   marketRegime?: string | null;
   indicatorSnapshot?: any | null;
+  entryFee?: number | null;
+  exitFee?: number | null;
+  totalFees?: number | null;
+  grossPnl?: number | null;
+  netPnl?: number | null;
+  feeRate?: number | null;
 }
 
 interface UnifiedTrade {
@@ -95,6 +101,12 @@ interface UnifiedTrade {
   confidenceAtEntry?: number | null;
   marketRegime?: string | null;
   indicatorSnapshot?: any | null;
+  entryFee?: number | null;
+  exitFee?: number | null;
+  totalFees?: number | null;
+  grossPnl?: number | null;
+  netPnl?: number | null;
+  feeRate?: number | null;
 }
 
 interface FilterDropdownProps {
@@ -297,6 +309,12 @@ export default function TradeHistoryPage() {
         confidenceAtEntry: tr.confidenceAtEntry || null,
         marketRegime: tr.marketRegime || null,
         indicatorSnapshot: tr.indicatorSnapshot || null,
+        entryFee: tr.entryFee ?? 0,
+        exitFee: tr.exitFee ?? 0,
+        totalFees: tr.totalFees ?? 0,
+        grossPnl: tr.grossPnl ?? tr.pnl,
+        netPnl: tr.netPnl ?? tr.pnl,
+        feeRate: tr.feeRate ?? 0.001,
       });
     });
 
@@ -384,20 +402,20 @@ export default function TradeHistoryPage() {
   const stats = useMemo(() => {
     const closed = filteredTrades.filter(t => t.status !== "OPEN");
     const total = closed.length;
-    const wins = closed.filter(t => t.pnl > 0).length;
-    const losses = closed.filter(t => t.pnl <= 0).length;
+    const wins = closed.filter(t => (t.netPnl ?? t.pnl) > 0).length;
+    const losses = total - wins;
     const winRate = total > 0 ? (wins / total) * 100 : 0;
     const lossRate = total > 0 ? (losses / total) * 100 : 0;
     
-    const totalPnl = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const totalPnl = filteredTrades.reduce((sum, t) => sum + (t.status === "OPEN" ? t.pnl : (t.netPnl ?? t.pnl)), 0);
     const avgRoi = total > 0 ? closed.reduce((sum, t) => sum + t.roi, 0) / total : 0;
 
     let bestTrade = closed.length > 0 ? closed[0] : null;
     let worstTrade = closed.length > 0 ? closed[0] : null;
 
     closed.forEach((t) => {
-      if (bestTrade && t.pnl > bestTrade.pnl) bestTrade = t;
-      if (worstTrade && t.pnl < worstTrade.pnl) worstTrade = t;
+      if (bestTrade && (t.netPnl ?? t.pnl) > (bestTrade.netPnl ?? bestTrade.pnl)) bestTrade = t;
+      if (worstTrade && (t.netPnl ?? t.pnl) < (worstTrade.netPnl ?? worstTrade.pnl)) worstTrade = t;
     });
 
     return {
@@ -536,13 +554,13 @@ export default function TradeHistoryPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-sm font-black text-emerald-500">
-                    {stats.bestTrade ? `+$${stats.bestTrade.pnl.toFixed(1)}` : "--"}
+                    {stats.bestTrade ? `+$${(stats.bestTrade.netPnl ?? stats.bestTrade.pnl).toFixed(1)}` : "--"}
                   </span>
                   <p className="text-[9px] font-bold text-muted-foreground uppercase">Best ({stats.bestTrade?.symbol || "-"})</p>
                 </div>
                 <div>
                   <span className="text-sm font-black text-destructive">
-                    {stats.worstTrade ? `-$${Math.abs(stats.worstTrade.pnl).toFixed(1)}` : "--"}
+                    {stats.worstTrade ? `-$${Math.abs(stats.worstTrade.netPnl ?? stats.worstTrade.pnl).toFixed(1)}` : "--"}
                   </span>
                   <p className="text-[9px] font-bold text-muted-foreground uppercase">Worst ({stats.worstTrade?.symbol || "-"})</p>
                 </div>
@@ -682,6 +700,7 @@ export default function TradeHistoryPage() {
                     <th className="px-5 py-4 text-right">Exit / Current</th>
                     <th className="px-5 py-4 text-right">Stop Loss</th>
                     <th className="px-5 py-4 text-right">Take Profit</th>
+                    <th className="px-5 py-4 text-right">Fees</th>
                     <th className="px-5 py-4 text-right">PnL (ROI)</th>
                     <th className="px-5 py-4 text-center">Status</th>
                     <th className="px-5 py-4 text-right">Execution Date</th>
@@ -691,20 +710,21 @@ export default function TradeHistoryPage() {
                 <tbody className="divide-y divide-border/60 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={10} className="px-5 py-12 text-center text-muted-foreground font-semibold">
+                      <td colSpan={11} className="px-5 py-12 text-center text-muted-foreground font-semibold">
                         <Activity className="animate-spin text-primary mx-auto mb-2" size={24} />
                         Querying trade audit log...
                       </td>
                     </tr>
                   ) : filteredTrades.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-5 py-12 text-center text-muted-foreground font-semibold">
+                      <td colSpan={11} className="px-5 py-12 text-center text-muted-foreground font-semibold">
                         No trades found for selected filters
                       </td>
                     </tr>
                   ) : (
                     filteredTrades.map((trade) => {
-                      const isProfit = trade.pnl >= 0;
+                      const displayPnl = trade.status === "OPEN" ? trade.pnl : (trade.netPnl ?? trade.pnl);
+                      const isProfit = displayPnl >= 0;
 
                       return (
                         <tr 
@@ -713,7 +733,7 @@ export default function TradeHistoryPage() {
                         >
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-2">
-                              <span className="font-extrabold tracking-tight text-foreground">{trade.symbol}</span>
+                               <span className="font-extrabold tracking-tight text-foreground">{trade.symbol}</span>
                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border ${
                                 trade.direction === "LONG" 
                                   ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
@@ -763,11 +783,14 @@ export default function TradeHistoryPage() {
                           <td className="px-5 py-4 text-right text-muted-foreground font-medium">
                             {trade.takeProfit ? `$${trade.takeProfit.toLocaleString()}` : "--"}
                           </td>
+                          <td className="px-5 py-4 text-right text-muted-foreground font-semibold">
+                            {trade.status === "OPEN" ? "--" : `$${(trade.totalFees ?? 0).toFixed(2)}`}
+                          </td>
                           <td className={`px-5 py-4 text-right font-extrabold`}>
                             <div className={`flex flex-col items-end ${isProfit ? "text-emerald-500" : "text-destructive"}`}>
                               <span className="flex items-center gap-0.5">
                                 {isProfit ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                                {isProfit ? "+" : ""}${trade.pnl.toFixed(2)}
+                                {isProfit ? "+" : ""}${displayPnl.toFixed(2)}
                               </span>
                               <span className="text-[10px] font-bold">
                                 {isProfit ? "+" : ""}{trade.roi.toFixed(2)}%
@@ -1056,6 +1079,56 @@ export default function TradeHistoryPage() {
                       <span className="font-black text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
                         {calculateRMultiple(selectedTrade)}
                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 5: Execution Fees & Profitability */}
+                <div className="space-y-3 animate-fade-in">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-1">Section 5: Execution Fees & Profitability</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Execution Fees Box */}
+                    <div className="bg-[#0f172a]/40 border border-border/60 rounded-xl p-4 space-y-2 text-xs">
+                      <span className="text-[10px] font-black uppercase text-amber-500 block border-b border-border/20 pb-1 mb-2">EXECUTION FEES</span>
+                      <div className="flex justify-between py-1 border-b border-border/10">
+                        <span className="text-muted-foreground font-medium">Entry Fee (0.1%):</span>
+                        <span className="font-mono text-foreground">${(selectedTrade.entryFee ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border/10">
+                        <span className="text-muted-foreground font-medium">Exit Fee (0.1%):</span>
+                        <span className="font-mono text-foreground">${(selectedTrade.exitFee ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between py-1 pt-1.5 font-bold">
+                        <span className="text-foreground">Total Fees:</span>
+                        <span className="font-mono text-amber-500">${(selectedTrade.totalFees ?? 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Profitability Box */}
+                    <div className="bg-[#0f172a]/40 border border-border/60 rounded-xl p-4 space-y-2 text-xs flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-primary block border-b border-border/20 pb-1 mb-2">PROFITABILITY</span>
+                        <div className="flex justify-between py-1 border-b border-border/10">
+                          <span className="text-muted-foreground font-medium">Gross PnL:</span>
+                          <span className={`font-mono font-bold ${(selectedTrade.grossPnl ?? selectedTrade.pnl) >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                            {(selectedTrade.grossPnl ?? selectedTrade.pnl) >= 0 ? "+" : ""}${(selectedTrade.grossPnl ?? selectedTrade.pnl).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Net PnL - Visually Emphasized */}
+                      <div className="bg-primary/10 border border-primary/30 rounded-lg p-2.5 flex justify-between items-center mt-2 shadow-sm">
+                        <span className="text-xs font-black uppercase text-primary tracking-wider">Net PnL:</span>
+                        <span className={`font-mono text-sm font-black px-2 py-0.5 rounded ${
+                          (selectedTrade.netPnl ?? (selectedTrade.pnl - (selectedTrade.totalFees ?? 0))) >= 0 
+                            ? "text-emerald-400 bg-emerald-950/40 border border-emerald-500/20" 
+                            : "text-red-400 bg-red-950/40 border border-red-500/20"
+                        }`}>
+                          {(selectedTrade.netPnl ?? (selectedTrade.pnl - (selectedTrade.totalFees ?? 0))) >= 0 ? "+" : ""}
+                          ${(selectedTrade.netPnl ?? (selectedTrade.pnl - (selectedTrade.totalFees ?? 0))).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

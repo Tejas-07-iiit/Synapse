@@ -100,6 +100,15 @@ async function runDaemon() {
       const priceDiff = isLong ? exitPrice - entryPrice : entryPrice - exitPrice;
       const roi = (priceDiff / entryPrice) * 100 * leverage;
 
+      const finalQuantity = data.quantity || 0;
+      const entryValue = entryPrice * finalQuantity;
+      const exitValue = exitPrice * finalQuantity;
+      const entryFee = entryValue * 0.001;
+      const exitFee = exitValue * 0.001;
+      const totalFees = entryFee + exitFee;
+      const grossPnl = pnl;
+      const netPnl = grossPnl - totalFees;
+
       // Create Trade History log
       try {
         await prisma.trade.create({
@@ -121,7 +130,7 @@ async function runDaemon() {
             currentPrice: exitPrice,
             stopLoss,
             takeProfit,
-            quantity: data.quantity || 0,
+            quantity: finalQuantity,
             leverage,
             pnl,
             roi,
@@ -129,6 +138,12 @@ async function runDaemon() {
             openedAt: new Date(openedAt),
             closedAt: new Date(closedAt),
             executionType: "PAPER",
+            entryFee,
+            exitFee,
+            totalFees,
+            grossPnl,
+            netPnl,
+            feeRate: 0.001,
           },
         });
         
@@ -146,8 +161,8 @@ async function runDaemon() {
       await prisma.wallet.update({
         where: { userId },
         data: {
-          balance: { increment: pnl },
-          realizedPnl: { increment: pnl },
+          balance: { increment: netPnl },
+          realizedPnl: { increment: netPnl },
         },
       });
 

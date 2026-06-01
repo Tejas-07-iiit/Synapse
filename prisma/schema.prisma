@@ -151,6 +151,14 @@ model Trade {
   openedAt          DateTime
   closedAt          DateTime  @default(now())
   executionType     String    // PAPER, LIVE
+  
+  entryFee          Float     @default(0)
+  exitFee           Float     @default(0)
+  totalFees         Float     @default(0)
+  grossPnl          Float     @default(0)
+  netPnl            Float     @default(0)
+  feeRate           Float     @default(0.001)
+
   // Strategy intelligence fields
   strategyId        String?
   strategyCategory  String?

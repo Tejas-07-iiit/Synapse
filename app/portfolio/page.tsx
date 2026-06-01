@@ -59,6 +59,12 @@ interface DbTrade {
   openedAt: string;
   closedAt: string;
   executionType: string;
+  entryFee?: number;
+  exitFee?: number;
+  totalFees?: number;
+  grossPnl?: number;
+  netPnl?: number;
+  feeRate?: number;
 }
 
 interface FilterDropdownProps {
@@ -262,7 +268,11 @@ export default function PortfolioPage() {
   }, [filteredActivePositions, tickerData]);
 
   const realizedPnL = useMemo(() => {
-    return filteredClosedTrades.reduce((sum, t) => sum + t.pnl, 0);
+    return filteredClosedTrades.reduce((sum, t) => sum + (t.netPnl ?? t.pnl), 0);
+  }, [filteredClosedTrades]);
+
+  const totalFeesPaid = useMemo(() => {
+    return filteredClosedTrades.reduce((sum, t) => sum + (t.totalFees ?? 0), 0);
   }, [filteredClosedTrades]);
 
   const currentEquity = useMemo(() => {
@@ -288,7 +298,7 @@ export default function PortfolioPage() {
     timeMap.set(safeStartTimestamp, startingCapital);
 
     sortedTrades.forEach((trade) => {
-      currentVal += trade.pnl;
+      currentVal += trade.netPnl ?? trade.pnl;
       const time = Math.floor(new Date(trade.closedAt).getTime() / 1000);
       
       // If multiple trades close on the exact same second, this overwrites the value with the aggregated PnL
@@ -317,7 +327,7 @@ export default function PortfolioPage() {
     );
 
     sortedTrades.forEach((t) => {
-      currentVal += t.pnl;
+      currentVal += t.netPnl ?? t.pnl;
       if (currentVal > peak) {
         peak = currentVal;
       }
@@ -379,14 +389,15 @@ export default function PortfolioPage() {
       }
       const s = statsMap[name];
       s.trades += 1;
-      if (t.pnl > 0) {
+      const tradeNetPnl = t.netPnl ?? t.pnl; // USE netPnl
+      if (tradeNetPnl > 0) {
         s.wins += 1;
-        s.totalGains += t.pnl;
+        s.totalGains += tradeNetPnl;
       } else {
         s.losses += 1;
-        s.totalLosses += Math.abs(t.pnl);
+        s.totalLosses += Math.abs(tradeNetPnl);
       }
-      s.netProfit += t.pnl;
+      s.netProfit += tradeNetPnl;
       s.totalRoi += t.roi;
     });
 
@@ -433,7 +444,7 @@ export default function PortfolioPage() {
 
     const assetPnlMap: Record<string, number> = {};
     filteredClosedTrades.forEach((t) => {
-      assetPnlMap[t.symbol] = (assetPnlMap[t.symbol] || 0) + t.pnl;
+      assetPnlMap[t.symbol] = (assetPnlMap[t.symbol] || 0) + (t.netPnl ?? t.pnl);
     });
 
     const uniqueAssetCount = Object.keys(assetPnlMap).length;
@@ -652,7 +663,7 @@ export default function PortfolioPage() {
           </div>
 
           {/* Section 1: Account Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             
             {/* Starting Capital */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
@@ -672,14 +683,23 @@ export default function PortfolioPage() {
               </div>
             </div>
 
-            {/* Realized PnL */}
+            {/* Net Profitability */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Realized PnL</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Net Profitability</span>
               <div>
                 <span className={`text-2xl font-black ${realizedPnL >= 0 ? "text-emerald-500" : "text-destructive"}`}>
                   {realizedPnL >= 0 ? "+" : ""}${realizedPnL.toFixed(2)}
                 </span>
                 <span className="text-[10px] text-muted-foreground block mt-1">Closed Trades Cumulative</span>
+              </div>
+            </div>
+
+            {/* Total Fees Paid */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Total Fees Paid</span>
+              <div>
+                <span className="text-2xl font-black text-amber-500">${totalFeesPaid.toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground block mt-1">Exchange Entry/Exit Fees</span>
               </div>
             </div>
 

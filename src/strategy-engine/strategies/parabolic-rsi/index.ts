@@ -23,6 +23,7 @@ export class ParabolicRSIStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   // ────────────────────────────────────────────
   // Parabolic SAR on RSI — internal helper

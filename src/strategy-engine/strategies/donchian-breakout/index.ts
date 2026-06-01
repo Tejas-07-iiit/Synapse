@@ -12,6 +12,7 @@ export class DonchianBreakoutStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["donchianUpper", "donchianLower", "adx", "atr", "volumeMA"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators } = context;
@@ -63,8 +64,9 @@ export class DonchianBreakoutStrategy implements TradingStrategy {
       return { direction: "HOLD", reasoning, confidence: 0 };
     }
 
-    const closedAboveChannel = close > prevUpper;
-    const closedBelowChannel = close < prevLower;
+    const prevClose = lastIdx > 0 ? candles[lastIdx - 1].close : close;
+    const closedAboveChannel = prevClose <= prevUpper && close > prevUpper;
+    const closedBelowChannel = prevClose >= prevLower && close < prevLower;
 
     if (closedAboveChannel && isAdxRising && hasVolumeExpansion && isStrongBullishCandle && isTrendingOrBreakout) {
       direction = "LONG";

@@ -29,6 +29,7 @@ export class WaveTrendStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr", "rsi"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   // LazyBear standard parameters
   private readonly channelLength = 10;

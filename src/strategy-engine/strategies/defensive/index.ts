@@ -11,6 +11,7 @@ export class DefensiveStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "macdLine", "signalLine", "macdHist", "supportLevels", "resistanceLevels"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators } = context;

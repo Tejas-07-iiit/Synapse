@@ -23,6 +23,7 @@ export class ResidualMomentumStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "ema20", "sma50", "atr"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly regressionPeriod = 20;
   private readonly zScoreThreshold = 1.5;

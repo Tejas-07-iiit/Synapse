@@ -220,12 +220,11 @@ model UserSettings {
   id               String   @id @default(uuid())
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  autoTrading      Boolean  @default(false)
+  autoTrading      Boolean  @default(true)
   riskPerTradePct  Float    @default(2.0)
   maxOpenTrades    Int      @default(3)
   defaultSlPct     Float    @default(1.5)
   defaultTpPct     Float    @default(3.0)
-  prefTimeframe    String   @default("15m")
   prefSymbol       String   @default("BTCUSDT")
   updatedAt        DateTime @updatedAt
 }

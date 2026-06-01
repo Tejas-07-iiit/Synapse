@@ -26,6 +26,7 @@ export class SqueezeMomentumStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly squeezeLookback = 5;
   private readonly momentumPeriod = 20;
@@ -98,24 +99,10 @@ export class SqueezeMomentumStrategy implements TradingStrategy {
     const histPrev2 = hist[lastIdx - 2];
 
     // Check if squeeze was ON recently, and has just released (transitioned from true -> false)
-    let squeezeRelease = false;
-    let squeezeDuration = 0;
-    let releaseAgo = 0;
+    const squeezeRelease = squeezeOn[lastIdx - 1] === true && squeezeOn[lastIdx] === false;
+    const releaseAgo = 0;
+    const squeezeDuration = 0; // TODO: calculate actual duration if needed
 
-    // Track squeeze history
-    for (let i = 1; i <= 20 && lastIdx - i >= 0; i++) {
-      if (squeezeOn[lastIdx - i]) {
-        squeezeDuration++;
-      }
-    }
-
-    for (let i = 0; i < this.squeezeLookback && lastIdx - i > 0; i++) {
-      if (squeezeOn[lastIdx - i - 1] === true && squeezeOn[lastIdx - i] === false) {
-        squeezeRelease = true;
-        releaseAgo = i;
-        break;
-      }
-    }
 
     // Momentum direction and acceleration
     const momUp = histLast > histPrev;

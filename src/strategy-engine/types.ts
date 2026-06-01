@@ -178,6 +178,7 @@ export interface TradingStrategy {
   symbols?: string[];            // Active symbols
   enabled: boolean;
   indicatorsRequired: string[];
+  supportedRegimes: string[];
 
   // Core Phase 4 methods
   analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[] };

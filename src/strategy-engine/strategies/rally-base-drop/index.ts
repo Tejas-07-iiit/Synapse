@@ -12,6 +12,7 @@ export class RallyBaseDropStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["atr", "volumeMA"];
+  public supportedRegimes = ["Ranging","Accumulation","Distribution","Low Volatility","Breakout","High Volatility"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number; zone?: SupplyDemandZone } {
     const { candles, structure } = context;

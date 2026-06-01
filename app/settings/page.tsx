@@ -42,44 +42,21 @@ export default function SettingsPage() {
 
   // States
   const [mounted, setMounted] = useState(false);
-  const [pingLatency, setPingLatency] = useState<number | null>(null);
-  const [lastSync, setLastSync] = useState<string>("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
 
-  // Form states mapping directly to settings store
+  // Form states mapping directly to settings store (prefTimeframe removed)
   const [formData, setFormData] = useState({
     autoTrading: false,
     riskPerTradePct: 2.0,
     maxOpenTrades: 3,
     defaultSlPct: 1.5,
     defaultTpPct: 3.0,
-    prefTimeframe: "15m",
     prefSymbol: "BTCUSDT",
   });
 
-  // Signal toggles
-  const [prefEma, setPrefEma] = useState(true);
-  const [prefRsi, setPrefRsi] = useState(true);
-  const [prefMacd, setPrefMacd] = useState(true);
-  const [prefBb, setPrefBb] = useState(true);
-  const [prefCandle, setPrefCandle] = useState(false);
-
   useEffect(() => {
     setMounted(true);
-    setLastSync(new Date().toLocaleTimeString());
-    const checkPing = async () => {
-      const start = Date.now();
-      try {
-        await fetch("https://api.binance.com/api/v3/ping");
-        setPingLatency(Date.now() - start);
-      } catch {
-        setPingLatency(null);
-      }
-    };
-    checkPing();
-    const interval = setInterval(checkPing, 15000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -99,22 +76,10 @@ export default function SettingsPage() {
         maxOpenTrades: settings.maxOpenTrades,
         defaultSlPct: settings.defaultSlPct,
         defaultTpPct: settings.defaultTpPct,
-        prefTimeframe: settings.prefTimeframe,
         prefSymbol: settings.prefSymbol,
       });
     }
-  }, [settings.autoTrading, settings.riskPerTradePct, settings.maxOpenTrades, settings.defaultSlPct, settings.defaultTpPct, settings.prefTimeframe, settings.prefSymbol, settings.loading, settings.error]);
-
-  // Load UI-only settings from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setPrefEma(localStorage.getItem("settings_pref_ema") !== "false");
-      setPrefRsi(localStorage.getItem("settings_pref_rsi") !== "false");
-      setPrefMacd(localStorage.getItem("settings_pref_macd") !== "false");
-      setPrefBb(localStorage.getItem("settings_pref_bb") !== "false");
-      setPrefCandle(localStorage.getItem("settings_pref_candle") === "true");
-    }
-  }, []);
+  }, [settings.autoTrading, settings.riskPerTradePct, settings.maxOpenTrades, settings.defaultSlPct, settings.defaultTpPct, settings.prefSymbol, settings.loading, settings.error]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -135,14 +100,6 @@ export default function SettingsPage() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     }
-    
-    if (typeof window !== "undefined") {
-      localStorage.setItem("settings_pref_ema", String(prefEma));
-      localStorage.setItem("settings_pref_rsi", String(prefRsi));
-      localStorage.setItem("settings_pref_macd", String(prefMacd));
-      localStorage.setItem("settings_pref_bb", String(prefBb));
-      localStorage.setItem("settings_pref_candle", String(prefCandle));
-    }
   };
 
   const handleResetWallet = async () => {
@@ -152,7 +109,7 @@ export default function SettingsPage() {
         await fetch("/api/settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id, resetWallet: true }), // Placeholder API endpoint logic to be handled next
+          body: JSON.stringify({ userId: user.id, resetWallet: true }),
         });
         await wallet.fetchWallet(user.id);
         setResetSuccess(true);
@@ -197,78 +154,24 @@ export default function SettingsPage() {
             <div>
               <h1 className="text-xl font-black tracking-tight text-foreground uppercase flex items-center gap-2">
                 <Settings className="text-primary animate-pulse" size={22} />
-                Terminal Settings & Health
+                Terminal Settings
               </h1>
               <p className="text-xs text-muted-foreground">
-                Customize local preferences, display engines, and view API connections health.
+                Customize local preferences, risk settings, and manage your account.
               </p>
             </div>
           </div>
 
           <form onSubmit={handleSaveSettings} className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             
-            {/* Left/Middle Columns: Settings Forms */}
+            {/* Left/Middle Columns: Workspace Settings */}
             <div className="xl:col-span-2 space-y-6">
               
-              {/* Section 1: Appearance Themes */}
-              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
-                  <Sun size={16} />
-                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Terminal Theme Appearance</h3>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  
-                  {/* Light Button */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme("light")}
-                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
-                      theme === "light"
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Sun size={18} />
-                    Light Theme
-                  </button>
-
-                  {/* Dark Button */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme("dark")}
-                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
-                      theme === "dark"
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Moon size={18} />
-                    Dark Theme
-                  </button>
-
-                  {/* System Button */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme("system")}
-                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
-                      theme === "system"
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Laptop size={18} />
-                    System Sync
-                  </button>
-
-                </div>
-              </div>
-
-              {/* Section 2: Trading Defaults */}
+              {/* Workspace defaults config */}
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
                   <Sliders size={16} />
-                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Workspace defaults config</h3>
+                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Workspace Defaults</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -288,21 +191,7 @@ export default function SettingsPage() {
                     </select>
                   </div>
 
-                  {/* Default Timeframe */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-muted-foreground uppercase">Default Indicators Timeframe</label>
-                    <select
-                      name="prefTimeframe"
-                      value={formData.prefTimeframe}
-                      onChange={handleChange}
-                      className="w-full p-2.5 bg-secondary/50 border border-border rounded-xl text-foreground font-semibold uppercase focus:outline-none focus:border-primary"
-                    >
-                      <option value="5m">5 Minute (Scalp)</option>
-                      <option value="15m">15 Minute (Intraday)</option>
-                    </select>
-                  </div>
-
-                  {/* Default Risk */}
+                  {/* Target Risk per Trade (%) */}
                   <div className="space-y-1.5">
                     <label className="font-bold text-muted-foreground uppercase">Target Risk per Trade (%)</label>
                     <input
@@ -332,7 +221,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  {/* Default SL % */}
+                  {/* Default Stop Loss % */}
                   <div className="space-y-1.5">
                     <label className="font-bold text-muted-foreground uppercase">Default Stop Loss (%)</label>
                     <input
@@ -362,8 +251,8 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  {/* Auto Trading */}
-                  <div className="flex items-center justify-between p-2.5 bg-secondary/35 border border-border rounded-xl mt-4 md:col-span-2">
+                  {/* Auto Trading Toggle */}
+                  <div className="flex items-center justify-between p-2.5 bg-secondary/35 border border-border rounded-xl md:col-span-2">
                     <div>
                       <span className="font-bold text-foreground block">Autonomous Paper Trading</span>
                       <span className="text-[10px] text-muted-foreground">Allows the strategy engine to automatically open/close positions.</span>
@@ -383,73 +272,6 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Section 3: Signal Preferences */}
-              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
-                  <Database size={16} />
-                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Confluence Signal Engines preferences</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  
-                  {/* EMA Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-secondary/20 border border-border/60 rounded-xl">
-                    <div>
-                      <span className="font-bold text-foreground block">EMA Exponential Ribbon Crossover</span>
-                      <span className="text-[10px] text-muted-foreground">Generates alignment indicators from EMA 12/20/26/50 confluences.</span>
-                    </div>
-                    <button type="button" onClick={() => setPrefEma(!prefEma)} className="cursor-pointer">
-                      {prefEma ? <ToggleRight size={28} className="text-primary" /> : <ToggleLeft size={28} className="text-muted-foreground" />}
-                    </button>
-                  </div>
-
-                  {/* RSI Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-secondary/20 border border-border/60 rounded-xl">
-                    <div>
-                      <span className="font-bold text-foreground block">RSI Momentum Threshold Index</span>
-                      <span className="text-[10px] text-muted-foreground">Triggers oversold/overbought notifications below 30 or above 70.</span>
-                    </div>
-                    <button type="button" onClick={() => setPrefRsi(!prefRsi)} className="cursor-pointer">
-                      {prefRsi ? <ToggleRight size={28} className="text-primary" /> : <ToggleLeft size={28} className="text-muted-foreground" />}
-                    </button>
-                  </div>
-
-                  {/* MACD Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-secondary/20 border border-border/60 rounded-xl">
-                    <div>
-                      <span className="font-bold text-foreground block">MACD Signal Line Divergences</span>
-                      <span className="text-[10px] text-muted-foreground">Monitors MACD histogram and crossover directions.</span>
-                    </div>
-                    <button type="button" onClick={() => setPrefMacd(!prefMacd)} className="cursor-pointer">
-                      {prefMacd ? <ToggleRight size={28} className="text-primary" /> : <ToggleLeft size={28} className="text-muted-foreground" />}
-                    </button>
-                  </div>
-
-                  {/* Bollinger Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-secondary/20 border border-border/60 rounded-xl">
-                    <div>
-                      <span className="font-bold text-foreground block">Bollinger Bands Breakout Scanner</span>
-                      <span className="text-[10px] text-muted-foreground">Monitors upper/lower bounds envelope breakouts.</span>
-                    </div>
-                    <button type="button" onClick={() => setPrefBb(!prefBb)} className="cursor-pointer">
-                      {prefBb ? <ToggleRight size={28} className="text-primary" /> : <ToggleLeft size={28} className="text-muted-foreground" />}
-                    </button>
-                  </div>
-
-                  {/* Candlestick Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-secondary/20 border border-border/60 rounded-xl md:col-span-2">
-                    <div>
-                      <span className="font-bold text-foreground block">AI Candlestick Pattern Recognition Engine</span>
-                      <span className="text-[10px] text-muted-foreground">Highlights Doji, Hammer, and Engulfing candlestick patterns automatically.</span>
-                    </div>
-                    <button type="button" onClick={() => setPrefCandle(!prefCandle)} className="cursor-pointer">
-                      {prefCandle ? <ToggleRight size={28} className="text-primary" /> : <ToggleLeft size={28} className="text-muted-foreground" />}
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-
               {/* Action Bar */}
               <div className="flex justify-end gap-3">
                 <button
@@ -463,14 +285,66 @@ export default function SettingsPage() {
 
             </div>
 
-            {/* Right Column: User Profile & API status */}
+            {/* Right Column: Theme & Account Details */}
             <div className="space-y-6">
               
-              {/* Section 4: Account Details */}
+              {/* Terminal Theme Appearance */}
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
+                  <Sun size={16} />
+                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Terminal Theme Appearance</h3>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  {/* Light Button */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
+                      theme === "light"
+                        ? "bg-primary/10 border-primary text-primary"
+                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Sun size={18} />
+                    Light
+                  </button>
+
+                  {/* Dark Button */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
+                      theme === "dark"
+                        ? "bg-primary/10 border-primary text-primary"
+                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Moon size={18} />
+                    Dark
+                  </button>
+
+                  {/* System Button */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("system")}
+                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border text-xs font-black uppercase transition duration-200 cursor-pointer ${
+                      theme === "system"
+                        ? "bg-primary/10 border-primary text-primary"
+                        : "bg-secondary/40 border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Laptop size={18} />
+                    System
+                  </button>
+                </div>
+              </div>
+
+              {/* Secure Profile details (Account settings) */}
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col space-y-4">
                 <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
                   <UserIcon size={16} />
-                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Secure Profile details</h3>
+                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">Account Settings</h3>
                 </div>
 
                 {user && (
@@ -522,60 +396,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Section 5: System Status Health */}
-              <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col space-y-4">
-                <div className="flex items-center gap-2 text-primary border-b border-border/40 pb-2">
-                  <Wifi size={16} />
-                  <h3 className="font-black text-xs uppercase tracking-wider text-card-foreground">System Health Monitor</h3>
-                </div>
-
-                <div className="space-y-4 text-xs">
-                  {/* Websocket Connection */}
-                  <div className="flex justify-between items-center border-b border-border/20 py-1.5">
-                    <span className="text-muted-foreground font-semibold">Websocket Gateway</span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black border uppercase ${
-                      wsStatus === "CONNECTED"
-                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
-                        : wsStatus === "RECONNECTING"
-                        ? "bg-amber-500/10 border-amber-500/20 text-amber-500 animate-pulse"
-                        : "bg-destructive/10 border-destructive/20 text-destructive"
-                    }`}>
-                      {wsStatus}
-                    </span>
-                  </div>
-
-                  {/* API Latency */}
-                  <div className="flex justify-between items-center border-b border-border/20 py-1.5">
-                    <span className="text-muted-foreground font-semibold">Binance API Latency</span>
-                    <span className="font-bold text-foreground">
-                      {pingLatency !== null ? `${pingLatency}ms` : "checking..."}
-                    </span>
-                  </div>
-
-                  {/* Active Websocket Streams */}
-                  <div className="flex justify-between items-center border-b border-border/20 py-1.5">
-                    <span className="text-muted-foreground font-semibold">Active Watchlist Streams</span>
-                    <span className="font-bold text-foreground">
-                      {supportedSymbols.length > 0 ? `${supportedSymbols.length} Tickers` : "3 Tickers"}
-                    </span>
-                  </div>
-
-                  {/* Last Sync Timestamp */}
-                  <div className="flex justify-between items-center border-b border-border/20 py-1.5">
-                    <span className="text-muted-foreground font-semibold">Last State Sync</span>
-                    <span className="font-bold text-muted-foreground">{lastSync}</span>
-                  </div>
-
-                  <div className="flex gap-2.5 items-start text-[10px] text-muted-foreground leading-relaxed bg-secondary/15 border border-border/20 px-3 py-2 rounded-lg">
-                    <ShieldAlert size={14} className="text-primary mt-0.5 shrink-0" />
-                    <span>
-                      Algorithmic state runs are logged locally to audit logs. Client connection streams require persistent WebSocket gateway connection.
-                    </span>
-                  </div>
-
-                </div>
               </div>
 
             </div>

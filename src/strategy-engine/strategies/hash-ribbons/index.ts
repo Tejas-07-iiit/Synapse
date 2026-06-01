@@ -30,6 +30,7 @@ export class HashRibbonsStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT"]; // BTC only
   public enabled = true;
   public indicatorsRequired = ["atr", "rsi", "ema20"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly smaShortPeriod = 30;
   private readonly smaLongPeriod = 60;
@@ -128,13 +129,9 @@ export class HashRibbonsStrategy implements TradingStrategy {
     let direction: "LONG" | "SHORT" | "HOLD" = "HOLD";
 
     // --- LONG: Recovery crossover detected ---
-    if (isBullishCross || isRecoveryPhase) {
+    if (isBullishCross) {
       direction = "LONG";
-      if (isBullishCross) {
-        reasoning.push("Hash Ribbons LONG: Hashrate SMA30 crossed above SMA60 — miner recovery signal.");
-      } else {
-        reasoning.push("Hash Ribbons LONG: In recovery phase — hashrate SMA30 sustaining above SMA60.");
-      }
+      reasoning.push("Hash Ribbons LONG: Hashrate SMA30 crossed above SMA60 — miner recovery signal.");
       reasoning.push(`Capitulation lasted ${capitulationDuration} candles.`);
       reasoning.push(`Recovery strength: ${(recoveryStrength * 100).toFixed(2)}%.`);
     }

@@ -89,7 +89,7 @@ export class PaperTradingEngine {
    * Evaluates incoming real-time price updates against open positions.
    * Checks stopLoss and takeProfit conditions to trigger auto-liquidations/exits.
    */
-  public static async updatePrices(symbol: string, currentPrice: number) {
+  public static async updatePrices(symbol: string, currentPrice: number, currentHigh?: number, currentLow?: number) {
     const sym = symbol.toUpperCase();
     const activePositions = Array.from(this.positions.values()).filter(
       (p) => p.symbol === sym && p.status === "OPEN"
@@ -127,30 +127,38 @@ export class PaperTradingEngine {
         }
       }
 
-      // Check Stop Loss & Take Profit exits
+      // Check Stop Loss & Take Profit exits using absolute wick extremes if available
       let shouldClose = false;
       let exitReason = "";
+      let executionPrice = currentPrice;
+      
+      const lowestPrice = currentLow !== undefined ? currentLow : currentPrice;
+      const highestPrice = currentHigh !== undefined ? currentHigh : currentPrice;
 
       if (pos.direction === "LONG") {
-        if (pos.stopLoss && currentPrice <= pos.stopLoss) {
+        if (pos.stopLoss && lowestPrice <= pos.stopLoss) {
           shouldClose = true;
           exitReason = "STOP_LOSS";
-        } else if (pos.takeProfit && currentPrice >= pos.takeProfit) {
+          executionPrice = pos.stopLoss;
+        } else if (pos.takeProfit && highestPrice >= pos.takeProfit) {
           shouldClose = true;
           exitReason = "TAKE_PROFIT";
+          executionPrice = pos.takeProfit;
         }
       } else {
-        if (pos.stopLoss && currentPrice >= pos.stopLoss) {
+        if (pos.stopLoss && highestPrice >= pos.stopLoss) {
           shouldClose = true;
           exitReason = "STOP_LOSS";
-        } else if (pos.takeProfit && currentPrice <= pos.takeProfit) {
+          executionPrice = pos.stopLoss;
+        } else if (pos.takeProfit && lowestPrice <= pos.takeProfit) {
           shouldClose = true;
           exitReason = "TAKE_PROFIT";
+          executionPrice = pos.takeProfit;
         }
       }
 
       if (shouldClose) {
-        await this.closePosition(pos.id, currentPrice, exitReason);
+        await this.closePosition(pos.id, executionPrice, exitReason);
       }
     }
   }
@@ -301,6 +309,21 @@ export class PaperTradingEngine {
       );
       if (!riskResult.allowed) {
         return null;
+      }
+
+      // Risk Reward Enforcement (RR >= 1.5)
+      if (stopLoss !== null && takeProfit !== null) {
+        const risk = Math.abs(price - stopLoss);
+        const reward = Math.abs(takeProfit - price);
+        if (risk > 0) {
+          const rr = reward / risk;
+          if (rr < 1.5) {
+            const minReward = risk * 1.5;
+            const oldTp = takeProfit;
+            takeProfit = direction === "LONG" ? price + minReward : price - minReward;
+            console.log(`[RR Guard] Adjusted TP from ${oldTp.toFixed(4)} to ${takeProfit.toFixed(4)} to enforce 1.5 RR.`);
+          }
+        }
       }
 
       try {

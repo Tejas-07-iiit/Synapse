@@ -41,6 +41,7 @@ export class T3NexusStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly t3Length = 8;
   private readonly volumeFactor = 0.7;

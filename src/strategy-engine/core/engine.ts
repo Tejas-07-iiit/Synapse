@@ -128,6 +128,11 @@ class StrategyEngine {
         (!strategy.timeframe && !strategy.timeframes);
 
       if (supportsSymbol && supportsTimeframe) {
+        // Enforce Regime check BEFORE execution
+        if (strategy.supportedRegimes && !strategy.supportedRegimes.includes(regime)) {
+          continue;
+        }
+
         const lastCandleTime = strategyCandles[strategyCandles.length - 1]?.time || 0;
         const lockKey = `${sym}_${tf}_${strategy.id}_${lastCandleTime}`;
         if (this.signalLocks.has(lockKey)) {

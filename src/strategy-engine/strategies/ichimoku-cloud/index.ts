@@ -29,6 +29,7 @@ export class IchimokuCloudStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly tenkanPeriod = 9;
   private readonly kijunPeriod = 26;

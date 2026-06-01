@@ -26,6 +26,7 @@ export class ZeiiermanVolatilityStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "adx", "volumeMA"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly bandPeriod = 20;
   private readonly adxThreshold = 25;

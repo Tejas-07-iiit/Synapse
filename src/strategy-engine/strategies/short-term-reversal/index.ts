@@ -12,6 +12,7 @@ export class ShortTermReversalStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "momentum"];
+  public supportedRegimes = ["Ranging","Accumulation","Distribution","Low Volatility"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators } = context;

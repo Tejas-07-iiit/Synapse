@@ -11,6 +11,7 @@ export class RSIReversalStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi"];
+  public supportedRegimes = ["Ranging","Accumulation","Distribution","Low Volatility"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[] } {
     const { candles, indicators } = context;

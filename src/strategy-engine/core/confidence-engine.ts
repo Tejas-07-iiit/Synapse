@@ -1,5 +1,6 @@
 import { StrategyContext } from "../types";
 import { RegimeEngine } from "./regime-engine";
+import { PerformanceWeightingEngine } from "./performance-weighting";
 
 const STRATEGY_CATEGORIES: Record<string, string> = {
   "ema-crossover": "Trend Following",
@@ -176,7 +177,26 @@ export class ConfidenceEngine {
     }
     score += confirmScore;
 
-    // Clamp score strictly between 0 and 100
-    return Math.min(100, Math.max(0, Math.round(score)));
+    let finalScore = Math.round(score);
+    let perfBoost = 0;
+
+    // 6. Performance Weighting Adjustments
+    if (strategyId) {
+      perfBoost = PerformanceWeightingEngine.getStrategyBoost(strategyId);
+      finalScore += perfBoost;
+    }
+
+    finalScore = Math.min(100, Math.max(0, finalScore));
+
+    console.log(`[ConfidenceEngine] 📊 Confidence Breakdown for strategy: ${strategyId || "unknown"} (${direction}):
+    Trend: ${trendScore}/25
+    Momentum: ${momentumScore}/20
+    Volume: ${volumeScore}/15
+    Regime: ${regimeScore}/20
+    Confirmation: ${confirmScore}/20
+    Performance Boost/Penalty: ${perfBoost}
+    Final Confidence: ${finalScore}%`);
+
+    return finalScore;
   }
 }

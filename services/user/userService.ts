@@ -26,12 +26,11 @@ export async function ensureUserExists(userId: string) {
         },
         settings: {
           create: {
-            autoTrading: false,
+            autoTrading: true,
             riskPerTradePct: 2.0,
             maxOpenTrades: 3,
             defaultSlPct: 1.5,
             defaultTpPct: 3.0,
-            prefTimeframe: "15m",
             prefSymbol: "BTCUSDT",
           }
         }

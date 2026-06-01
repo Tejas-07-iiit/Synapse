@@ -26,6 +26,7 @@ export class HyperSupertrendStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   // ────────────────────────────────────────────
   // Supertrend computation

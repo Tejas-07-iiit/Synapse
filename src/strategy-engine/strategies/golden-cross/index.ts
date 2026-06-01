@@ -25,6 +25,7 @@ export class GoldenCrossStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["sma50", "atr", "rsi"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly minSeparation = 0.005; // 0.5% minimum SMA separation
   private readonly sma200Period = 200;
@@ -77,19 +78,9 @@ export class GoldenCrossStrategy implements TradingStrategy {
     const bullishCross = sma50Prev <= sma200Prev && sma50Last > sma200Last;
     const bearishCross = sma50Prev >= sma200Prev && sma50Last < sma200Last;
 
-    // Fresh crossover within 5 candles
-    let freshBullishCross = bullishCross;
-    let freshBearishCross = bearishCross;
-    if (!freshBullishCross && !freshBearishCross) {
-      for (let i = 1; i <= 4 && lastIdx - i > 0; i++) {
-        const prev50 = sma50[lastIdx - i];
-        const prevPrev50 = sma50[lastIdx - i - 1];
-        const prev200 = sma200[lastIdx - i];
-        const prevPrev200 = sma200[lastIdx - i - 1];
-        if (prevPrev50 <= prevPrev200 && prev50 > prev200) freshBullishCross = true;
-        if (prevPrev50 >= prevPrev200 && prev50 < prev200) freshBearishCross = true;
-      }
-    }
+    // Fresh crossover
+    const freshBullishCross = bullishCross;
+    const freshBearishCross = bearishCross;
 
     // SMA separation
     const separation = close > 0 ? Math.abs(sma50Last - sma200Last) / close : 0;

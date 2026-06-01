@@ -6,7 +6,6 @@ export interface UserSettings {
   maxOpenTrades: number;
   defaultSlPct: number;
   defaultTpPct: number;
-  prefTimeframe: string;
   prefSymbol: string;
 }
 
@@ -24,7 +23,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   maxOpenTrades: 3,
   defaultSlPct: 1.5,
   defaultTpPct: 3.0,
-  prefTimeframe: "15m",
   prefSymbol: "BTCUSDT",
   loading: false,
   error: null,
@@ -41,7 +39,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
           maxOpenTrades: data.settings.maxOpenTrades,
           defaultSlPct: data.settings.defaultSlPct,
           defaultTpPct: data.settings.defaultTpPct,
-          prefTimeframe: data.settings.prefTimeframe,
           prefSymbol: data.settings.prefSymbol,
           loading: false,
         });

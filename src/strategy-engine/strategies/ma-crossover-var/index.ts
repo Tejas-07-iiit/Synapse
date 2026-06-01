@@ -30,6 +30,7 @@ export class MACrossoverVariableStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly minEMASeparation = 0.0008; // 0.08% minimum separation
   private readonly minSMA200Slope = 0.005;     // 0.005% minimum slope
@@ -88,21 +89,9 @@ export class MACrossoverVariableStrategy implements TradingStrategy {
     const bullishCross = ema20Prev <= ema50Prev && ema20Last > ema50Last;
     const bearishCross = ema20Prev >= ema50Prev && ema20Last < ema50Last;
 
-    let freshBullishCross = bullishCross;
-    let freshBearishCross = bearishCross;
-    
-    // Check within 5 candles for a fresh crossover
-    if (!freshBullishCross && !freshBearishCross) {
-      for (let i = 1; i <= 4 && lastIdx - i > 0; i++) {
-        const prev20 = ema20[lastIdx - i];
-        const prevPrev20 = ema20[lastIdx - i - 1];
-        const prev50 = ema50[lastIdx - i];
-        const prevPrev50 = ema50[lastIdx - i - 1];
-        
-        if (prevPrev20 <= prevPrev50 && prev20 > prev50) freshBullishCross = true;
-        if (prevPrev20 >= prevPrev50 && prev20 < prev50) freshBearishCross = true;
-      }
-    }
+    // Fresh crossover
+    const freshBullishCross = bullishCross;
+    const freshBearishCross = bearishCross;
 
     // SMA200 slope (over 5 candles for stability)
     const sma200_5ago = lastIdx >= 5 ? sma200[lastIdx - 5] : sma200Prev;

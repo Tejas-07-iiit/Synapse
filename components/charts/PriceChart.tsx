@@ -222,8 +222,15 @@ export function PriceChart({
 
     return () => {
       currentPriceLines.clear();
-      markersPluginRef.current?.detach();
+      try {
+        if (typeof markersPluginRef.current?.detach === 'function') {
+          markersPluginRef.current.detach();
+        }
+      } catch (e) {
+        // Plugin might not support detach
+      }
       markersPluginRef.current = null;
+      chart.applyOptions({ autoSize: false }); // Prevent ResizeObserver callbacks from firing after disposal
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;

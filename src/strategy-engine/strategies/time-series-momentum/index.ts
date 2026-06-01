@@ -27,6 +27,7 @@ export class TimeSeriesMomentumStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["adx", "momentum", "atr", "rsi"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly adxThreshold = 25;
   private readonly adxMinimum = 20;    // Below this, market is sideways → reject

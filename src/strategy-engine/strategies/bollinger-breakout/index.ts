@@ -12,6 +12,7 @@ export class BollingerBreakoutStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["bbUpper", "bbMiddle", "bbLower", "adx", "atr", "volumeMA"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators } = context;
@@ -64,7 +65,8 @@ export class BollingerBreakoutStrategy implements TradingStrategy {
     // 3. Bollinger Band width expanding
     // 4. Candle volume above average
     // 5. Strong bullish candle body (closes near high, bodyRatio >= 0.6, close > open)
-    const isBbLong = close > bbUpper;
+    const prevClose = lastIdx > 0 ? candles[lastIdx - 1].close : close;
+    const isBbLong = prevClose <= prevBbUpper && close > bbUpper;
     
     // SHORT Conditions:
     // 1. Price closes below lower Bollinger Band
@@ -72,7 +74,7 @@ export class BollingerBreakoutStrategy implements TradingStrategy {
     // 3. Band width expanding
     // 4. Strong bearish candle
     // 5. Volume expansion
-    const isBbShort = close < bbLower;
+    const isBbShort = prevClose >= prevBbLower && close < bbLower;
 
     if (isBbLong && isAdxRising && isExpanding && hasVolumeExpansion && !isFakeoutLong && close > open) {
       direction = "LONG";

@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   Info
 } from "lucide-react";
-import { createChart, LineSeries, type IChartApi, type UTCTimestamp } from "lightweight-charts";
+import { createChart, AreaSeries, LineType, type IChartApi, type UTCTimestamp } from "lightweight-charts";
 
 interface DbPosition {
   id: string;
@@ -278,20 +278,26 @@ export default function PortfolioPage() {
     if (sortedTrades.length === 0) return [];
 
     let currentVal = startingCapital;
-    const curve = [
-      {
-        time: Math.floor(new Date(sortedTrades[0].openedAt).getTime() / 1000) as UTCTimestamp,
-        value: startingCapital,
-      }
-    ];
+    const timeMap = new Map<number, number>();
+
+    const startTimestamp = Math.floor(new Date(sortedTrades[0].openedAt).getTime() / 1000);
+    const firstCloseTimestamp = Math.floor(new Date(sortedTrades[0].closedAt).getTime() / 1000);
+    
+    // Guarantee start point is before first close
+    const safeStartTimestamp = startTimestamp < firstCloseTimestamp ? startTimestamp : firstCloseTimestamp - 1;
+    timeMap.set(safeStartTimestamp, startingCapital);
 
     sortedTrades.forEach((trade) => {
       currentVal += trade.pnl;
-      curve.push({
-        time: Math.floor(new Date(trade.closedAt).getTime() / 1000) as UTCTimestamp,
-        value: currentVal
-      });
+      const time = Math.floor(new Date(trade.closedAt).getTime() / 1000);
+      
+      // If multiple trades close on the exact same second, this overwrites the value with the aggregated PnL
+      timeMap.set(time, currentVal);
     });
+
+    const curve = Array.from(timeMap.entries())
+      .map(([time, value]) => ({ time: time as UTCTimestamp, value }))
+      .sort((a, b) => a.time - b.time);
 
     return curve;
   }, [filteredClosedTrades, startingCapital]);
@@ -463,6 +469,7 @@ export default function PortfolioPage() {
     if (!chartContainerRef.current || !hasSufficientCurveData) return;
 
     if (chartInstanceRef.current) {
+      chartInstanceRef.current.applyOptions({ autoSize: false });
       chartInstanceRef.current.remove();
       chartInstanceRef.current = null;
     }
@@ -470,10 +477,30 @@ export default function PortfolioPage() {
     const isDark = resolvedTheme === "dark";
     const colors = {
       text: isDark ? "#a1a1aa" : "#64748b",
-      grid: isDark ? "#18181b" : "#f1f5f9",
-      border: isDark ? "#18181b" : "#e2e8f0",
-      line: isDark ? "#3b82f6" : "#2563eb",
+      grid: isDark ? "rgba(24, 24, 27, 0.1)" : "rgba(241, 245, 249, 0.1)",
+      line: "#00D4FF",
+      areaTop: "rgba(0, 212, 255, 0.2)",
+      areaBottom: "rgba(0, 212, 255, 0.0)",
+      crosshair: isDark ? "rgba(161, 161, 170, 0.4)" : "rgba(100, 116, 139, 0.4)",
     };
+
+    let tickMarkFormatter: ((time: number) => string) | undefined = undefined;
+    if (selectedDateFilter === "LAST_7" || selectedDateFilter === "TODAY") {
+      tickMarkFormatter = (time: number) => {
+        const d = new Date(time * 1000);
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      };
+    } else if (selectedDateFilter === "LAST_30" || selectedDateFilter === "THIS_MONTH" || selectedDateFilter === "LAST_MONTH") {
+      tickMarkFormatter = (time: number) => {
+        const d = new Date(time * 1000);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      };
+    } else {
+      tickMarkFormatter = (time: number) => {
+        const d = new Date(time * 1000);
+        return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+      };
+    }
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -487,25 +514,35 @@ export default function PortfolioPage() {
         horzLines: { color: colors.grid },
       },
       rightPriceScale: {
-        borderColor: colors.border,
+        borderVisible: false,
         alignLabels: true,
       },
       timeScale: {
-        borderColor: colors.border,
+        borderVisible: false,
         timeVisible: true,
         fixLeftEdge: true,
+        tickMarkFormatter: tickMarkFormatter,
+      },
+      crosshair: {
+        vertLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
+        horzLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
       },
       autoSize: true,
     });
 
-    const lineSeries = chart.addSeries(LineSeries, {
-      color: colors.line,
+    const areaSeries = chart.addSeries(AreaSeries, {
+      lineColor: colors.line,
+      topColor: colors.areaTop,
+      bottomColor: colors.areaBottom,
       lineWidth: 2,
+      lineType: LineType.Curved,
       crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      crosshairMarkerBorderColor: "#fff",
+      crosshairMarkerBackgroundColor: colors.line,
     });
 
-    const sortedPoints = [...equityCurveData].sort((a, b) => a.time - b.time);
-    lineSeries.setData(sortedPoints);
+    areaSeries.setData(equityCurveData);
 
     chartInstanceRef.current = chart;
 
@@ -514,10 +551,11 @@ export default function PortfolioPage() {
     }, 100);
 
     return () => {
+      chart.applyOptions({ autoSize: false });
       chart.remove();
       chartInstanceRef.current = null;
     };
-  }, [equityCurveData, hasSufficientCurveData, resolvedTheme]);
+  }, [equityCurveData, hasSufficientCurveData, resolvedTheme, selectedDateFilter]);
 
   if (authLoading) {
     return (

@@ -29,6 +29,7 @@ export class HeikenAshiSwingStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly minBodyRatio = 0.3; // Minimum body/range ratio to filter doji candles
 

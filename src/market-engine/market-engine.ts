@@ -206,6 +206,9 @@ class MarketEngine {
         // 1. Update the symbol-specific candle cache
         store.updateLastCandleForSymbol(symUpper, tfLower, candle);
 
+        // Forward kline high/low extremes to paper trading engine to perfectly catch wick liquidations
+        PaperTradingEngine.updatePrices(symUpper, candle.close, candle.high, candle.low);
+
         // 2. If it's the active symbol and timeframe, update the active candles for UI
         if (symUpper === this.activeSymbol && tfLower === this.activeTimeframe) {
           store.updateLastCandle(candle, isClosed);

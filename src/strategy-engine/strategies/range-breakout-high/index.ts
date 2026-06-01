@@ -25,6 +25,7 @@ export class RangeBreakoutHighStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "bbUpper", "bbMiddle", "bbLower", "volumeMA"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly donchianPeriod = 20;
   private readonly rangeThreshold = 0.03;  // 3% of price — tight range cutoff

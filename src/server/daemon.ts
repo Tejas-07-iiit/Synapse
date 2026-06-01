@@ -307,17 +307,77 @@ async function runDaemon() {
           continue;
         }
 
-        // Set SL / TP boundaries
-        const direction: "LONG" | "SHORT" = sig.signal;
-        const defaultSl =
-          direction === "LONG"
-            ? sig.entry * (1 - settings.defaultSlPct / 100)
-            : sig.entry * (1 + settings.defaultSlPct / 100);
+        // A. Check quarantine status
+        if (PerformanceWeightingEngine.isQuarantined(sig.strategyId)) {
+          console.log(`[Daemon] 🛡️ Autonomous trade blocked for user ${userId} on ${sym}: Strategy ${sig.strategyId} is QUARANTINED.`);
+          continue;
+        }
 
-        const defaultTp =
-          direction === "LONG"
-            ? sig.entry * (1 + settings.defaultTpPct / 100)
-            : sig.entry * (1 - settings.defaultTpPct / 100);
+        // B. Check symbol cooldowns
+        const lastTrade = await prisma.trade.findFirst({
+          where: {
+            userId,
+            symbol: sym,
+            executionType: "PAPER",
+          },
+          orderBy: {
+            closedAt: "desc",
+          },
+        });
+
+        if (lastTrade) {
+          const timeSinceCloseMs = Date.now() - new Date(lastTrade.closedAt).getTime();
+          let cooldownMinutes = 0;
+          if (lastTrade.status === "STOPPED") {
+            cooldownMinutes = 30;
+          } else if (lastTrade.status === "TP HIT") {
+            cooldownMinutes = 5;
+          } else { // "CLOSED"
+            cooldownMinutes = 10;
+          }
+
+          const cooldownMs = cooldownMinutes * 60 * 1000;
+          if (timeSinceCloseMs < cooldownMs) {
+            const remainingMins = Math.ceil((cooldownMs - timeSinceCloseMs) / (60 * 1000));
+            console.log(`[Daemon] ⏳ Trade blocked for user ${userId} on ${sym}: In cooldown (${remainingMins}m remaining, last status: ${lastTrade.status})`);
+            continue;
+          }
+        }
+
+        // C. Set strategy-specific ATR-based Stop Loss & Take Profit boundaries
+        const direction: "LONG" | "SHORT" = sig.signal;
+        
+        // Retrieve real-time ATR value for the current symbol
+        const lastIdx = indicators.atr ? indicators.atr.length - 1 : -1;
+        const atrVal = (lastIdx >= 0 && indicators.atr[lastIdx]) ? indicators.atr[lastIdx] : (sig.entry * 0.015);
+
+        const category = sig.strategyCategory || "Central Engine";
+        const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
+        const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
+        const isBreakoutStrat = category === "Breakout" || category === "Volatility";
+
+        let slMult = 2.0;
+        let tpMult = 4.0;
+        if (isTrendingStrat) {
+          slMult = 2.5;
+          tpMult = 5.0;
+        } else if (isBreakoutStrat) {
+          slMult = 2.0;
+          tpMult = 4.0;
+        } else if (isMeanReversionStrat) {
+          slMult = 1.5;
+          tpMult = 3.0;
+        }
+
+        const atrSlDist = slMult * atrVal;
+        const atrTpDist = tpMult * atrVal;
+
+        const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
+        const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
+
+        // Fallbacks if ATR SL/TP is not computed properly or is invalid
+        const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
+        const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
 
         try {
           console.log(`[Daemon] 🚀 Placing autonomous order: ${direction} ${sym} for User: ${settings.user.username}`);
@@ -327,8 +387,8 @@ async function runDaemon() {
             direction,
             sig.entry,
             null, // Auto-size based on risk settings and wallet balance
-            sig.stopLoss || defaultSl,
-            sig.takeProfit || defaultTp,
+            finalSl,
+            finalTp,
             1, // 1x leverage
             wallet.balance, // explicitBalance
             {

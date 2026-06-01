@@ -12,6 +12,7 @@ export class BollingerReversionStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["bbUpper", "bbMiddle", "bbLower", "adx", "rsi", "atr"];
+  public supportedRegimes = ["Ranging","Accumulation","Distribution","Low Volatility"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators } = context;

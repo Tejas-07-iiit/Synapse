@@ -30,6 +30,7 @@ export class SMATrendFilterStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["sma50", "rsi", "atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly minSMASeparation = 0.002;  // 0.2% minimum separation
   private readonly minSMA50Slope = 0.005;     // 0.005% minimum slope

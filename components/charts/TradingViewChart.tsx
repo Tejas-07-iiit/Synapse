@@ -51,52 +51,66 @@ const TradeZoneOverlay = ({
   const updateStyle = useCallback(() => {
     if (!chartApi || !seriesApi) return;
     
-    const openedAtSeconds = Math.floor(new Date(overlay.openedAt).getTime() / 1000);
-    const startXVal = chartApi.timeScale().timeToCoordinate(openedAtSeconds as UTCTimestamp);
-    const chartWidth = chartApi.timeScale().width();
-    
-    if (startXVal === null) {
-      setStyle({ display: "none" });
-      return;
+    try {
+      const openedAtSeconds = Math.floor(new Date(overlay.openedAt).getTime() / 1000);
+      const startXVal = chartApi.timeScale().timeToCoordinate(openedAtSeconds as UTCTimestamp);
+      const chartWidth = chartApi.timeScale().width();
+      
+      if (startXVal === null) {
+        setStyle({ display: "none" });
+        return;
+      }
+
+      const startX = Math.max(0, startXVal);
+      const width = Math.max(0, chartWidth - startX);
+      
+      const entryY = seriesApi.priceToCoordinate(overlay.entryPrice);
+      const tpY = seriesApi.priceToCoordinate(overlay.tpPrice);
+      const slY = seriesApi.priceToCoordinate(overlay.slPrice);
+      
+      if (entryY === null || tpY === null || slY === null) {
+        setStyle({ display: "none" });
+        return;
+      }
+
+      const tpTop = Math.min(entryY, tpY);
+      const tpHeight = Math.abs(entryY - tpY);
+      const slTop = Math.min(entryY, slY);
+      const slHeight = Math.abs(entryY - slY);
+
+      setStyle({
+        display: "block",
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 10,
+        "--startX": `${startX}px`,
+        "--width": `${width}px`,
+        "--tpTop": `${tpTop}px`,
+        "--tpHeight": `${tpHeight}px`,
+        "--slTop": `${slTop}px`,
+        "--slHeight": `${slHeight}px`,
+      } as React.CSSProperties & Record<string, string | number>);
+    } catch (e) {
+      // Chart is likely disposed
     }
-
-    const startX = Math.max(0, startXVal);
-    const width = Math.max(0, chartWidth - startX);
-    
-    const entryY = seriesApi.priceToCoordinate(overlay.entryPrice);
-    const tpY = seriesApi.priceToCoordinate(overlay.tpPrice);
-    const slY = seriesApi.priceToCoordinate(overlay.slPrice);
-    
-    if (entryY === null || tpY === null || slY === null) {
-      setStyle({ display: "none" });
-      return;
-    }
-
-    const tpTop = Math.min(entryY, tpY);
-    const tpHeight = Math.abs(entryY - tpY);
-    const slTop = Math.min(entryY, slY);
-    const slHeight = Math.abs(entryY - slY);
-
-    setStyle({
-      display: "block",
-      position: "absolute",
-      inset: 0,
-      pointerEvents: "none",
-      zIndex: 10,
-      "--startX": `${startX}px`,
-      "--width": `${width}px`,
-      "--tpTop": `${tpTop}px`,
-      "--tpHeight": `${tpHeight}px`,
-      "--slTop": `${slTop}px`,
-      "--slHeight": `${slHeight}px`,
-    } as React.CSSProperties & Record<string, string | number>);
   }, [chartApi, seriesApi, overlay]);
 
   useEffect(() => {
-    updateStyle();
-    const timeScale = chartApi.timeScale();
-    timeScale.subscribeVisibleLogicalRangeChange(updateStyle);
-    return () => timeScale.unsubscribeVisibleLogicalRangeChange(updateStyle);
+    try {
+      updateStyle();
+      const timeScale = chartApi.timeScale();
+      timeScale.subscribeVisibleLogicalRangeChange(updateStyle);
+      return () => {
+        try {
+          timeScale.unsubscribeVisibleLogicalRangeChange(updateStyle);
+        } catch (e) {
+          // Chart disposed
+        }
+      };
+    } catch (e) {
+      // Chart disposed
+    }
   }, [chartApi, updateStyle]);
 
   const isLong = overlay.direction === "LONG";
@@ -170,8 +184,10 @@ export default function TradingViewChart() {
   } | null>(null);
   const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
   
+  const chartKey = `${symbol}-${timeframe}`;
+  
   // APIs for Overlays
-  const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<"Candlestick"> } | null>(null);
+  const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<"Candlestick">; key: string } | null>(null);
 
   // Fetch active positions
   useEffect(() => {
@@ -410,7 +426,7 @@ export default function TradingViewChart() {
         )}
         
         <PriceChart
-          key={`${symbol}-${timeframe}`} // STABLE RESET PATTERN
+          key={chartKey} // STABLE RESET PATTERN
           symbol={symbol}
           candles={candles}
           indicators={indicators}
@@ -419,11 +435,11 @@ export default function TradingViewChart() {
           showEMA={showEMA}
           showSMA={showSMA}
           onCrosshairMove={handleCrosshairMove}
-          onChartReady={(chart, series) => setApis({ chart, series })}
+          onChartReady={(chart, series) => setApis({ chart, series, key: chartKey })}
         />
 
         {/* Trade Zone Overlays */}
-        {apis && overlays.map(o => (
+        {apis && apis.key === chartKey && overlays.map(o => (
           <TradeZoneOverlay 
             key={o.id} 
             overlay={o} 

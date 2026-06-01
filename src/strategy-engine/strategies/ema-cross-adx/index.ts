@@ -28,6 +28,7 @@ export class EMACrossADXStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "sma50", "adx", "macdHist", "macdLine", "signalLine", "atr"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   private readonly adxThreshold = 25;
   private readonly adxMinimum = 20;
@@ -65,18 +66,8 @@ export class EMACrossADXStrategy implements TradingStrategy {
     const isFlatSeparation = emaSeparation < this.minEmaSeparation;
 
     // Fresh crossover: crossover happened within last 3 candles
-    let freshBullishCross = bullishCross;
-    let freshBearishCross = bearishCross;
-    if (!freshBullishCross && !freshBearishCross) {
-      for (let lookback = 1; lookback <= 2 && lastIdx - lookback > 0; lookback++) {
-        const prevEma = indicators.ema20[lastIdx - lookback];
-        const prevSma = indicators.sma50[lastIdx - lookback];
-        const prevPrevEma = indicators.ema20[lastIdx - lookback - 1];
-        const prevPrevSma = indicators.sma50[lastIdx - lookback - 1];
-        if (prevPrevEma <= prevPrevSma && prevEma > prevSma) freshBullishCross = true;
-        if (prevPrevEma >= prevPrevSma && prevEma < prevSma) freshBearishCross = true;
-      }
-    }
+    const freshBullishCross = bullishCross;
+    const freshBearishCross = bearishCross;
 
     let direction: "LONG" | "SHORT" | "HOLD" = "HOLD";
     const reasoning: string[] = [];

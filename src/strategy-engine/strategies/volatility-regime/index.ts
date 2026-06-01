@@ -28,6 +28,7 @@ export class VolatilityRegimeStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "adx", "ema20", "sma50"];
+  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
 
   private readonly lookback = 100;
   private readonly adxThreshold = 25;

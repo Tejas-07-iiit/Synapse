@@ -31,6 +31,7 @@ export class NewsFearGreedStrategy implements TradingStrategy {
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "ema20", "atr", "macdHist"];
+  public supportedRegimes = ["Bullish Trend","Bearish Trend","Breakout","High Volatility"];
 
   // ────────────────────────────────────────────
   // Mock Sentiment Provider

@@ -74,6 +74,7 @@ export class PaperTradingEngine {
           confidenceAtEntry: pos.confidenceAtEntry || undefined,
           marketRegime: pos.marketRegime || undefined,
           indicatorSnapshot: pos.indicatorSnapshot || undefined,
+          auditPayload: pos.auditPayload || undefined,
         });
       }
       console.log(`[PaperTrading] Loaded ${positionsList.length} active positions from database.`);
@@ -219,6 +220,7 @@ export class PaperTradingEngine {
       const confidenceAtEntry = signalContext?.confidence !== undefined ? signalContext.confidence / 100 : 1.0;
       const marketRegime = signalContext?.marketContext?.regime || "UNKNOWN";
       const indicatorSnapshot = signalContext?.indicators || {};
+      const auditPayload = signalContext?.auditPayload || null;
 
       // 1.5 CHECK COOLDOWN
       const cooldownExpiry = this.symbolCooldowns.get(sym) || 0;
@@ -342,6 +344,21 @@ export class PaperTradingEngine {
       try {
         console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
         let dbPos: any = null;
+
+        // Enrich auditPayload with final sizing
+        let finalAuditPayload = auditPayload;
+        if (finalAuditPayload) {
+          try {
+            finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
+            if (finalAuditPayload.tradePlan) {
+              finalAuditPayload.tradePlan.sizeUsdt = Number(orderValueUsdt.toFixed(2));
+              finalAuditPayload.tradePlan.quantity = Number(qty.toFixed(6));
+            }
+          } catch (e) {
+            console.error("[PaperTrading] Failed to enrich auditPayload sizing:", e);
+          }
+        }
+
         if (this.dbHandler) {
           dbPos = await this.dbHandler.openPosition({
             userId,
@@ -359,6 +376,7 @@ export class PaperTradingEngine {
             confidenceAtEntry,
             marketRegime,
             indicatorSnapshot,
+            auditPayload: finalAuditPayload,
           });
         } else {
           // Save position to DB via API
@@ -383,6 +401,7 @@ export class PaperTradingEngine {
                 confidenceAtEntry,
                 marketRegime,
                 indicatorSnapshot,
+                auditPayload: finalAuditPayload,
               },
             }),
           });
@@ -418,6 +437,7 @@ export class PaperTradingEngine {
           confidenceAtEntry: dbPos.confidenceAtEntry || undefined,
           marketRegime: dbPos.marketRegime || undefined,
           indicatorSnapshot: dbPos.indicatorSnapshot || undefined,
+          auditPayload: dbPos.auditPayload || undefined,
         };
 
         this.positions.set(position.id, position);
@@ -508,6 +528,7 @@ export class PaperTradingEngine {
           marketRegime: pos.marketRegime,
           indicatorSnapshot: pos.indicatorSnapshot,
           exitReason: exitReasonExplanation,
+          auditPayload: pos.auditPayload,
         });
       } else {
         // Close position in DB via API
@@ -539,6 +560,7 @@ export class PaperTradingEngine {
               marketRegime: pos.marketRegime,
               indicatorSnapshot: pos.indicatorSnapshot,
               exitReason: exitReasonExplanation,
+              auditPayload: pos.auditPayload,
             },
           }),
         });

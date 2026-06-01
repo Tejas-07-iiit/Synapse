@@ -40,17 +40,29 @@ const STRATEGY_CATEGORIES: Record<string, string> = {
 
 export class ConfidenceEngine {
   /**
-   * Calculates a centralized confidence score (0 to 100) for a given trade setup.
+   * Calculates a detailed component breakdown of the confidence score for a given trade setup.
    */
-  public static calculate(
+  public static calculateDetailed(
     direction: "LONG" | "SHORT" | "HOLD",
     context: StrategyContext,
     strategyId?: string
-  ): number {
-    if (direction === "HOLD") return 0;
+  ): {
+    trendScore: number;
+    momentumScore: number;
+    volumeScore: number;
+    regimeScore: number;
+    confirmScore: number;
+    perfBoost: number;
+    finalScore: number;
+  } {
+    if (direction === "HOLD") {
+      return { trendScore: 0, momentumScore: 0, volumeScore: 0, regimeScore: 0, confirmScore: 0, perfBoost: 0, finalScore: 0 };
+    }
 
     const { candles, indicators } = context;
-    if (candles.length === 0) return 50;
+    if (candles.length === 0) {
+      return { trendScore: 0, momentumScore: 0, volumeScore: 0, regimeScore: 0, confirmScore: 0, perfBoost: 0, finalScore: 50 };
+    }
 
     const lastIdx = candles.length - 1;
     const price = candles[lastIdx].close;
@@ -188,6 +200,25 @@ export class ConfidenceEngine {
 
     finalScore = Math.min(100, Math.max(0, finalScore));
 
-    return finalScore;
+    return {
+      trendScore,
+      momentumScore,
+      volumeScore,
+      regimeScore,
+      confirmScore,
+      perfBoost,
+      finalScore
+    };
+  }
+
+  /**
+   * Calculates a centralized confidence score (0 to 100) for a given trade setup.
+   */
+  public static calculate(
+    direction: "LONG" | "SHORT" | "HOLD",
+    context: StrategyContext,
+    strategyId?: string
+  ): number {
+    return this.calculateDetailed(direction, context, strategyId).finalScore;
   }
 }

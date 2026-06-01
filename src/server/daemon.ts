@@ -5,6 +5,7 @@ import { strategyEngine } from "../strategy-engine/core/engine";
 import { marketWsService } from "../market-engine/websocket";
 import { useMarketStore } from "../stores/marketStore";
 import { PerformanceWeightingEngine } from "../strategy-engine/core/performance-weighting";
+import { ConfidenceEngine } from "../strategy-engine/core/confidence-engine";
 import { AuditLogger } from "../lib/audit/trading-audit";
 
 const prisma = new PrismaClient();
@@ -42,6 +43,7 @@ async function runDaemon() {
           confidenceAtEntry: data.confidenceAtEntry || null,
           marketRegime: data.marketRegime || null,
           indicatorSnapshot: data.indicatorSnapshot || null,
+          auditPayload: data.auditPayload || null,
         },
       });
     },
@@ -74,6 +76,7 @@ async function runDaemon() {
         marketRegime,
         indicatorSnapshot,
         exitReason,
+        auditPayload,
       } = data;
 
       // Update position to CLOSED
@@ -108,6 +111,28 @@ async function runDaemon() {
       const totalFees = entryFee + exitFee;
       const grossPnl = pnl;
       const netPnl = grossPnl - totalFees;
+
+      let finalAuditPayload = auditPayload || null;
+      if (finalAuditPayload && typeof finalAuditPayload === "object") {
+        finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
+      } else {
+        finalAuditPayload = {};
+      }
+
+      finalAuditPayload.exitOutcome = {
+        exitPrice,
+        exitReason: exitReason || reason,
+        durationMs: new Date(closedAt).getTime() - new Date(openedAt).getTime(),
+        closedAt: new Date(closedAt).getTime(),
+      };
+
+      finalAuditPayload.executionCosts = {
+        entryFee,
+        exitFee,
+        totalFees,
+        grossPnl,
+        netPnl,
+      };
 
       // Create Trade History log
       try {
@@ -144,6 +169,7 @@ async function runDaemon() {
             grossPnl,
             netPnl,
             feeRate: 0.001,
+            auditPayload: finalAuditPayload,
           },
         });
         
@@ -295,7 +321,7 @@ async function runDaemon() {
   });
 
   // 3. MULTI-USER AUTONOMOUS ORDER EXECUTION SYSTEM
-  strategyEngine.registerCallback(async (symbol, timeframe, regime, signals, indicators) => {
+  strategyEngine.registerCallback(async (symbol, timeframe, regime, signals, indicators, rawSignals) => {
     const sym = symbol.toUpperCase();
     const tf = timeframe.toLowerCase();
 
@@ -313,6 +339,151 @@ async function runDaemon() {
         direction: sig.signal,
         regime: regime
       });
+
+      // Generate Entry Audit Payload
+      const lastVal = (arr?: number[]) => {
+        if (!arr || arr.length === 0) return 0;
+        return arr[arr.length - 1];
+      };
+
+      const candlesCache = useMarketStore.getState().allCandles[`${sym}_${tf}`] || [];
+      const tickerCache = useMarketStore.getState().tickerData[sym] || null;
+      const stratContext = {
+        symbol: sym,
+        timeframe: tf,
+        candles: candlesCache,
+        indicators,
+        ticker: tickerCache
+      };
+      
+      const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
+
+      const lastCandle = candlesCache[candlesCache.length - 1];
+      const lastVol = lastCandle ? lastCandle.volume : 0;
+      const lastVolMA = lastVal(indicators.volumeMA) || 0;
+      const volumeRatio = lastVolMA > 0 ? Number((lastVol / lastVolMA).toFixed(2)) : 1.0;
+
+      const competitionList = (rawSignals || []).map(r => {
+        return {
+          strategyId: r.strategyId,
+          strategyName: r.strategyName || r.strategyId,
+          confidence: r.confidence,
+          direction: r.signal,
+          reasoning: r.reasoning
+        };
+      }).sort((a, b) => b.confidence - a.confidence);
+
+      const otherStrategiesLost = (rawSignals || [])
+        .filter(r => r.strategyId !== sig.strategyId)
+        .map(r => {
+          let reason = "Signal did not match winning direction or had lower confidence score.";
+          if (r.signal === "HOLD") {
+            reason = "Strategy generated a HOLD signal (neutral outlook).";
+          } else if (r.signal !== sig.signal) {
+            reason = `Strategy proposed a ${r.signal} signal, which conflicted with the winning ${sig.signal} direction.`;
+          } else {
+            reason = `Proposed a ${r.signal} signal with ${r.confidence}% confidence, but was out-prioritized.`;
+          }
+          return {
+            strategyId: r.strategyId,
+            strategyName: r.strategyName || r.strategyId,
+            confidence: r.confidence,
+            direction: r.signal,
+            reason
+          };
+        });
+
+      // Calculate final TP and SL to be used in trade plan
+      const atrVal = (lastVal(indicators.atr)) || (sig.entry * 0.015);
+      const category = sig.strategyCategory || "Central Engine";
+      const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
+      const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
+      const isBreakoutStrat = category === "Breakout" || category === "Volatility";
+
+      let slMult = 2.0;
+      let tpMult = 4.0;
+      if (isTrendingStrat) {
+        slMult = 2.5;
+        tpMult = 5.0;
+      } else if (isBreakoutStrat) {
+        slMult = 2.0;
+        tpMult = 4.0;
+      } else if (isMeanReversionStrat) {
+        slMult = 1.5;
+        tpMult = 3.0;
+      }
+
+      const atrSlDist = slMult * atrVal;
+      const atrTpDist = tpMult * atrVal;
+
+      const atrSl = sig.signal === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
+      const atrTp = sig.signal === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
+
+      const finalSl = atrSl > 0 ? atrSl : (sig.signal === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
+      const finalTp = atrTp > 0 ? atrTp : (sig.signal === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
+
+      const risk = Math.abs(sig.entry - finalSl);
+      const reward = Math.abs(finalTp - sig.entry);
+      const riskRewardRatio = risk > 0 ? Number((reward / risk).toFixed(2)) : 1.5;
+
+      const entryAuditPayload = {
+        marketSnapshot: {
+          asset: sym,
+          timeframe: tf,
+          regime: regime || "UNKNOWN",
+          volatility: lastVal(indicators.atr),
+          volume: lastVol,
+          trendStrength: lastVal(indicators.adx),
+          summary: `Market regime classified as ${regime} with ${lastVal(indicators.adx) > 25 ? "strong" : "weak"} trend strength and ATR of ${lastVal(indicators.atr).toFixed(4)}.`
+        },
+        strategyCompetition: competitionList.length > 0 ? competitionList : [
+          { strategyId: sig.strategyId, strategyName: sig.strategyName || sig.strategyId, confidence: sig.confidence, direction: sig.signal, reasoning: sig.reasoning }
+        ],
+        winningStrategy: {
+          strategyId: sig.strategyId,
+          strategyName: sig.strategyName || sig.strategyId,
+          confidence: sig.confidence,
+          selectionReason: sig.reasoning ? sig.reasoning.join(". ") : "Highest confidence score with regime alignment."
+        },
+        confidenceBreakdown: {
+          trendScore: detailedConf.trendScore,
+          momentumScore: detailedConf.momentumScore,
+          volumeScore: detailedConf.volumeScore,
+          regimeScore: detailedConf.regimeScore,
+          confirmScore: detailedConf.confirmScore,
+          perfBoost: detailedConf.perfBoost,
+          finalScore: detailedConf.finalScore
+        },
+        tradeEvidence: {
+          rsi: lastVal(indicators.rsi),
+          ema20: lastVal(indicators.ema20),
+          sma50: lastVal(indicators.sma50),
+          macdHist: lastVal(indicators.macdHist),
+          adx: lastVal(indicators.adx),
+          atr: lastVal(indicators.atr),
+          volumeRatio
+        },
+        tradePlan: {
+          direction: sig.signal,
+          entryPrice: sig.entry,
+          stopLoss: finalSl,
+          takeProfit: finalTp,
+          riskRewardRatio,
+          sizeUsdt: 0,
+          quantity: 0
+        },
+        executionCosts: {
+          entryFee: 0,
+          exitFee: 0,
+          totalFees: 0,
+          grossPnl: 0,
+          netPnl: 0
+        },
+        otherStrategiesLost,
+        executiveSummary: `A autonomous ${sig.signal} position was opened on ${sym} at $${sig.entry}. Winning strategy ${sig.strategyName || sig.strategyId} achieved confidence score of ${sig.confidence}% in a ${regime} market structure.`
+      };
+
+      (sig as any).auditPayload = entryAuditPayload;
 
       // Query database for all users that have autoTrading enabled
       const usersWithAuto = await prisma.userSettings.findMany({

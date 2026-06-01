@@ -21,6 +21,7 @@ export interface VirtualPosition {
   confidenceAtEntry?: number;
   marketRegime?: string;
   indicatorSnapshot?: any;
+  auditPayload?: any;
 }
 
 export interface VirtualOrder {

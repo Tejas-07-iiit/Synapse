@@ -125,6 +125,7 @@ model Position {
   confidenceAtEntry Float?
   marketRegime      String?
   indicatorSnapshot Json?
+  auditPayload      Json?
 
   @@index([userId])
   @@index([symbol])
@@ -167,6 +168,7 @@ model Trade {
   confidenceAtEntry Float?
   marketRegime      String?
   indicatorSnapshot Json?
+  auditPayload      Json?
 
   @@index([userId])
   @@index([symbol])

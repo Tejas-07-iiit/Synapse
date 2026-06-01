@@ -12,7 +12,8 @@ export type EngineRunCallback = (
   timeframe: string,
   regime: MarketRegime,
   signals: StrategySignal[],
-  indicators: IndicatorValues
+  indicators: IndicatorValues,
+  rawSignals?: StrategySignal[]
 ) => void;
 
 export interface SignalsDbHandler {
@@ -178,7 +179,7 @@ class StrategyEngine {
     // 5. Trigger callbacks to update global Zustand stores and paper trading executions
     this.callbacks.forEach((cb) => {
       try {
-        cb(sym, tf, regime, prioritizedSignals, indicators);
+        cb(sym, tf, regime, prioritizedSignals, indicators, rawSignals);
       } catch (err) {
         console.error(`[Engine] Callback execution error:`, err);
       }

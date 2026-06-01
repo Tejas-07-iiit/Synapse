@@ -26,13 +26,81 @@ export async function GET(request: Request) {
   }
 }
 
+function generateManualAuditPayload(data: any) {
+  const direction = data.direction;
+  const entryPrice = data.entryPrice;
+  const quantity = data.quantity || 0;
+  const leverage = data.leverage || 1;
+
+  const risk = data.stopLoss ? Math.abs(entryPrice - data.stopLoss) : 0;
+  const reward = data.takeProfit ? Math.abs(data.takeProfit - entryPrice) : 0;
+  const riskRewardRatio = risk > 0 ? Number((reward / risk).toFixed(2)) : 1.5;
+
+  return {
+    marketSnapshot: {
+      asset: data.symbol,
+      timeframe: "Manual",
+      regime: data.marketRegime || "UNKNOWN",
+      volatility: 0.0,
+      volume: 0.0,
+      trendStrength: 0.0,
+      summary: "Manual trade executed directly by user."
+    },
+    strategyCompetition: [
+      { strategyId: "manual", strategyName: "Manual Trade", confidence: 100, direction, reasoning: ["User initiated manual trade"] }
+    ],
+    winningStrategy: {
+      strategyId: "manual",
+      strategyName: "Manual Trade",
+      confidence: 100,
+      selectionReason: "Direct user execution"
+    },
+    confidenceBreakdown: {
+      trendScore: 0,
+      momentumScore: 0,
+      volumeScore: 0,
+      regimeScore: 0,
+      confirmScore: 0,
+      perfBoost: 0,
+      finalScore: 100
+    },
+    tradeEvidence: {
+      rsi: 50,
+      ema20: entryPrice,
+      sma50: entryPrice,
+      macdHist: 0,
+      adx: 0,
+      atr: 0,
+      volumeRatio: 1.0
+    },
+    tradePlan: {
+      direction,
+      entryPrice,
+      stopLoss: data.stopLoss || null,
+      takeProfit: data.takeProfit || null,
+      riskRewardRatio,
+      sizeUsdt: Number((entryPrice * quantity).toFixed(2)),
+      quantity
+    },
+    executionCosts: {
+      entryFee: Number((entryPrice * quantity * 0.001).toFixed(4)),
+      exitFee: 0,
+      totalFees: Number((entryPrice * quantity * 0.001).toFixed(4)),
+      grossPnl: 0,
+      netPnl: 0
+    },
+    otherStrategiesLost: [],
+    executiveSummary: `Manual ${direction} trade executed by user on ${data.symbol} at $${entryPrice}.`
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action, data } = body;
 
     if (action === "open") {
-      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage, strategyId, strategyName, strategyCategory, entryReason, confidenceAtEntry, marketRegime, indicatorSnapshot } = data;
+      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage, strategyId, strategyName, strategyCategory, entryReason, confidenceAtEntry, marketRegime, indicatorSnapshot, auditPayload } = data;
 
       await ensureUserExists(userId);
 
@@ -52,6 +120,20 @@ export async function POST(request: Request) {
           { success: false, error: `An open position already exists for ${symbol}` },
           { status: 409 } // Conflict
         );
+      }
+
+      let finalAuditPayload = auditPayload || null;
+      if (!finalAuditPayload) {
+        finalAuditPayload = generateManualAuditPayload({
+          symbol,
+          direction,
+          entryPrice,
+          quantity,
+          stopLoss,
+          takeProfit,
+          leverage,
+          marketRegime
+        });
       }
 
       const dbPos = await prisma.position.create({
@@ -74,6 +156,7 @@ export async function POST(request: Request) {
           confidenceAtEntry: confidenceAtEntry || null,
           marketRegime: marketRegime || null,
           indicatorSnapshot: indicatorSnapshot || null,
+          auditPayload: finalAuditPayload,
         },
       });
 
@@ -149,6 +232,38 @@ export async function POST(request: Request) {
       const finalIndicatorSnapshot = existingPos?.indicatorSnapshot || data.indicatorSnapshot || null;
       const finalExitReason = data.exitReason || null;
 
+      let finalAuditPayload = data.auditPayload || existingPos?.auditPayload || null;
+      if (finalAuditPayload && typeof finalAuditPayload === "object") {
+        finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
+      } else {
+        finalAuditPayload = generateManualAuditPayload({
+          symbol: finalSymbol,
+          direction: finalDirection,
+          entryPrice: finalEntryPrice,
+          quantity: finalQuantity,
+          stopLoss: finalStopLoss,
+          takeProfit: finalTakeProfit,
+          leverage: finalLeverage,
+          marketRegime: finalMarketRegime
+        });
+      }
+
+      // Update exitOutcome
+      finalAuditPayload.exitOutcome = {
+        exitPrice,
+        exitReason: finalExitReason || reason,
+        durationMs: new Date(finalClosedAt).getTime() - new Date(finalOpenedAt).getTime(),
+        closedAt: new Date(finalClosedAt).getTime(),
+      };
+
+      finalAuditPayload.executionCosts = {
+        entryFee,
+        exitFee,
+        totalFees,
+        grossPnl,
+        netPnl,
+      };
+
       if (finalUserId) {
         await prisma.trade.create({
           data: {
@@ -183,6 +298,7 @@ export async function POST(request: Request) {
             grossPnl,
             netPnl,
             feeRate: 0.001,
+            auditPayload: finalAuditPayload,
           },
         });
 

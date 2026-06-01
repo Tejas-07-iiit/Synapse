@@ -686,10 +686,10 @@ export default function TradeHistoryPage() {
 
           {/* Section 2: Main Trade Table */}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto custom-scrollbar">
+            <div className="max-h-[580px] overflow-y-auto overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-border/80 bg-secondary/20 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                <thead className="sticky top-0 z-10 bg-card">
+                  <tr className="border-b border-border bg-secondary/20 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     <th className="px-5 py-4">Asset / Side</th>
                     <th className="px-5 py-4">Strategy</th>
                     <th className="px-5 py-4 text-right">Entry Price</th>

@@ -1,7 +1,13 @@
 import { VirtualPosition, VirtualOrder } from "../types";
-import { RiskEngine } from "../risk";
+import { RiskEngine, RiskCheckSettings } from "../risk";
 import { useWalletStore } from "@/src/stores/walletStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
+
+export interface PaperTradingSettings {
+  autoTrading: boolean;
+  maxOpenTrades: number;
+  riskPerTradePct: number;
+}
 
 export interface DbClientHandler {
   fetchActivePositions: (userId: string) => Promise<any[]>;
@@ -154,7 +160,9 @@ export class PaperTradingEngine {
     sizeUsdt: number | null = null,
     stopLoss: number | null = null,
     takeProfit: number | null = null,
-    leverage: number = 1
+    leverage: number = 1,
+    explicitBalance?: number,
+    explicitSettings?: PaperTradingSettings
   ): Promise<VirtualPosition | null> {
     const sym = symbol.toUpperCase();
 
@@ -187,20 +195,28 @@ export class PaperTradingEngine {
         return null;
       }
 
-      // Double-check database via API call to be absolutely sure
+      // Double-check database to be absolutely sure
       try {
-        const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
-        const body = await res.json();
-        if (body.success && Array.isArray(body.positions)) {
-          const dbOpen = body.positions.some(
+        let dbOpen = false;
+        if (this.dbHandler) {
+          const dbPositions = await this.dbHandler.fetchActivePositions(userId);
+          dbOpen = dbPositions.some(
             (p: { symbol: string; status: string }) => p.symbol === sym && p.status === "OPEN"
           );
-          if (dbOpen) {
-            alreadyOpen = true;
-            console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
-            console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
-            return null;
+        } else if (typeof window !== "undefined") {
+          const res = await fetch(`/api/positions?userId=${encodeURIComponent(userId)}`);
+          const body = await res.json();
+          if (body.success && Array.isArray(body.positions)) {
+            dbOpen = body.positions.some(
+              (p: { symbol: string; status: string }) => p.symbol === sym && p.status === "OPEN"
+            );
           }
+        }
+        if (dbOpen) {
+          alreadyOpen = true;
+          console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
+          console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+          return null;
         }
       } catch (e) {
         console.warn("[PaperTradingEngine] Database position lock check failed, proceeding with in-memory state:", e);
@@ -211,16 +227,20 @@ export class PaperTradingEngine {
       let qty = 0;
       let orderValueUsdt = 0;
 
-      const wallet = useWalletStore.getState();
-      const settings = useSettingsStore.getState();
+      let balance = explicitBalance !== undefined ? explicitBalance : 0;
+      if (explicitBalance === undefined) {
+        balance = useWalletStore.getState().balance;
+      }
+      
+      const settings = explicitSettings || useSettingsStore.getState();
 
       if (sizeUsdt === null) {
-        orderValueUsdt = wallet.balance * (settings.riskPerTradePct / 100) * leverage;
+        orderValueUsdt = balance * (settings.riskPerTradePct / 100) * leverage;
       } else {
         orderValueUsdt = sizeUsdt;
       }
       
-      console.log(`[POSITION_SIZING] Wallet balance: $${wallet.balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
+      console.log(`[POSITION_SIZING] Wallet balance: $${balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
 
       if (orderValueUsdt <= 0 || isNaN(orderValueUsdt)) {
         console.log(`[POSITION_REJECTED] Invalid position size calculated: $${orderValueUsdt.toFixed(2)}. Aborting.`);
@@ -236,10 +256,10 @@ export class PaperTradingEngine {
       
       // Calculate available balance (Balance - Margin Used)
       const usedMargin = Array.from(this.positions.values())
-        .filter(p => p.status === "OPEN")
+        .filter(p => p.status === "OPEN" && p.userId === userId)
         .reduce((sum, p) => sum + (p.entryPrice * p.quantity) / p.leverage, 0);
 
-      const availableBalance = wallet.balance - usedMargin;
+      const availableBalance = balance - usedMargin;
 
       // Validate order against risk manager
       const dummyOrder: VirtualOrder = {
@@ -253,12 +273,15 @@ export class PaperTradingEngine {
         status: "PENDING",
       };
 
+      const userActivePositionsCount = this.getOpenPositions().filter(p => p.userId === userId).length;
+
       const riskResult = RiskEngine.validateOrder(
         dummyOrder, 
-        this.getOpenPositions().length, 
+        userActivePositionsCount, 
         alreadyOpen,
         leverage,
-        availableBalance
+        availableBalance,
+        explicitSettings
       );
       if (!riskResult.allowed) {
         return null;

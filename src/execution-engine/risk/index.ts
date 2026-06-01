@@ -1,18 +1,26 @@
 import { VirtualOrder } from "../types";
 import { useSettingsStore } from "@/src/stores/settingsStore";
 
+export interface RiskCheckSettings {
+  autoTrading: boolean;
+  maxOpenTrades: number;
+}
+
 export class RiskEngine {
   /**
    * Validates a proposed order against risk parameters.
+   * Accepts explicit settings to work in both browser (Zustand) and daemon (DB) modes.
+   * If no explicit settings are provided, falls back to Zustand store (browser mode).
    */
   public static validateOrder(
     order: VirtualOrder,
     activePositionsCount: number,
     alreadyOpenForSymbol: boolean,
     leverage: number,
-    availableBalance: number
+    availableBalance: number,
+    explicitSettings?: RiskCheckSettings
   ): { allowed: boolean; reason?: string } {
-    const settings = useSettingsStore.getState();
+    const settings = explicitSettings || useSettingsStore.getState();
 
     console.log(`[RISK_ENGINE] Validating order: ${order.direction} ${order.symbol} @ $${order.price} | Qty: ${order.quantity} | Leverage: ${leverage}x | Available: $${availableBalance.toFixed(2)}`);
 

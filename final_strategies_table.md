@@ -14,7 +14,6 @@
 | **Bollinger Reversion** | Framework Native | Mean-Reversion | Low | Yes | Bollinger Bands (20,2), ADX14, RSI14 |
 | **Short Term Reversal** | Framework Native | Mean-Reversion | Low | Yes | RSI14, Momentum12, EMA50 |
 | **Dow Factor MFI RSI** | Framework Native | Momentum | Medium | Yes | Dow theory swing high/low, RSI14, MFI14 |
-
 | **Parabolic RSI** | Framework Native | Momentum | Medium | Yes | Parabolic SAR applied to RSI(14) |
 | **Range Breakout High** | Framework Native | Momentum | Low | Yes | Range High/Low 52, EMA50 |
 | **Residual Momentum** | Framework Native | Momentum | Low | Yes | Momentum12, EMA50, EMA200 |

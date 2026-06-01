@@ -110,13 +110,17 @@ class MarketEngine {
 
       this.initializedTimeframe = tf;
 
-      // 1. MUST LOAD ACTIVE POSITIONS FIRST TO PREVENT BLIND EXECUTION
-      const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
-      try {
-        await PaperTradingEngine.loadActivePositions(targetUserId);
-        console.log(`[BOOT] Active positions loaded successfully.`);
-      } catch (err) {
-        console.error(`[BOOT] Failed to load active positions. Halting autonomous execution on boot.`, err);
+      // 1. MUST LOAD ACTIVE POSITIONS FIRST TO PREVENT BLIND EXECUTION (Browser/Client Mode only)
+      if (typeof window !== "undefined") {
+        const targetUserId = useAuthStore.getState().user?.id;
+        if (targetUserId) {
+          try {
+            await PaperTradingEngine.loadActivePositions(targetUserId);
+            console.log(`[BOOT] Active positions loaded successfully for user ${targetUserId}.`);
+          } catch (err) {
+            console.error(`[BOOT] Failed to load active positions for user ${targetUserId}.`, err);
+          }
+        }
       }
 
       // 2. Fetch historical candles for all coins from REST and compute initial indicators
@@ -345,12 +349,12 @@ class MarketEngine {
     }
 
     // 3. Update signalStore with new prioritized signals
-    const settings = useSettingsStore.getState();
-
     for (const sig of signals) {
       const isTradeDirection = sig.signal === "LONG" || sig.signal === "SHORT";
       if (isTradeDirection) {
-        const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
+        const targetUserId = typeof window !== "undefined"
+          ? (useAuthStore.getState().user?.id || "default-user-id")
+          : "default-user-id";
         const activePos = PaperTradingEngine.getOpenPositions().find(
           (p) => p.symbol === sym && p.status === "OPEN" && p.userId === targetUserId
         );
@@ -367,56 +371,6 @@ class MarketEngine {
       signalStore.addSignal(sig);
 
       console.log(`[STRATEGY_SIGNAL] Strategy: ${sig.strategyName} | Symbol: ${sig.symbol} | Type: ${sig.signal} | Confidence: ${sig.confidence}% | Price: $${sig.entry}`);
-
-      const isAutonomous = settings.autoTrading || 
-        process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING === "true" || 
-        process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING === "on";
-
-      console.log(`[EXECUTION_ENGINE] Auto-trading check for ${sym}: isAutonomous = ${isAutonomous} | settings.autoTrading = ${settings.autoTrading} | env = ${process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING}`);
-
-      if (sig.signal === "LONG" || sig.signal === "SHORT") {
-        if (sig.blocked) {
-          console.log(`[EXECUTION_ENGINE] Signal blocked: Active position already exists for ${sym}`);
-          continue;
-        }
-        if (isAutonomous) {
-          const direction: "LONG" | "SHORT" = sig.signal;
-          try {
-            // Resolve user for trade execution, fallback to default-user-id
-            const targetUserId = useAuthStore.getState().user?.id || "default-user-id";
-            
-            console.log(`[EXECUTION_ENGINE] Attempting to open position for ${sym} (Direction: ${direction}) for User ID: ${targetUserId} via PaperTradingEngine.`);
-
-            // Calculate dynamic SL/TP based on settings if not provided by signal
-            const defaultSl = direction === "LONG" 
-              ? sig.entry * (1 - settings.defaultSlPct / 100)
-              : sig.entry * (1 + settings.defaultSlPct / 100);
-            
-            const defaultTp = direction === "LONG"
-              ? sig.entry * (1 + settings.defaultTpPct / 100)
-              : sig.entry * (1 - settings.defaultTpPct / 100);
-
-            const position = await PaperTradingEngine.openPosition(
-              targetUserId,
-              sym,
-              direction,
-              sig.entry,
-              null, // Size: null (lets PaperTradingEngine calculate dynamically from wallet)
-              sig.stopLoss || defaultSl,
-              sig.takeProfit || defaultTp,
-              1 // Leverage: 1x
-            );
-
-            if (position) {
-              console.log(`[MarketEngine] ✅ Auto-executed trade: ${direction} ${sym} @ $${sig.entry}`);
-            }
-          } catch (err) {
-            console.error(`[MarketEngine] Auto-execution failed for ${sym}:`, err);
-          }
-        } else {
-          console.log(`[EXECUTION_ENGINE] Signal ignored: ${sig.signal} ${sym} @ $${sig.entry} (Auto-trading is OFF — no trade placed)`);
-        }
-      }
     }
   }
 

@@ -3,8 +3,6 @@ import { marketEngine } from "../market-engine/market-engine";
 import { PaperTradingEngine } from "../execution-engine/paper";
 import { strategyEngine } from "../strategy-engine/core/engine";
 import { marketWsService } from "../market-engine/websocket";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useWalletStore } from "../stores/walletStore";
 import { useMarketStore } from "../stores/marketStore";
 
 const prisma = new PrismaClient();
@@ -283,25 +281,6 @@ async function runDaemon() {
           continue;
         }
 
-        // Inject this specific user settings/wallet into in-memory Zustand store states
-        // so PaperTradingEngine calculates quantity and runs risk validations under their context
-        useWalletStore.setState({
-          balance: wallet.balance,
-          totalDeposited: wallet.totalDeposited,
-          totalWithdrawn: wallet.totalWithdrawn,
-          realizedPnl: wallet.realizedPnl,
-        });
-
-        useSettingsStore.setState({
-          autoTrading: settings.autoTrading,
-          riskPerTradePct: settings.riskPerTradePct,
-          maxOpenTrades: settings.maxOpenTrades,
-          defaultSlPct: settings.defaultSlPct,
-          defaultTpPct: settings.defaultTpPct,
-          prefTimeframe: settings.prefTimeframe,
-          prefSymbol: settings.prefSymbol,
-        });
-
         // Set SL / TP boundaries
         const direction: "LONG" | "SHORT" = sig.signal;
         const defaultSl =
@@ -324,7 +303,13 @@ async function runDaemon() {
             null, // Auto-size based on risk settings and wallet balance
             sig.stopLoss || defaultSl,
             sig.takeProfit || defaultTp,
-            1 // 1x leverage
+            1, // 1x leverage
+            wallet.balance, // explicitBalance
+            {
+              autoTrading: settings.autoTrading,
+              maxOpenTrades: settings.maxOpenTrades,
+              riskPerTradePct: settings.riskPerTradePct,
+            } // explicitSettings
           );
 
           if (position) {

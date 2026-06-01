@@ -21,10 +21,7 @@ export default function MarketSummary({ summary, symbol }: MarketSummaryProps) {
         <span>Market Intelligence Summary ({cleanSymbol})</span>
       </div>
 
-      <div className="flex-1 flex gap-4 items-start">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-          <Sparkles size={16} className="text-primary" />
-        </div>
+      <div className="flex-1">
         <div className="space-y-2">
           <p className="text-foreground/90 text-sm leading-relaxed font-medium">
             {summary}

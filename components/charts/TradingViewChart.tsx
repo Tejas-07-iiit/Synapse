@@ -331,7 +331,7 @@ export default function TradingViewChart() {
   }, []);
 
   return (
-    <div className="bg-[#0c0c0e] border border-[#18181b] rounded-xl p-4 flex flex-col h-auto w-full shadow-2xl relative overflow-hidden">
+    <div className="bg-card border border-border rounded-xl p-4 flex flex-col h-auto w-full shadow-sm hover:shadow-md transition-all relative overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] -z-10 pointer-events-none" />
       
@@ -340,10 +340,10 @@ export default function TradingViewChart() {
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
             <div className="flex items-center gap-3">
-              <h3 className="font-black text-2xl tracking-tighter text-white uppercase italic">
+              <h3 className="font-black text-2xl tracking-tighter text-foreground uppercase italic">
                 {symbol.replace("USDT", "")}<span className="text-muted-foreground not-italic font-medium text-lg ml-0.5">/USDT</span>
               </h3>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary border border-border">
                 <div className={`w-1.5 h-1.5 rounded-full ${wsStatus === "CONNECTED" ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   {wsStatus === "CONNECTED" ? "Live" : "Offline"}
@@ -363,28 +363,28 @@ export default function TradingViewChart() {
 
         <div className="flex items-center gap-2">
           {/* Indicator Toggles */}
-          <div className="flex items-center bg-[#18181b] p-1 rounded-lg border border-white/5 mr-2">
+          <div className="flex items-center bg-secondary p-1 rounded-lg border border-border mr-2">
             <button
               onClick={() => setShowEMA(!showEMA)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${showEMA ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-muted-foreground hover:bg-white/5'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all border ${showEMA ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-sm' : 'text-muted-foreground border-transparent hover:bg-card-foreground/5'}`}
             >
               EMA
             </button>
             <button
               onClick={() => setShowSMA(!showSMA)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all ${showSMA ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' : 'text-muted-foreground hover:bg-white/5'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all border ${showSMA ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 shadow-sm' : 'text-muted-foreground border-transparent hover:bg-card-foreground/5'}`}
             >
               SMA
             </button>
           </div>
 
           {/* Timeframe Switcher */}
-          <div className="flex bg-[#18181b] p-1 rounded-lg border border-white/5">
+          <div className="flex bg-secondary p-1 rounded-lg border border-border">
             {["1m", "5m", "15m", "1h", "4h"].map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}
-                className={`text-[10px] font-black px-3 py-1.5 rounded-md transition-all ${timeframe === tf ? 'bg-white/10 text-white shadow-lg' : 'text-muted-foreground hover:text-white'}`}
+                className={`text-[10px] font-black px-3 py-1.5 rounded-md transition-all border ${timeframe === tf ? 'bg-card text-foreground shadow border border-border' : 'text-muted-foreground border-transparent hover:text-foreground'}`}
               >
                 {tf.toUpperCase()}
               </button>
@@ -394,15 +394,15 @@ export default function TradingViewChart() {
       </div>
 
       {/* HUD Panel */}
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-4 mb-4 bg-white/[0.02] border border-white/5 rounded-xl p-3 backdrop-blur-md z-10 select-none">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-4 mb-4 bg-secondary/40 border border-border rounded-xl p-3 backdrop-blur-md z-10 select-none">
         {[
-          { label: "OPEN", val: hoverData?.open, color: "text-white" },
-          { label: "HIGH", val: hoverData?.high, color: "text-emerald-400" },
-          { label: "LOW", val: hoverData?.low, color: "text-rose-400" },
-          { label: "CLOSE", val: hoverData?.close, color: "text-white" },
+          { label: "OPEN", val: hoverData?.open, color: "text-foreground" },
+          { label: "HIGH", val: hoverData?.high, color: "text-emerald-500" },
+          { label: "LOW", val: hoverData?.low, color: "text-rose-500" },
+          { label: "CLOSE", val: hoverData?.close, color: "text-foreground" },
           { label: "VOL", val: hoverData?.volume, color: "text-muted-foreground" },
-          { label: "EMA", val: hoverData?.ema, color: "text-blue-400", show: showEMA },
-          { label: "SMA", val: hoverData?.sma, color: "text-yellow-500", show: showSMA },
+          { label: "EMA", val: hoverData?.ema, color: "text-blue-500", show: showEMA },
+          { label: "SMA", val: hoverData?.sma, color: "text-yellow-600", show: showSMA },
         ].filter(i => i.show !== false).map((item) => (
           <div key={item.label} className="flex flex-col gap-0.5">
             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter opacity-50">{item.label}</span>
@@ -414,14 +414,14 @@ export default function TradingViewChart() {
       </div>
 
       {/* Main Chart Container */}
-      <div className="relative w-full h-[600px] rounded-xl border border-white/5 bg-black/20 overflow-hidden">
+      <div className="relative w-full h-[600px] rounded-xl border border-border bg-secondary/15 overflow-hidden">
         {loading && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="relative">
               <div className="w-12 h-12 border-2 border-primary/20 rounded-full animate-ping" />
               <Zap className="absolute inset-0 m-auto text-primary animate-pulse" size={24} />
             </div>
-            <span className="text-xs font-bold text-white mt-4 uppercase tracking-[0.2em] animate-pulse">Synchronizing Market Data</span>
+            <span className="text-xs font-bold text-foreground mt-4 uppercase tracking-[0.2em] animate-pulse">Synchronizing Market Data</span>
           </div>
         )}
         

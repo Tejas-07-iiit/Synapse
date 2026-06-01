@@ -14,6 +14,8 @@ import VolatilityCard from "@/components/market/volatility-card";
 import RegimeCard from "@/components/market/regime-card";
 import IndicatorTable from "@/components/market/indicator-table";
 import { Brain, RefreshCw, AlertCircle } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import TradingLoader from "@/components/TradingLoader";
 
 export default function MarketIntelligencePage() {
   const { symbol, timeframe, indicators, analytics, loading, error } = useMarketEngine();
@@ -21,13 +23,16 @@ export default function MarketIntelligencePage() {
   const activeTicker = symbol ? tickerData[symbol] : undefined;
   
   const setTimeframe = useMarketStore((state) => state.setTimeframe);
+  const { isLoading: authLoading } = useAuthStore();
 
   const cleanSymbol = symbol ? symbol.replace("USDT", "") : "";
 
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
-      {/* Sidebar Navigation */}
-      <Sidebar />
+    <>
+      <TradingLoader loading={authLoading || (loading && !analytics)} />
+      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
+        {/* Sidebar Navigation */}
+        <Sidebar />
 
       {/* Main Panel Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-background/95">
@@ -117,5 +122,6 @@ export default function MarketIntelligencePage() {
         </main>
       </div>
     </div>
+    </>
   );
 }

@@ -15,6 +15,7 @@ import { TickerInfo } from "@/src/strategy-engine/types";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
 import { useWalletStore } from "@/src/stores/walletStore";
+import TradingLoader from "@/components/TradingLoader";
 
 export default function DashboardShell() {
   const setSupportedSymbols = useMarketStore((state) => state.setSupportedSymbols);
@@ -23,6 +24,9 @@ export default function DashboardShell() {
   const fetchSettings = useSettingsStore((state) => state.fetchSettings);
   const fetchWallet = useWalletStore((state) => state.fetchWallet);
   const user = useAuthStore((state) => state.user);
+  const authLoading = useAuthStore((state) => state.isLoading);
+  const settingsLoading = useSettingsStore((state) => state.loading);
+  const walletLoading = useWalletStore((state) => state.loading);
 
   // Load user settings and wallet on mount / user change
   useEffect(() => {
@@ -68,44 +72,47 @@ export default function DashboardShell() {
   }, [supportedSymbols]);
 
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
-      {/* Sidebar Navigation */}
-      <Sidebar />
+    <>
+      <TradingLoader loading={authLoading || settingsLoading || walletLoading} />
+      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
+        {/* Sidebar Navigation */}
+        <Sidebar />
 
-      {/* Main Panel Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-background/95">
-        {/* Top Navbar */}
-        <Navbar />
+        {/* Main Panel Content */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-background/95">
+          {/* Top Navbar */}
+          <Navbar />
 
-        {/* Workspace Body */}
-        <main className="flex-1 px-8 py-6 pb-16 space-y-6 min-h-0">
-          {/* Top Row Cards */}
-          <MarketCards />
+          {/* Workspace Body */}
+          <main className="flex-1 px-8 py-6 pb-16 space-y-6 min-h-0">
+            {/* Top Row Cards */}
+            <MarketCards />
 
-          {/* Full Width TradingView Chart */}
-          <div className="w-full">
-            <TradingViewChart />
-          </div>
-
-          {/* Market Analytics Cards (positioned right under the chart) */}
-          <div className="w-full">
-            <MarketAnalytics />
-          </div>
-
-          {/* Bottom Widgets Grid (2-Column Layout) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-5">
-            {/* Column 1: Market Watchlist */}
-            <div className="flex flex-col">
-              <MarketTable />
+            {/* Full Width TradingView Chart */}
+            <div className="w-full">
+              <TradingViewChart />
             </div>
 
-            {/* Column 2: Full Height Strategy Signal Log */}
-            <div className="flex flex-col">
-              <SignalPanel className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-[724px] shadow-sm hover:shadow-md transition-all" />
+            {/* Market Analytics Cards (positioned right under the chart) */}
+            <div className="w-full">
+              <MarketAnalytics />
             </div>
-          </div>
-        </main>
+
+            {/* Bottom Widgets Grid (2-Column Layout) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-5">
+              {/* Column 1: Market Watchlist */}
+              <div className="flex flex-col">
+                <MarketTable />
+              </div>
+
+              {/* Column 2: Full Height Strategy Signal Log */}
+              <div className="flex flex-col">
+                <SignalPanel className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-[724px] shadow-sm hover:shadow-md transition-all" />
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

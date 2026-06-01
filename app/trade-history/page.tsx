@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useMarketStore } from "@/src/stores/marketStore";
 import Sidebar from "@/components/sidebar/Sidebar";
 import Navbar from "@/components/navbar/Navbar";
+import TradingLoader from "@/components/TradingLoader";
 import { 
   Search, 
   Info, 
@@ -435,21 +436,12 @@ export default function TradeHistoryPage() {
     };
   }, [filteredTrades]);
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-semibold">Loading authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
-      {/* Sidebar Navigation */}
-      <Sidebar />
+    <>
+      <TradingLoader loading={authLoading || loading} />
+      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans transition-colors duration-300">
+        {/* Sidebar Navigation */}
+        <Sidebar />
 
       {/* Main Panel Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-background/95">
@@ -1413,5 +1405,6 @@ export default function TradeHistoryPage() {
       })()}
 
     </div>
+    </>
   );
 }

@@ -8,6 +8,7 @@ import { useWalletStore } from "@/src/stores/walletStore";
 import Sidebar from "@/components/sidebar/Sidebar";
 import Navbar from "@/components/navbar/Navbar";
 import { useTheme } from "next-themes";
+import TradingLoader from "@/components/TradingLoader";
 import { 
   Briefcase, 
   ArrowUpRight, 
@@ -248,10 +249,26 @@ export default function PortfolioPage() {
     return closedTrades.filter(t => filterByDate(t.closedAt));
   }, [closedTrades, filterByDate]);
 
-  // Section 1 Math: Starting Capital, Current Equity, PnL
+  // Section 1 Math: Wallet Balance, Profit, Loss, PnL
+  const walletBalance = wallet.balance;
+
   const startingCapital = useMemo(() => {
     return wallet.totalDeposited > 0 ? wallet.totalDeposited : 10000.0;
   }, [wallet.totalDeposited]);
+
+  const totalProfit = useMemo(() => {
+    return filteredClosedTrades.reduce((sum, t) => {
+      const net = t.netPnl ?? t.pnl;
+      return net > 0 ? sum + net : sum;
+    }, 0);
+  }, [filteredClosedTrades]);
+
+  const totalLoss = useMemo(() => {
+    return filteredClosedTrades.reduce((sum, t) => {
+      const net = t.netPnl ?? t.pnl;
+      return net < 0 ? sum + Math.abs(net) : sum;
+    }, 0);
+  }, [filteredClosedTrades]);
 
   const unrealizedPnL = useMemo(() => {
     let sum = 0;
@@ -267,6 +284,10 @@ export default function PortfolioPage() {
     return sum;
   }, [filteredActivePositions, tickerData]);
 
+  const currentEquity = useMemo(() => {
+    return wallet.balance + unrealizedPnL;
+  }, [wallet.balance, unrealizedPnL]);
+
   const realizedPnL = useMemo(() => {
     return filteredClosedTrades.reduce((sum, t) => sum + (t.netPnl ?? t.pnl), 0);
   }, [filteredClosedTrades]);
@@ -274,10 +295,6 @@ export default function PortfolioPage() {
   const totalFeesPaid = useMemo(() => {
     return filteredClosedTrades.reduce((sum, t) => sum + (t.totalFees ?? 0), 0);
   }, [filteredClosedTrades]);
-
-  const currentEquity = useMemo(() => {
-    return wallet.balance + unrealizedPnL;
-  }, [wallet.balance, unrealizedPnL]);
 
   // Section 2: Equity Curve Generation
   const equityCurveData = useMemo(() => {
@@ -568,20 +585,11 @@ export default function PortfolioPage() {
     };
   }, [equityCurveData, hasSufficientCurveData, resolvedTheme, selectedDateFilter]);
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-semibold">Loading authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none transition-colors duration-300">
-      <Sidebar />
+    <>
+      <TradingLoader loading={authLoading || loading} />
+      <div className="flex h-screen w-screen bg-background text-foreground overflow-hidden font-sans select-none transition-colors duration-300">
+        <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-background/95">
         <Navbar />
@@ -663,23 +671,32 @@ export default function PortfolioPage() {
           </div>
 
           {/* Section 1: Account Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
             
-            {/* Starting Capital */}
+            {/* Total Wallet Balance */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Starting Capital</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Total Wallet Balance</span>
               <div>
-                <span className="text-2xl font-black text-foreground">${startingCapital.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                <span className="text-[10px] text-muted-foreground block mt-1">Initial Deposited Base</span>
+                <span className="text-2xl font-black text-foreground">${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="text-[10px] text-muted-foreground block mt-1">Available Trading Balance</span>
               </div>
             </div>
 
-            {/* Current Equity */}
+            {/* Total Profit */}
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Current Equity</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Total Profit</span>
               <div>
-                <span className="text-2xl font-black text-foreground">${currentEquity.toLocaleString(undefined, { minimumFractionDigits: 3 })}</span>
-                <span className="text-[10px] text-muted-foreground block mt-1">Cash Balance + Floating PnL</span>
+                <span className="text-2xl font-black text-emerald-500">+${totalProfit.toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground block mt-1">Sum of Winning Closed Trades</span>
+              </div>
+            </div>
+
+            {/* Total Loss */}
+            <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Total Loss</span>
+              <div>
+                <span className="text-2xl font-black text-destructive">-${totalLoss.toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground block mt-1">Sum of Losing Closed Trades</span>
               </div>
             </div>
 
@@ -866,5 +883,6 @@ export default function PortfolioPage() {
         </main>
       </div>
     </div>
+    </>
   );
 }

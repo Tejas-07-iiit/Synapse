@@ -22,16 +22,11 @@ export class RiskEngine {
   ): { allowed: boolean; reason?: string } {
     const settings = explicitSettings || useSettingsStore.getState();
 
-    console.log(`[RISK_ENGINE] Validating order: ${order.direction} ${order.symbol} @ $${order.price} | Qty: ${order.quantity} | Leverage: ${leverage}x | Available: $${availableBalance.toFixed(2)}`);
-
     // 0.5. Symbol lock check
     if (alreadyOpenForSymbol) {
-      const reason = `Active position already exists for ${order.symbol}`;
-      console.log(`[POSITION_LOCK] ${order.symbol} blocked → existing active trade found`);
-      console.log(`[TRADE_REJECTED] Reason: ${reason}`);
       return {
         allowed: false,
-        reason,
+        reason: `Active position already exists for ${order.symbol}`,
       };
     }
 
@@ -41,21 +36,17 @@ export class RiskEngine {
       process.env.NEXT_PUBLIC_AUTONOMOUS_TRADING === "on";
 
     if (!isAutoTradingEnabled) {
-      const reason = `Auto-trading is currently disabled in settings and env.`;
-      console.log(`[POSITION_REJECTED] Risk Engine rejection: ${reason}`);
       return {
         allowed: false,
-        reason,
+        reason: `Auto-trading is currently disabled in settings and env.`,
       };
     }
 
     // 1. Limit active positions count
     if (activePositionsCount >= settings.maxOpenTrades) {
-      const reason = `Risk Limit Exceeded: Maximum open positions (${settings.maxOpenTrades}) reached.`;
-      console.log(`[POSITION_REJECTED] Risk Engine rejection: ${reason}`);
       return {
         allowed: false,
-        reason,
+        reason: `Risk Limit Exceeded: Maximum open positions (${settings.maxOpenTrades}) reached.`,
       };
     }
 
@@ -64,15 +55,12 @@ export class RiskEngine {
     const requiredMargin = orderValueUsdt / leverage;
     
     if (requiredMargin > availableBalance) {
-      const reason = `Insufficient Margin: Required margin ($${requiredMargin.toFixed(2)}) exceeds available balance ($${availableBalance.toFixed(2)}).`;
-      console.log(`[POSITION_REJECTED] Risk Engine rejection: ${reason}`);
       return {
         allowed: false,
-        reason,
+        reason: `Insufficient Margin: Required margin ($${requiredMargin.toFixed(2)}) exceeds available balance ($${availableBalance.toFixed(2)}).`,
       };
     }
 
-    console.log(`[RISK_ENGINE] Order approved by Risk Engine.`);
     return { allowed: true };
   }
 

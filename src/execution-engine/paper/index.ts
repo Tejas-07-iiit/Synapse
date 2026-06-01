@@ -2,6 +2,7 @@ import { VirtualPosition, VirtualOrder } from "../types";
 import { RiskEngine, RiskCheckSettings } from "../risk";
 import { useWalletStore } from "@/src/stores/walletStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
+import { AuditLogger } from "../../lib/audit/trading-audit";
 
 export interface PaperTradingSettings {
   autoTrading: boolean;
@@ -110,11 +111,33 @@ export class PaperTradingEngine {
       // Update in DB (non-blocking) via API, throttled to once every 10 seconds
       const now = Date.now();
       const lastUpdate = this.lastDbUpdate.get(pos.id) || 0;
-      if (now - lastUpdate > 10000) {
+      if (now - lastUpdate > 300000) { // Log monitor every 5 minutes (300000ms) to avoid spam
         this.lastDbUpdate.set(pos.id, now);
-        console.log(`[SLTP_MONITOR] Symbol: ${sym} | Price: $${currentPrice.toFixed(2)} | Pos ID: ${pos.id} | Entry: $${pos.entryPrice.toFixed(2)} | SL: ${pos.stopLoss ? pos.stopLoss.toFixed(2) : "None"} | TP: ${pos.takeProfit ? pos.takeProfit.toFixed(2) : "None"} | Current PnL: $${pos.pnl.toFixed(2)}`);
+        
+        let distTp = null;
+        let distSl = null;
+        if (pos.takeProfit) {
+          distTp = Math.abs(currentPrice - pos.takeProfit) / currentPrice * 100;
+        }
+        if (pos.stopLoss) {
+          distSl = Math.abs(currentPrice - pos.stopLoss) / currentPrice * 100;
+        }
+        
+        AuditLogger.logPositionMonitor({
+          symbol: sym,
+          positionId: pos.id,
+          currentPrice,
+          entry: pos.entryPrice,
+          sl: pos.stopLoss,
+          tp: pos.takeProfit,
+          distanceToTpPct: distTp ? Number(distTp.toFixed(2)) : null,
+          distanceToSlPct: distSl ? Number(distSl.toFixed(2)) : null,
+        });
+        
         if (this.dbHandler) {
-          this.dbHandler.updatePosition(pos.id, currentPrice, pos.pnl).catch(() => {});
+          this.dbHandler.updatePosition(pos.id, currentPrice, pos.pnl).catch((err) => {
+            AuditLogger.logDatabaseError({ action: "updatePosition", message: `Failed to update pos ${pos.id}`, errorDetails: err });
+          });
         } else {
           fetch("/api/positions", {
             method: "POST",
@@ -184,14 +207,11 @@ export class PaperTradingEngine {
 
     // 1. ACQUIRE MUTEX LOCK
     if (this.executionLocks.has(sym)) {
-      console.log(`[MUTEX_LOCK] Execution already in progress for ${sym}. Rejecting concurrent attempt.`);
       return null;
     }
     this.executionLocks.add(sym);
 
     try {
-      console.log(`[PAPER_TRADING] Attempting to open position: ${direction} ${sym} @ $${price}`);
-
       const strategyId = signalContext?.strategyId || "manual";
       const strategyName = signalContext?.strategyName || "Manual Trade";
       const strategyCategory = signalContext?.strategyCategory || "Manual";
@@ -203,8 +223,6 @@ export class PaperTradingEngine {
       // 1.5 CHECK COOLDOWN
       const cooldownExpiry = this.symbolCooldowns.get(sym) || 0;
       if (Date.now() < cooldownExpiry) {
-        const remainingSeconds = Math.ceil((cooldownExpiry - Date.now()) / 1000);
-        console.log(`[COOLDOWN_ACTIVE] ${sym} is in cooldown. Execution blocked. Remaining: ${remainingSeconds}s.`);
         return null;
       }
 
@@ -214,8 +232,6 @@ export class PaperTradingEngine {
       );
 
       if (alreadyOpen) {
-        console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
-        console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
         return null;
       }
 
@@ -238,15 +254,11 @@ export class PaperTradingEngine {
         }
         if (dbOpen) {
           alreadyOpen = true;
-          console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
-          console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
           return null;
         }
       } catch (e) {
-        console.warn("[PaperTradingEngine] Database position lock check failed, proceeding with in-memory state:", e);
+        AuditLogger.logSystemError({ module: "PaperTradingEngine", message: "Database position lock check failed", errorDetails: e });
       }
-
-      console.log(`[TRADE_ALLOWED] No active position found for ${sym}`);
 
       let qty = 0;
       let orderValueUsdt = 0;
@@ -308,6 +320,7 @@ export class PaperTradingEngine {
         explicitSettings
       );
       if (!riskResult.allowed) {
+        AuditLogger.logRiskRejected({ userId, symbol: sym, reason: riskResult.reason || "Risk Engine rejected order" });
         return null;
       }
 

@@ -188,15 +188,6 @@ export class ConfidenceEngine {
 
     finalScore = Math.min(100, Math.max(0, finalScore));
 
-    console.log(`[ConfidenceEngine] 📊 Confidence Breakdown for strategy: ${strategyId || "unknown"} (${direction}):
-    Trend: ${trendScore}/25
-    Momentum: ${momentumScore}/20
-    Volume: ${volumeScore}/15
-    Regime: ${regimeScore}/20
-    Confirmation: ${confirmScore}/20
-    Performance Boost/Penalty: ${perfBoost}
-    Final Confidence: ${finalScore}%`);
-
     return finalScore;
   }
 }

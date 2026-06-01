@@ -1,6 +1,7 @@
 import { StrategySignal } from "../types";
 import { StrategyEvaluator } from "./evaluator";
 import { PerformanceWeightingEngine } from "./performance-weighting";
+import { AuditLogger } from "../../lib/audit/trading-audit";
 
 export class SignalPriorityEngine {
   private static readonly CONFIDENCE_THRESHOLD = 60; // Minimum raw confidence to avoid weak signals
@@ -40,6 +41,14 @@ export class SignalPriorityEngine {
         sig.confidence = 0;
         sig.blocked = true;
         sig.blockReason = `Regime mismatch: ${category} strategy not allowed in ${regime} regime.`;
+        AuditLogger.logSignalRejected({
+          strategyId: sig.strategyId,
+          strategyName: sig.strategyName,
+          symbol: sig.symbol,
+          timeframe: sig.timeframe,
+          confidence: sig.confidence,
+          reason: sig.blockReason
+        });
       }
     }
 
@@ -47,7 +56,18 @@ export class SignalPriorityEngine {
     const activeSetups: StrategySignal[] = [];
 
     for (const sig of signals) {
-      if (sig.signal === "HOLD" || sig.confidence < this.CONFIDENCE_THRESHOLD) continue;
+      if (sig.signal === "HOLD") continue;
+      
+      if (sig.confidence < this.CONFIDENCE_THRESHOLD) {
+        AuditLogger.logConfidenceRejected({
+          strategyId: sig.strategyId,
+          strategyName: sig.strategyName,
+          symbol: sig.symbol,
+          confidence: sig.confidence,
+          threshold: this.CONFIDENCE_THRESHOLD
+        });
+        continue;
+      }
 
       // A. Performance Boost
       const boost = PerformanceWeightingEngine.getStrategyBoost(sig.strategyId);
@@ -81,6 +101,14 @@ export class SignalPriorityEngine {
 
       if ((sig as any).finalScore >= this.FINAL_SCORE_THRESHOLD) {
         activeSetups.push(sig);
+      } else {
+        AuditLogger.logConfidenceRejected({
+          strategyId: sig.strategyId,
+          strategyName: sig.strategyName,
+          symbol: sig.symbol,
+          confidence: (sig as any).finalScore,
+          threshold: this.FINAL_SCORE_THRESHOLD
+        });
       }
     }
 

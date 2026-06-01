@@ -5,6 +5,7 @@ import { strategyEngine } from "../strategy-engine/core/engine";
 import { marketWsService } from "../market-engine/websocket";
 import { useMarketStore } from "../stores/marketStore";
 import { PerformanceWeightingEngine } from "../strategy-engine/core/performance-weighting";
+import { AuditLogger } from "../lib/audit/trading-audit";
 
 const prisma = new PrismaClient();
 
@@ -100,35 +101,46 @@ async function runDaemon() {
       const roi = (priceDiff / entryPrice) * 100 * leverage;
 
       // Create Trade History log
-      await prisma.trade.create({
-        data: {
-          userId,
-          symbol,
-          strategyName: strategyName || "Central Engine",
-          strategyId: strategyId || null,
-          strategyCategory: strategyCategory || null,
-          entryReason: entryReason || null,
-          exitReason: exitReason || null,
-          confidenceAtEntry: confidenceAtEntry || null,
-          confidence: confidenceAtEntry || 0.8,
-          marketRegime: marketRegime || null,
-          indicatorSnapshot: indicatorSnapshot || null,
-          direction,
-          entryPrice,
-          exitPrice,
-          currentPrice: exitPrice,
-          stopLoss,
-          takeProfit,
-          quantity: data.quantity || 0,
-          leverage,
-          pnl,
-          roi,
-          status: tradeStatus,
-          openedAt: new Date(openedAt),
-          closedAt: new Date(closedAt),
-          executionType: "PAPER",
-        },
-      });
+      try {
+        await prisma.trade.create({
+          data: {
+            userId,
+            symbol,
+            strategyName: strategyName || "Central Engine",
+            strategyId: strategyId || null,
+            strategyCategory: strategyCategory || null,
+            entryReason: entryReason || null,
+            exitReason: exitReason || null,
+            confidenceAtEntry: confidenceAtEntry || null,
+            confidence: confidenceAtEntry || 0.8,
+            marketRegime: marketRegime || null,
+            indicatorSnapshot: indicatorSnapshot || null,
+            direction,
+            entryPrice,
+            exitPrice,
+            currentPrice: exitPrice,
+            stopLoss,
+            takeProfit,
+            quantity: data.quantity || 0,
+            leverage,
+            pnl,
+            roi,
+            status: tradeStatus,
+            openedAt: new Date(openedAt),
+            closedAt: new Date(closedAt),
+            executionType: "PAPER",
+          },
+        });
+        
+        AuditLogger.logTradeClosed({ userId, symbol, entry: entryPrice, exit: exitPrice, pnl, reason, strategyName });
+        if (tradeStatus === "TP HIT") {
+          AuditLogger.logTakeProfitHit({ userId, symbol, entry: entryPrice, exit: exitPrice, profit: pnl, roi, strategyName });
+        } else if (tradeStatus === "STOPPED") {
+          AuditLogger.logStopLossHit({ userId, symbol, entry: entryPrice, exit: exitPrice, loss: pnl, roi, strategyName });
+        }
+      } catch (err) {
+        AuditLogger.logDatabaseError({ action: "createTrade", message: "Failed to log trade history", errorDetails: err });
+      }
 
       // Update Wallet realized balance
       await prisma.wallet.update({
@@ -277,7 +289,15 @@ async function runDaemon() {
         continue;
       }
 
-      console.log(`[Daemon] 🔔 Signal generated: ${sig.strategyName} ${sig.signal} ${sym} (${tf}) @ $${sig.entry}`);
+      AuditLogger.logSignalGenerated({
+        strategyId: sig.strategyId,
+        strategyName: sig.strategyName || "Unknown Strategy",
+        symbol: sym,
+        timeframe: tf,
+        confidence: sig.confidence,
+        direction: sig.signal,
+        regime: regime
+      });
 
       // Query database for all users that have autoTrading enabled
       const usersWithAuto = await prisma.userSettings.findMany({
@@ -285,15 +305,12 @@ async function runDaemon() {
         include: { user: true },
       });
 
-      console.log(`[Daemon] Found ${usersWithAuto.length} active users with autonomous trading enabled.`);
-
       for (const settings of usersWithAuto) {
         const userId = settings.userId;
 
         // Load wallet balance
         const wallet = await prisma.wallet.findUnique({ where: { userId } });
         if (!wallet) {
-          console.warn(`[Daemon] Wallet not found for user ${userId}. Skipping.`);
           continue;
         }
 
@@ -303,13 +320,13 @@ async function runDaemon() {
         );
 
         if (existingOpen) {
-          console.log(`[Daemon] Signal ignored for user ${userId}: active position already exists for ${sym}`);
+          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason: `Active position already exists for user ${userId}` });
           continue;
         }
 
         // A. Check quarantine status
         if (PerformanceWeightingEngine.isQuarantined(sig.strategyId)) {
-          console.log(`[Daemon] 🛡️ Autonomous trade blocked for user ${userId} on ${sym}: Strategy ${sig.strategyId} is QUARANTINED.`);
+          AuditLogger.logQuarantineBlocked({ userId, symbol: sym, strategyId: sig.strategyId });
           continue;
         }
 
@@ -339,7 +356,7 @@ async function runDaemon() {
           const cooldownMs = cooldownMinutes * 60 * 1000;
           if (timeSinceCloseMs < cooldownMs) {
             const remainingMins = Math.ceil((cooldownMs - timeSinceCloseMs) / (60 * 1000));
-            console.log(`[Daemon] ⏳ Trade blocked for user ${userId} on ${sym}: In cooldown (${remainingMins}m remaining, last status: ${lastTrade.status})`);
+            AuditLogger.logCooldownBlocked({ userId, symbol: sym, remainingMinutes: remainingMins, lastStatus: lastTrade.status });
             continue;
           }
         }
@@ -380,7 +397,6 @@ async function runDaemon() {
         const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
 
         try {
-          console.log(`[Daemon] 🚀 Placing autonomous order: ${direction} ${sym} for User: ${settings.user.username}`);
           const position = await PaperTradingEngine.openPosition(
             userId,
             sym,
@@ -400,10 +416,20 @@ async function runDaemon() {
           );
 
           if (position) {
-            console.log(`[Daemon] ✅ Autonomous trade created. Position ID: ${position.id}`);
+            AuditLogger.logTradeExecuted({
+              userId,
+              symbol: sym,
+              direction,
+              entry: sig.entry,
+              sl: finalSl,
+              tp: finalTp,
+              quantity: position.quantity,
+              strategyName: sig.strategyName || "Unknown Strategy",
+              confidence: sig.confidence
+            });
           }
         } catch (err) {
-          console.error(`[Daemon] ❌ Autonomous trade placement failed for user ${userId}:`, err);
+          AuditLogger.logSystemError({ module: "Daemon", message: `Autonomous trade placement failed for user ${userId}`, errorDetails: err });
         }
       }
     }
@@ -435,6 +461,21 @@ async function runDaemon() {
   marketWsService.subscribe(tickerStreams);
 
   console.log("[Daemon] Market streams & ticker execution actively running 24/7.");
+
+  setInterval(async () => {
+    try {
+      const activeUsersCount = await prisma.userSettings.count({ where: { autoTrading: true } });
+      AuditLogger.logDaemonHeartbeat({
+        status: "Daemon Running",
+        wsConnected: useMarketStore.getState().wsConnected,
+        activeUsers: activeUsersCount,
+        openPositions: PaperTradingEngine.getOpenPositions().length,
+        trackedSymbols: useMarketStore.getState().supportedSymbols,
+      });
+    } catch (err) {
+      AuditLogger.logDatabaseError({ action: "Heartbeat", message: "Failed to fetch active users count", errorDetails: err });
+    }
+  }, 60000);
 }
 
 runDaemon().catch((err) => {

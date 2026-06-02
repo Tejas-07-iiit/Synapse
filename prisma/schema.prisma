@@ -35,12 +35,15 @@ model TradeSignal {
   createdAt        DateTime @default(now())
   
   userId           String?
+  tradingMode      String?  // SCALPING, INTRADAY
   blocked          Boolean  @default(false)
   blockReason      String?
   activePositionId String?
   
   confidenceScore  Int?
   marketRegime     String?
+  atr              Float?
+  positionSizeUsdt Float?
   
   @@index([symbol, timeframe])
   @@index([strategyId])
@@ -166,22 +169,24 @@ model Trade {
   closedAt          DateTime  @default(now())
   executionType     String    // PAPER, LIVE
   
+  // Audit metadata
+  tradingMode       String?
+  marketRegime      String?
+  atrAtEntry        Float?
+  entryReason       String?
+  exitReason        String?
+  strategyId        String?
+  strategyCategory  String?
+  confidenceAtEntry Float?
+  indicatorSnapshot Json?
+  auditPayload      Json?
+  
   entryFee          Float     @default(0)
   exitFee           Float     @default(0)
   totalFees         Float     @default(0)
   grossPnl          Float     @default(0)
   netPnl            Float     @default(0)
   feeRate           Float     @default(0.001)
-
-  // Strategy intelligence fields
-  strategyId        String?
-  strategyCategory  String?
-  entryReason       String?
-  exitReason        String?
-  confidenceAtEntry Float?
-  marketRegime      String?
-  indicatorSnapshot Json?
-  auditPayload      Json?
 
   expiresAt         DateTime?
   confidenceScore   Int?

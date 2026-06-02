@@ -153,6 +153,12 @@ export class ConfidenceEngine {
       score += perfBoost;
     }
 
+    // 7. Scalping Sensitivity Boost (+10)
+    // Scalping trades happen in fast markets where indicators might not hit "Extreme" levels.
+    if (stratCategory === TradingMode.SCALPING) {
+      score += 10;
+    }
+
     const finalScore = Math.min(100, Math.max(0, score));
 
     return {

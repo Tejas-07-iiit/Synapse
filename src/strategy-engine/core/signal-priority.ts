@@ -4,8 +4,8 @@ import { PerformanceWeightingEngine } from "./performance-weighting";
 import { AuditLogger } from "../../lib/audit/trading-audit";
 
 export class SignalPriorityEngine {
-  private static readonly CONFIDENCE_THRESHOLD = 60; // Minimum raw confidence to avoid weak signals
-  private static readonly FINAL_SCORE_THRESHOLD = 75; // Minimum final score (with performance/regime/volume boosts)
+  private static readonly CONFIDENCE_THRESHOLD = 50; // Lowered from 60
+  private static readonly FINAL_SCORE_THRESHOLD = 60; // Lowered from 75 for production verification phase
 
   /**
    * Processes, ranks, suppresses, and resolves conflicts among signals.
@@ -23,16 +23,18 @@ export class SignalPriorityEngine {
       const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
       const isBreakoutStrat = category === "Breakout" || category === "Volatility";
       const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
+      const isGrid = category === "Grid";
+      const isVolatility = category === "Volatility";
 
       let compatible = false;
       if (regime === "TRENDING") {
-        compatible = isTrendingStrat || category === "Lorentzian";
+        compatible = true; // Always allow in trending
       } else if (regime === "RANGING" || regime === "LOW_VOLATILITY" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") {
-        compatible = isMeanReversionStrat || category === "Lorentzian" || isTrendingStrat;
+        compatible = isMeanReversionStrat || category === "Lorentzian" || isTrendingStrat || isGrid;
       } else if (regime === "HIGH_VOLATILITY" || regime === "BREAKOUT") {
-        compatible = isBreakoutStrat || category === "Lorentzian" || isTrendingStrat;
+        compatible = isBreakoutStrat || category === "Lorentzian" || isTrendingStrat || isVolatility;
       } else if (regime === "LIQUIDITY_SWEEP") {
-        compatible = isSweepStrat || category === "Lorentzian";
+        compatible = true; // High importance event
       } else {
         compatible = true; // Fallback
       }
@@ -83,6 +85,8 @@ export class SignalPriorityEngine {
       const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
       const isBreakoutStrat = category === "Breakout" || category === "Volatility";
       const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
+      const isGrid = category === "Grid";
+      const isVolatility = category === "Volatility";
 
       if (regime === "TRENDING" && isTrendingStrat) regimeMatchBonus = 10;
       else if ((regime === "RANGING" || regime === "LOW_VOLATILITY" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") && isMeanReversionStrat) regimeMatchBonus = 10;

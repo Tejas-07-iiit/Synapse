@@ -413,8 +413,11 @@ async function runDaemon() {
                 timestamp: new Date(rawSig.timestamp),
                 reasoning: rawSig.reasoning,
                 userId: settings.userId,
+                tradingMode: settings.preferredTradingMode,
                 blocked: true,
                 blockReason: rawSig.blockReason || "Strategy rejected by prioritization manager.",
+                marketRegime: regime,
+                atr: (indicators.atr && indicators.atr.length > 0) ? indicators.atr[indicators.atr.length - 1] : 0,
               }
             });
           } catch (dbErr) {
@@ -595,9 +598,14 @@ async function runDaemon() {
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
+                tradingMode: userMode,
                 blocked: true,
                 blockReason: "ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open.",
                 activePositionId: existingOpen.id,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
               }
             });
           } catch (dbErr) {
@@ -709,8 +717,13 @@ async function runDaemon() {
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
+                tradingMode: userMode,
                 blocked: true,
                 blockReason: reason,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
               }
             });
           } catch (dbErr) {
@@ -796,8 +809,13 @@ async function runDaemon() {
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
+                tradingMode: userMode,
                 blocked: true,
                 blockReason: reason,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
               }
             });
           } catch (dbErr) {
@@ -826,8 +844,13 @@ async function runDaemon() {
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
+                tradingMode: userMode,
                 blocked: true,
                 blockReason: reason,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
               }
             });
           } catch (dbErr) {
@@ -861,8 +884,13 @@ async function runDaemon() {
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
+                tradingMode: userMode,
                 blocked: true,
                 blockReason: reason,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
               }
             });
           } catch (dbErr) {
@@ -1017,10 +1045,13 @@ async function runDaemon() {
                   timestamp: new Date(sig.timestamp),
                   reasoning: sig.reasoning,
                   userId: userId,
+                  tradingMode: userMode,
                   blocked: false,
                   activePositionId: position.id,
                   confidenceScore: confidenceScore,
                   marketRegime: regime,
+                  atr: atrVal,
+                  positionSizeUsdt: estimatedSizeUsdt,
                 }
               });
             } catch (dbErr) {

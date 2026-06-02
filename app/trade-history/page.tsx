@@ -993,18 +993,16 @@ export default function TradeHistoryPage() {
         }) : "N/A";
 
         // Destructure audit sections with fallbacks
-        const {
-          marketSnapshot = {},
-          strategyCompetition = [],
-          winningStrategy = {},
-          confidenceBreakdown = {},
-          tradeEvidence = {},
-          tradePlan = {},
-          executionCosts = {},
-          otherStrategiesLost = [],
-          exitOutcome = {},
-          executiveSummary = ""
-        } = audit || {};
+        const marketSnapshot = audit?.marketSnapshot || {};
+        const strategyCompetition = audit?.strategyCompetition || [];
+        const winningStrategy = audit?.winningStrategy || {};
+        const confidenceBreakdown = audit?.confidenceBreakdown || {};
+        const tradeEvidence = audit?.tradeEvidence || {};
+        const tradePlan = audit?.tradePlan || {};
+        const executionCosts = audit?.executionCosts || {};
+        const otherStrategiesLost = audit?.otherStrategiesLost || [];
+        const exitOutcome = audit?.exitOutcome || {};
+        const executiveSummary = audit?.executiveSummary || "";
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
@@ -1259,7 +1257,7 @@ export default function TradeHistoryPage() {
                           <AlertCircle size={13} className="text-primary" /> Why Other Strategies Lost
                         </h4>
                         <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                          {otherStrategiesLost.map((lost: any, i: number) => (
+                          {otherStrategiesLost.filter(Boolean).map((lost: any, i: number) => (
                             <div key={i} className="p-2.5 bg-[#0b0c10]/40 border border-[#1b2030] rounded-lg text-xs leading-relaxed">
                               <div className="flex justify-between items-center mb-1">
                                 <span className="font-extrabold text-foreground truncate max-w-[150px]" title={lost.strategyName}>{lost.strategyName}</span>

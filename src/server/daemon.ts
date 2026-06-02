@@ -394,23 +394,34 @@ async function runDaemon() {
       let usersWithAuto: any[] = [];
       try {
         // Try raw SQL first to bypass any Client validation errors regarding missing columns
+        // We use double quotes for all identifiers to be safe with PostgreSQL case-sensitivity
         usersWithAuto = await prisma.$queryRawUnsafe(`
           SELECT s.*, 
-                 row_to_json(u.*) as user
+                 (SELECT row_to_json(u) FROM "synapse"."User" u WHERE u."id" = s."userId") as user
           FROM "synapse"."UserSettings" s
-          JOIN "synapse"."User" u ON s."userId" = u."id"
           WHERE s."autoTrading" = true
         `);
       } catch (rawErr) {
-        console.warn("[Daemon] Raw SQL settings fetch failed, trying standard Prisma query:", rawErr);
+        console.warn("[Daemon] Raw SQL settings fetch failed, trying fallback raw SQL:", rawErr);
         try {
-          usersWithAuto = await (prisma as any).userSettings.findMany({
-            where: { autoTrading: true },
-            include: { user: true },
-          });
-        } catch (stdErr: any) {
-           console.error("[Daemon] All attempts to fetch active users failed. Skipping this candle.", stdErr);
-           return;
+          // Try without schema prefix in case search_path is already set
+          usersWithAuto = await prisma.$queryRawUnsafe(`
+            SELECT s.*, 
+                   (SELECT row_to_json(u) FROM "User" u WHERE u."id" = s."userId") as user
+            FROM "UserSettings" s
+            WHERE s."autoTrading" = true
+          `);
+        } catch (rawErr2) {
+          console.error("[Daemon] All raw SQL attempts failed, trying standard Prisma query:", rawErr2);
+          try {
+            usersWithAuto = await (prisma as any).userSettings.findMany({
+              where: { autoTrading: true },
+              include: { user: true },
+            });
+          } catch (stdErr: any) {
+             console.error("[Daemon] All attempts to fetch active users failed. Skipping this candle.", stdErr);
+             return;
+          }
         }
       }
 

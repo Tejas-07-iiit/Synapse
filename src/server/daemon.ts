@@ -390,42 +390,35 @@ async function runDaemon() {
       const tf = timeframe.toLowerCase();
 
       // Query database for all users that have autoTrading enabled
-      // Explicitly select fields to avoid "Missing Column" errors if Prisma Client is desynced
+      // We use a robust approach to handle potential Prisma Client desyncs
       let usersWithAuto: any[] = [];
       try {
-        usersWithAuto = await (prisma as any).userSettings.findMany({
-          where: { autoTrading: true },
-          select: {
-            userId: true,
-            autoTrading: true,
-            maxOpenTrades: true,
-            prefSymbol: true,
-            preferredTradingMode: true,
-            // We'll try to select riskPerTradePct but catch if it fails
-            riskPerTradePct: true,
-            user: true,
-          },
-        });
-      } catch (err: any) {
-        if (err.message.includes("riskPerTradePct")) {
-          console.warn("[Daemon] Prisma desync detected: riskPerTradePct column missing in client view. Retrying without it.");
+        // Try raw SQL first to bypass any Client validation errors regarding missing columns
+        usersWithAuto = await prisma.$queryRawUnsafe(`
+          SELECT s.*, 
+                 row_to_json(u.*) as user
+          FROM "synapse"."UserSettings" s
+          JOIN "synapse"."User" u ON s."userId" = u."id"
+          WHERE s."autoTrading" = true
+        `);
+      } catch (rawErr) {
+        console.warn("[Daemon] Raw SQL settings fetch failed, trying standard Prisma query:", rawErr);
+        try {
           usersWithAuto = await (prisma as any).userSettings.findMany({
             where: { autoTrading: true },
-            select: {
-              userId: true,
-              autoTrading: true,
-              maxOpenTrades: true,
-              prefSymbol: true,
-              preferredTradingMode: true,
-              user: true,
-            },
+            include: { user: true },
           });
-          // Add default value to results
-          usersWithAuto = usersWithAuto.map(u => ({ ...u, riskPerTradePct: 2.0 }));
-        } else {
-          throw err;
+        } catch (stdErr: any) {
+           console.error("[Daemon] All attempts to fetch active users failed. Skipping this candle.", stdErr);
+           return;
         }
       }
+
+      // Final sanitization of the riskPerTradePct field
+      usersWithAuto = usersWithAuto.map(u => ({
+        ...u,
+        riskPerTradePct: u.riskPerTradePct !== undefined ? u.riskPerTradePct : 2.0
+      }));
 
       // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
       const blockedRaw = (rawSignals || []).filter(r => r.blocked);

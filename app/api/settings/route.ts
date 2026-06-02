@@ -16,23 +16,18 @@ export async function GET(request: Request) {
       });
     } catch (err: any) {
       if (err.message.includes("riskPerTradePct")) {
-        console.warn("[API-Settings] Prisma desync: riskPerTradePct missing. Retrying with explicit select.");
-        settings = await (prisma as any).userSettings.findUnique({
-          where: { userId },
-          select: {
-            id: true,
-            userId: true,
-            autoTrading: true,
-            maxOpenTrades: true,
-            prefSymbol: true,
-            preferredTradingMode: true,
-            updatedAt: true,
-          }
-        });
-        if (settings) settings.riskPerTradePct = 2.0;
+        console.warn("[API-Settings] Prisma desync detected, falling back to Raw SQL.");
+        const rawResults: any[] = await prisma.$queryRawUnsafe(`
+          SELECT * FROM "synapse"."UserSettings" WHERE "userId" = ${userId} LIMIT 1
+        `);
+        settings = rawResults.length > 0 ? rawResults[0] : null;
       } else {
         throw err;
       }
+    }
+
+    if (settings && settings.riskPerTradePct === undefined) {
+      settings.riskPerTradePct = 2.0;
     }
 
     return NextResponse.json({ success: true, settings });

@@ -44,6 +44,10 @@ export async function POST(request: Request) {
             takeProfit: sig.takeProfit,
             timestamp: new Date(sig.timestamp),
             reasoning: sig.reasoning,
+            userId: sig.userId || null,
+            blocked: sig.blocked || false,
+            blockReason: sig.blockReason || null,
+            activePositionId: sig.activePositionId || null,
           },
         });
 
@@ -134,8 +138,15 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "100");
+    const userId = searchParams.get("userId") || undefined;
 
     const dbSignals = await prisma.tradeSignal.findMany({
+      where: userId ? {
+        OR: [
+          { userId },
+          { userId: null }
+        ]
+      } : undefined,
       orderBy: { timestamp: "desc" },
       take: limit,
     });
@@ -152,6 +163,10 @@ export async function GET(request: Request) {
       takeProfit: s.takeProfit,
       timestamp: new Date(s.timestamp).getTime(),
       reasoning: s.reasoning,
+      userId: s.userId,
+      blocked: s.blocked,
+      blockReason: s.blockReason,
+      activePositionId: s.activePositionId,
     }));
 
     return NextResponse.json({ success: true, signals: mapped });

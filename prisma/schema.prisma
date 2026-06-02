@@ -21,21 +21,27 @@ model User {
 }
 
 model TradeSignal {
-  id          String   @id @default(uuid())
-  symbol      String
-  timeframe   String
-  strategyId  String
-  direction   String   // LONG, SHORT, HOLD
-  confidence  Float
-  entry       Float
-  stopLoss    Float
-  takeProfit  Float
-  timestamp   DateTime
-  reasoning   String[] // Array of reasoning strings
-  createdAt   DateTime @default(now())
+  id               String   @id @default(uuid())
+  symbol           String
+  timeframe        String
+  strategyId       String
+  direction        String   // LONG, SHORT, HOLD
+  confidence       Float
+  entry            Float
+  stopLoss         Float
+  takeProfit       Float
+  timestamp        DateTime
+  reasoning        String[] // Array of reasoning strings
+  createdAt        DateTime @default(now())
+  
+  userId           String?
+  blocked          Boolean  @default(false)
+  blockReason      String?
+  activePositionId String?
   
   @@index([symbol, timeframe])
   @@index([strategyId])
+  @@index([userId])
 }
 
 model SignalLog {

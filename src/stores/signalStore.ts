@@ -32,9 +32,12 @@ export const useSignalStore = create<SignalState>((set) => ({
 
   setSignals: (signals) => set({ activeSignals: signals }),
   clearSignals: () => set({ activeSignals: [] }),
-  fetchSignals: async () => {
+  fetchSignals: async (userId?: string) => {
     try {
-      const res = await fetch("/api/signals?limit=100");
+      const url = userId 
+        ? `/api/signals?limit=100&userId=${encodeURIComponent(userId)}`
+        : "/api/signals?limit=100";
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success && Array.isArray(data.signals)) {
         set({ activeSignals: data.signals });

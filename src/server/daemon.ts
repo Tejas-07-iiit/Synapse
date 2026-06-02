@@ -342,6 +342,40 @@ async function runDaemon() {
     const sym = symbol.toUpperCase();
     const tf = timeframe.toLowerCase();
 
+    // Query database for all users that have autoTrading enabled
+    const usersWithAuto = await prisma.userSettings.findMany({
+      where: { autoTrading: true },
+      include: { user: true },
+    });
+
+    // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
+    const blockedRaw = (rawSignals || []).filter(r => r.blocked);
+    for (const rawSig of blockedRaw) {
+      for (const settings of usersWithAuto) {
+        try {
+          await prisma.tradeSignal.create({
+            data: {
+              symbol: sym,
+              timeframe: tf,
+              strategyId: rawSig.strategyId,
+              direction: rawSig.signalType || rawSig.signal,
+              confidence: rawSig.confidence,
+              entry: rawSig.entry,
+              stopLoss: rawSig.stopLoss || 0,
+              takeProfit: rawSig.takeProfit || 0,
+              timestamp: new Date(rawSig.timestamp),
+              reasoning: rawSig.reasoning,
+              userId: settings.userId,
+              blocked: true,
+              blockReason: rawSig.blockReason || "Strategy rejected by prioritization manager.",
+            }
+          });
+        } catch (dbErr) {
+          console.error("[Daemon] Failed to log prioritization rejection to DB:", dbErr);
+        }
+      }
+    }
+
     for (const sig of signals) {
       if (sig.signal !== "LONG" && sig.signal !== "SHORT") {
         continue;
@@ -502,12 +536,6 @@ async function runDaemon() {
 
       (sig as any).auditPayload = entryAuditPayload;
 
-      // Query database for all users that have autoTrading enabled
-      const usersWithAuto = await prisma.userSettings.findMany({
-        where: { autoTrading: true },
-        include: { user: true },
-      });
-
       for (const settings of usersWithAuto) {
         const userId = settings.userId;
 
@@ -524,12 +552,55 @@ async function runDaemon() {
 
         if (existingOpen) {
           AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason: `Active position already exists for user ${userId}` });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: sig.stopLoss || 0,
+                takeProfit: sig.takeProfit || 0,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: "ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open.",
+                activePositionId: existingOpen.id,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log active position rejection to DB:", dbErr);
+          }
           continue;
         }
 
         // A. Check quarantine status
         if (PerformanceWeightingEngine.isQuarantined(sig.strategyId)) {
           AuditLogger.logQuarantineBlocked({ userId, symbol: sym, strategyId: sig.strategyId });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: sig.stopLoss || 0,
+                takeProfit: sig.takeProfit || 0,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: "STRATEGY QUARANTINED: Strategy was quarantined due to poor recent performance metrics.",
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log quarantine rejection to DB:", dbErr);
+          }
           continue;
         }
 
@@ -560,6 +631,27 @@ async function runDaemon() {
           if (timeSinceCloseMs < cooldownMs) {
             const remainingMins = Math.ceil((cooldownMs - timeSinceCloseMs) / (60 * 1000));
             AuditLogger.logCooldownBlocked({ userId, symbol: sym, remainingMinutes: remainingMins, lastStatus: lastTrade.status });
+            try {
+              await prisma.tradeSignal.create({
+                data: {
+                  symbol: sym,
+                  timeframe: tf,
+                  strategyId: sig.strategyId,
+                  direction: sig.signal,
+                  confidence: sig.confidence,
+                  entry: sig.entry,
+                  stopLoss: sig.stopLoss || 0,
+                  takeProfit: sig.takeProfit || 0,
+                  timestamp: new Date(sig.timestamp),
+                  reasoning: sig.reasoning,
+                  userId: userId,
+                  blocked: true,
+                  blockReason: `COOLDOWN ACTIVE: Cooldown active (${remainingMins}m remaining, last status: ${lastTrade.status}).`,
+                }
+              });
+            } catch (dbErr) {
+              console.error("[Daemon] Failed to log cooldown rejection to DB:", dbErr);
+            }
             continue;
           }
         }
@@ -599,6 +691,69 @@ async function runDaemon() {
         const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
         const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
 
+        // D. Check Max Open Trades Limit (Risk Manager Check)
+        const userActivePositionsCount = PaperTradingEngine.getOpenPositions().filter(p => p.userId === userId).length;
+        if (userActivePositionsCount >= settings.maxOpenTrades) {
+          const reason = `RISK MANAGEMENT BLOCK: Max open positions limit reached (${settings.maxOpenTrades}).`;
+          AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: reason,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log max open trades rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
+        // E. Check Insufficient Margin (Risk Manager Check)
+        const dummyOrderQty = (wallet.balance * (settings.riskPerTradePct / 100)) / sig.entry;
+        const requiredMargin = dummyOrderQty * sig.entry;
+        const usedMargin = PaperTradingEngine.getOpenPositions()
+          .filter(p => p.status === "OPEN" && p.userId === userId)
+          .reduce((sum, p) => sum + (p.entryPrice * p.quantity) / p.leverage, 0);
+        const availableBalance = wallet.balance - usedMargin;
+        if (requiredMargin > availableBalance) {
+          const reason = `RISK MANAGEMENT BLOCK: Insufficient margin (Required: $${requiredMargin.toFixed(2)}, Available: $${availableBalance.toFixed(2)}).`;
+          AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: reason,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log insufficient margin rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
         try {
           const position = await PaperTradingEngine.openPosition(
             userId,
@@ -630,6 +785,29 @@ async function runDaemon() {
               strategyName: sig.strategyName || "Unknown Strategy",
               confidence: sig.confidence
             });
+
+            // Log successful execution to TradeSignal DB
+            try {
+              await prisma.tradeSignal.create({
+                data: {
+                  symbol: sym,
+                  timeframe: tf,
+                  strategyId: sig.strategyId,
+                  direction: sig.signal,
+                  confidence: sig.confidence,
+                  entry: sig.entry,
+                  stopLoss: finalSl,
+                  takeProfit: finalTp,
+                  timestamp: new Date(sig.timestamp),
+                  reasoning: sig.reasoning,
+                  userId: userId,
+                  blocked: false,
+                  activePositionId: position.id,
+                }
+              });
+            } catch (dbErr) {
+              console.error("[Daemon] Failed to log executed signal to DB:", dbErr);
+            }
           }
         } catch (err) {
           AuditLogger.logSystemError({ module: "Daemon", message: `Autonomous trade placement failed for user ${userId}`, errorDetails: err });

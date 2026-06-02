@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { useSignalStore } from "@/src/stores/signalStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { TrendingUp, TrendingDown, Clock, ShieldAlert, Zap } from "lucide-react";
 
 interface SignalPanelProps {
@@ -12,12 +13,13 @@ export default function SignalPanel({ className }: SignalPanelProps) {
   const activeSignals = useSignalStore((state) => state.activeSignals);
   const clearSignals = useSignalStore((state) => state.clearSignals);
   const fetchSignals = useSignalStore((state) => (state as any).fetchSignals);
+  const { user } = useAuthStore();
 
   useEffect(() => {
-    if (fetchSignals) {
-      fetchSignals();
+    if (fetchSignals && user?.id) {
+      fetchSignals(user.id);
     }
-  }, [fetchSignals]);
+  }, [fetchSignals, user?.id]);
 
   const formatTime = (timestamp: number) => {
     const diff = Date.now() - timestamp;

@@ -157,10 +157,10 @@ export default function PortfolioPage() {
     }
   }, [isAuthenticated, authLoading, router]);
 
-  const fetchPortfolioData = useCallback(async () => {
+  const fetchPortfolioData = useCallback(async (silent = false) => {
     if (!user?.id) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [posRes, tradeRes] = await Promise.all([
         fetch(`/api/positions?userId=${user.id}&type=active`),
         fetch(`/api/positions?userId=${user.id}&type=closed`),
@@ -180,15 +180,21 @@ export default function PortfolioPage() {
       setError(null);
     } catch (err) {
       console.error("[Portfolio] Error fetching data:", err);
-      setError("Failed to fetch portfolio data. Please try again.");
+      if (!silent) setError("Failed to fetch portfolio data. Please try again.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
-      fetchPortfolioData();
+      fetchPortfolioData(false);
+      
+      const interval = setInterval(() => {
+        fetchPortfolioData(true);
+      }, 5000);
+      
+      return () => clearInterval(interval);
     }
   }, [user?.id, fetchPortfolioData]);
 

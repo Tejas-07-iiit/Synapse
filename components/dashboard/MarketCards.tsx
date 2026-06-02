@@ -35,28 +35,23 @@ export default function MarketCards() {
   const [activePositions, setActivePositions] = useState<Position[]>([]);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchWallet(user.id);
-    }
-  }, [user?.id, fetchWallet]);
-
-  useEffect(() => {
     if (!user?.id) return;
-    const fetchPositions = async () => {
+    const fetchData = async () => {
       try {
         const res = await fetch(`/api/positions?userId=${user.id}&type=active`);
         const data = await res.json();
         if (data.success) {
           setActivePositions(data.positions || []);
         }
+        fetchWallet(user.id).catch(() => {});
       } catch (err) {
         console.error("Failed to fetch active positions", err);
       }
     };
-    fetchPositions();
-    const interval = setInterval(fetchPositions, 4000);
+    fetchData();
+    const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
-  }, [user?.id]);
+  }, [user?.id, fetchWallet]);
 
   const formatPrice = (price: number | undefined) => {
     if (price === undefined) return "Loading...";

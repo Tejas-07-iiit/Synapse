@@ -1,0 +1,69 @@
+    // 1. ACTIVE POSITIONS
+    activePositions.forEach((pos) => {
+      if (pos.symbol.toUpperCase() !== currentSymbol) return;
+
+      const entryPrice = pos.entryPrice;
+      const direction = pos.direction as "LONG" | "SHORT";
+      const isLong = direction === "LONG";
+
+      const tpPrice = pos.takeProfit || (isLong ? entryPrice * 1.03 : entryPrice * 0.97);
+      const slPrice = pos.stopLoss || (isLong ? entryPrice * 0.985 : entryPrice * 1.015);
+
+      // Determine original values for dynamic strike-through display
+      const originalSl = pos.auditPayload?.tradePlan?.stopLoss;
+      const originalTp = pos.auditPayload?.tradePlan?.takeProfit;
+
+      let slTitle = "SL";
+      if (originalSl && Math.abs(originalSl - slPrice) > 0.0001) {
+        slTitle = `SL: ${strikeThrough(originalSl.toFixed(2))} ${slPrice.toFixed(2)}`;
+      }
+
+      let tpTitle = "TP";
+      if (originalTp && Math.abs(originalTp - tpPrice) > 0.0001) {
+        tpTitle = `TP: ${strikeThrough(originalTp.toFixed(2))} ${tpPrice.toFixed(2)}`;
+      }
+
+      p.push({
+        id: `${pos.id}-entry`,
+        price: entryPrice,
+        color: "#0ea5e9",
+        title: `${direction} ${pos.quantity.toFixed(4)}`,
+      });
+      p.push({
+        id: `${pos.id}-tp`,
+        price: tpPrice,
+        color: "#22c55e",
+        title: tpTitle,
+      });
+      p.push({
+        id: `${pos.id}-sl`,
+        price: slPrice,
+        color: "#ef4444",
+        title: slTitle,
+      });
+
+      m.push({
+        time: new Date(pos.openedAt).getTime(),
+        position: isLong ? "belowBar" : "aboveBar",
+        color: isLong ? "#22c55e" : "#ef4444",
+        shape: isLong ? "arrowUp" : "arrowDown",
+        text: `ENTRY @ ${entryPrice.toLocaleString()}`,
+      });
+
+      const pnl = isLong ? (currentPrice - entryPrice) * pos.quantity : (entryPrice - currentPrice) * pos.quantity;
+      const roi = (pnl / (entryPrice * pos.quantity)) * 100;
+
+      o.push({
+        id: pos.id,
+        symbol: pos.symbol,
+        direction,
+        status: "OPEN",
+        entryPrice,
+        tpPrice,
+        slPrice,
+        quantity: pos.quantity,
+        pnl,
+        roi,
+        openedAt: pos.openedAt,
+      });
+    });

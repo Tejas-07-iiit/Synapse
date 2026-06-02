@@ -189,10 +189,8 @@ class MarketEngine {
         const symUpper = symbol.toUpperCase();
         store.updateTicker(symUpper, ticker);
 
-        // Forward ticker updates to paper trading engine to check SL/TP executions for all positions (daemon/server only)
-        if (typeof window === "undefined") {
-          PaperTradingEngine.updatePrices(symUpper, ticker.price);
-        }
+        // Forward ticker updates to paper trading engine to check SL/TP executions for all positions
+        PaperTradingEngine.updatePrices(symUpper, ticker.price);
         
         // Note: We DO NOT recalculate indicators or strategies on price ticks anymore.
         // This dramatically saves CPU/RAM. We only evaluate on candle close.
@@ -208,10 +206,8 @@ class MarketEngine {
         // 1. Update the symbol-specific candle cache
         store.updateLastCandleForSymbol(symUpper, tfLower, candle);
 
-        // Forward kline high/low extremes to paper trading engine to perfectly catch wick liquidations (daemon/server only)
-        if (typeof window === "undefined") {
-          PaperTradingEngine.updatePrices(symUpper, candle.close, candle.high, candle.low);
-        }
+        // Forward kline high/low extremes to paper trading engine to perfectly catch wick liquidations
+        PaperTradingEngine.updatePrices(symUpper, candle.close, candle.high, candle.low);
 
         // 2. If it's the active symbol and timeframe, update the active candles for UI
         if (symUpper === this.activeSymbol && tfLower === this.activeTimeframe) {

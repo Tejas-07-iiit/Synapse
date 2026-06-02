@@ -189,6 +189,11 @@ export default function TradingViewChart() {
   // APIs for Overlays
   const [apis, setApis] = useState<{ chart: IChartApi; series: ISeriesApi<"Candlestick">; key: string } | null>(null);
 
+  // Helper for unicode strikethrough
+  const strikeThrough = (text: string) => {
+    return text.split('').map(char => char + '\u0336').join('');
+  };
+
   // Fetch active positions
   useEffect(() => {
     let active = true;
@@ -229,9 +234,23 @@ export default function TradingViewChart() {
       const entryPrice = pos.entryPrice;
       const direction = pos.direction as "LONG" | "SHORT";
       const isLong = direction === "LONG";
-      
+
       const tpPrice = pos.takeProfit || (isLong ? entryPrice * 1.03 : entryPrice * 0.97);
       const slPrice = pos.stopLoss || (isLong ? entryPrice * 0.985 : entryPrice * 1.015);
+
+      // Determine original values for dynamic strike-through display
+      const originalSl = pos.auditPayload?.tradePlan?.stopLoss;
+      const originalTp = pos.auditPayload?.tradePlan?.takeProfit;
+
+      let slTitle = "SL";
+      if (originalSl && Math.abs(originalSl - slPrice) > 0.0001) {
+        slTitle = `SL: ${strikeThrough(originalSl.toFixed(2))} ${slPrice.toFixed(2)}`;
+      }
+
+      let tpTitle = "TP";
+      if (originalTp && Math.abs(originalTp - tpPrice) > 0.0001) {
+        tpTitle = `TP: ${strikeThrough(originalTp.toFixed(2))} ${tpPrice.toFixed(2)}`;
+      }
 
       p.push({
         id: `${pos.id}-entry`,
@@ -243,13 +262,13 @@ export default function TradingViewChart() {
         id: `${pos.id}-tp`,
         price: tpPrice,
         color: "#22c55e",
-        title: "TP",
+        title: tpTitle,
       });
       p.push({
         id: `${pos.id}-sl`,
         price: slPrice,
         color: "#ef4444",
-        title: "SL",
+        title: slTitle,
       });
 
       m.push({

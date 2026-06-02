@@ -27,12 +27,14 @@ export class SignalPriorityEngine {
       let compatible = false;
       if (regime === "TRENDING") {
         compatible = isTrendingStrat || category === "Lorentzian";
-      } else if (regime === "RANGING" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") {
+      } else if (regime === "RANGING" || regime === "LOW_VOLATILITY" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") {
         compatible = isMeanReversionStrat || category === "Lorentzian" || isTrendingStrat;
-      } else if (regime === "BREAKOUT") {
-        compatible = isBreakoutStrat || category === "Lorentzian";
+      } else if (regime === "HIGH_VOLATILITY" || regime === "BREAKOUT") {
+        compatible = isBreakoutStrat || category === "Lorentzian" || isTrendingStrat;
       } else if (regime === "LIQUIDITY_SWEEP") {
         compatible = isSweepStrat || category === "Lorentzian";
+      } else {
+        compatible = true; // Fallback
       }
 
       if (!compatible) {
@@ -83,8 +85,8 @@ export class SignalPriorityEngine {
       const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
 
       if (regime === "TRENDING" && isTrendingStrat) regimeMatchBonus = 10;
-      else if ((regime === "RANGING" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") && isMeanReversionStrat) regimeMatchBonus = 10;
-      else if (regime === "BREAKOUT" && isBreakoutStrat) regimeMatchBonus = 10;
+      else if ((regime === "RANGING" || regime === "LOW_VOLATILITY" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") && isMeanReversionStrat) regimeMatchBonus = 10;
+      else if ((regime === "BREAKOUT" || regime === "HIGH_VOLATILITY") && isBreakoutStrat) regimeMatchBonus = 10;
       else if (regime === "LIQUIDITY_SWEEP" && isSweepStrat) regimeMatchBonus = 10;
       else if (category === "Lorentzian" || isTrendingStrat) regimeMatchBonus = 5; // Partial compatibility
 

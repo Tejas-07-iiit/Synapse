@@ -1,46 +1,11 @@
-import { StrategyContext } from "../types";
+import { StrategyContext, TradingMode } from "../types";
 import { RegimeEngine } from "./regime-engine";
 import { PerformanceWeightingEngine } from "./performance-weighting";
-
-const STRATEGY_CATEGORIES: Record<string, string> = {
-  "ema-crossover": "Trend Following",
-  "rsi-reversal": "Reversal",
-  "macd-momentum": "Momentum",
-  "bollinger-breakout": "Breakout",
-  "mean-reversion": "Mean-Reversion",
-  "momentum": "Momentum",
-  "defensive": "Defensive",
-  "grid": "Grid",
-  "lorentzian": "Lorentzian",
-  "donchian-breakout": "Breakout",
-  "rally-base-drop": "SupplyDemand",
-  "sr-sweep": "LiquiditySweep",
-  "bollinger-reversion": "MeanReversion",
-  "short-term-reversal": "Reversal",
-  "dow-mfi-rsi": "Momentum",
-  "parabolic-rsi": "Momentum",
-  "range-breakout-high": "Breakout",
-  "residual-momentum": "Momentum",
-  "time-series-momentum": "Momentum",
-  "wavetrend": "Momentum",
-  "hash-ribbons": "Sentiment",
-  "news-fear-greed": "Sentiment",
-  "ema-cross-adx": "Trend Following",
-  "golden-cross": "Trend Following",
-  "heiken-ashi-swing": "Trend Following",
-  "hyper-supertrend": "Trend Following",
-  "ichimoku-cloud": "Trend Following",
-  "ma-crossover-var": "Trend Following",
-  "sma-trend-filter": "Trend Following",
-  "t3-nexus": "Trend Following",
-  "squeeze-momentum": "Volatility",
-  "volatility-regime": "Volatility",
-  "zeiierman-volatility": "Volatility",
-};
+import { strategyRegistry } from "./registry";
 
 export class ConfidenceEngine {
   /**
-   * Calculates a detailed component breakdown of the confidence score for a given trade setup.
+   * Calculates a detailed component breakdown of the confidence score (0 to 100) for a given trade setup.
    */
   public static calculateDetailed(
     direction: "LONG" | "SHORT" | "HOLD",
@@ -67,145 +32,135 @@ export class ConfidenceEngine {
     const lastIdx = candles.length - 1;
     const price = candles[lastIdx].close;
 
-    let score = 0;
+    // 1. Get Strategy Meta and Real Performance Stats
+    const strategy = strategyId ? strategyRegistry.getStrategy(strategyId) : undefined;
+    const stratCategory = strategy?.category || TradingMode.INTRADAY;
+    const stats = strategyId ? PerformanceWeightingEngine.getStats(strategyId) : null;
+    
+    const winRate = stats ? stats.winRate : 0.50;
+    const profitFactor = stats ? stats.profitFactor : 1.0;
 
-    // 1. Trend Alignment (Max 25 pts)
-    let trendScore = 0;
-    const ema20 = indicators.ema20?.[lastIdx];
-    const sma50 = indicators.sma50?.[lastIdx];
-    if (ema20 && sma50) {
-      if (direction === "LONG") {
-        if (price > ema20 && ema20 > sma50) {
-          trendScore = 25; // Perfect trend alignment
-        } else if (price > ema20 || ema20 > sma50) {
-          trendScore = 12; // Partial alignment
-        }
-      } else if (direction === "SHORT") {
-        if (price < ema20 && ema20 < sma50) {
-          trendScore = 25; // Perfect trend alignment
-        } else if (price < ema20 || ema20 < sma50) {
-          trendScore = 12; // Partial alignment
-        }
-      }
+    let score = 40; // Base score (neutral setup)
+
+    // A. Win Rate Impact (Max +20, Min -15)
+    const winRateScore = Math.min(20, Math.max(-15, Math.round((winRate - 0.50) * 100)));
+    score += winRateScore;
+
+    // B. Profit Factor Impact (Max +15, Min -15)
+    const profitFactorScore = Math.min(15, Math.max(-15, Math.round((profitFactor - 1.0) * 20)));
+    score += profitFactorScore;
+
+    // C. Risk/Reward Profile (Max +10, Min -5)
+    // Estimate R/R: Scalping targets 1.5, Intraday targets 2.0
+    const estRr = stratCategory === TradingMode.SCALPING ? 1.5 : 2.0;
+    let rrScore = 5;
+    if (estRr >= 2.0) {
+      rrScore = 10;
+    } else if (estRr < 1.5) {
+      rrScore = -5;
     }
-    score += trendScore;
+    score += rrScore;
 
-    // 2. Momentum Alignment (Max 20 pts)
-    let momentumScore = 0;
-    const macdHist = indicators.macdHist?.[lastIdx] ?? 0;
-    const rsi = indicators.rsi?.[lastIdx] ?? 50;
-    const rsiPrev = lastIdx > 0 ? (indicators.rsi?.[lastIdx - 1] ?? 50) : 50;
+    // 2. Market Regime Compatibility Match (Max +20, Min -10)
+    let regimeScore = 0;
+    const regime = RegimeEngine.classify(context);
+    
+    // Check compatibility based on strategy ID or indicators used
+    const isTrendingStrat = strategyId && (
+      strategyId.includes("cross") || 
+      strategyId.includes("trend") || 
+      strategyId.includes("supertrend") || 
+      strategyId.includes("cloud") ||
+      strategyId.includes("defensive") ||
+      strategyId.includes("momentum")
+    );
+    const isMeanReversionStrat = strategyId && (
+      strategyId.includes("reversion") || 
+      strategyId.includes("reversal") || 
+      strategyId.includes("grid")
+    );
+    const isBreakoutStrat = strategyId && strategyId.includes("breakout");
 
-    if (direction === "LONG") {
-      if (macdHist > 0) momentumScore += 10;
-      if (rsi > rsiPrev) momentumScore += 10;
-    } else if (direction === "SHORT") {
-      if (macdHist < 0) momentumScore += 10;
-      if (rsi < rsiPrev) momentumScore += 10;
+    if (regime === "TRENDING") {
+      if (isTrendingStrat) regimeScore = 20;
+      else if (isMeanReversionStrat) regimeScore = -10;
+      else regimeScore = 5;
+    } else if (regime === "RANGING") {
+      if (isMeanReversionStrat) regimeScore = 20;
+      else if (isTrendingStrat) regimeScore = -10;
+      else regimeScore = 5;
+    } else if (regime === "HIGH_VOLATILITY") {
+      if (isBreakoutStrat) regimeScore = 20;
+      else if (isTrendingStrat) regimeScore = 10;
+      else regimeScore = 5;
+    } else if (regime === "LOW_VOLATILITY") {
+      if (isMeanReversionStrat) regimeScore = 20;
+      else if (isBreakoutStrat) regimeScore = -10;
+      else regimeScore = 5;
     }
-    score += momentumScore;
+    score += regimeScore;
 
-    // 3. Volume Confirmation (Max 15 pts)
+    // 3. Volume Confirmation (Max +15)
     let volumeScore = 0;
     const volume = candles[lastIdx].volume;
     const volumeMA = indicators.volumeMA?.[lastIdx] ?? 0;
     if (volumeMA > 0) {
       if (volume > volumeMA * 1.5) {
-        volumeScore = 15; // Strong volume expansion
+        volumeScore = 15;
       } else if (volume > volumeMA) {
-        volumeScore = 8;  // Moderate volume expansion
+        volumeScore = 8;
       }
     }
     score += volumeScore;
 
-    // 4. Regime Match (Max 20 pts)
-    let regimeScore = 0;
-    const regimeCategory = RegimeEngine.getRegimeCategory(context);
-    const category = strategyId ? (STRATEGY_CATEGORIES[strategyId] || "Central Engine") : "Central Engine";
-
-    const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
-    const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
-    const isBreakoutStrat = category === "Breakout" || category === "Volatility";
-    const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
-
-    if (regimeCategory === "TRENDING") {
-      if (isTrendingStrat) regimeScore = 20;
-      else if (category === "Lorentzian") regimeScore = 10;
-    } else if (regimeCategory === "RANGING" || regimeCategory === "ACCUMULATION" || regimeCategory === "DISTRIBUTION") {
-      if (isMeanReversionStrat) regimeScore = 20;
-      else if (category === "Lorentzian" || isTrendingStrat) regimeScore = 10;
-    } else if (regimeCategory === "BREAKOUT") {
-      if (isBreakoutStrat) regimeScore = 20;
-      else if (category === "Lorentzian") regimeScore = 10;
-    } else if (regimeCategory === "LIQUIDITY_SWEEP") {
-      if (isSweepStrat) regimeScore = 20;
-      else if (category === "Lorentzian") regimeScore = 10;
-    }
-    score += regimeScore;
-
-    // 5. Confirmation Indicators (Max 20 pts)
+    // 4. Trend Strength (ADX/EMA Slope) (Max +10)
     let confirmScore = 0;
-    const stochRsiK = indicators.stochRsiK?.[lastIdx];
-    const stochRsiD = indicators.stochRsiD?.[lastIdx];
     const adx = indicators.adx?.[lastIdx] ?? 0;
-
-    const isTrendOrBreakout = isTrendingStrat || isBreakoutStrat;
-    const isRangeOrReversion = isMeanReversionStrat || isSweepStrat;
-
-    if (direction === "LONG") {
-      // Stochastic RSI confirmation
-      if (stochRsiK !== undefined && stochRsiD !== undefined) {
-        if (stochRsiK > stochRsiD || stochRsiK < 20) {
-          confirmScore += 10;
-        }
-      } else {
-        confirmScore += 5; // Default fallback points
-      }
-      // ADX alignment
-      if (isTrendOrBreakout && adx > 25) {
-        confirmScore += 10;
-      } else if (isRangeOrReversion && adx < 20) {
-        confirmScore += 10;
-      } else if (adx >= 20 && adx <= 25) {
-        confirmScore += 5;
-      }
-    } else if (direction === "SHORT") {
-      // Stochastic RSI confirmation
-      if (stochRsiK !== undefined && stochRsiD !== undefined) {
-        if (stochRsiK < stochRsiD || stochRsiK > 80) {
-          confirmScore += 10;
-        }
-      } else {
-        confirmScore += 5;
-      }
-      // ADX alignment
-      if (isTrendOrBreakout && adx > 25) {
-        confirmScore += 10;
-      } else if (isRangeOrReversion && adx < 20) {
-        confirmScore += 10;
-      } else if (adx >= 20 && adx <= 25) {
-        confirmScore += 5;
-      }
+    if (isTrendingStrat || isBreakoutStrat) {
+      if (adx > 25) confirmScore += 10;
+      else if (adx > 20) confirmScore += 5;
+    } else if (isMeanReversionStrat) {
+      if (adx < 20) confirmScore += 10;
+      else if (adx < 25) confirmScore += 5;
     }
     score += confirmScore;
 
-    let finalScore = Math.round(score);
-    let perfBoost = 0;
+    // 5. Volatility Alignment (ATR / BB width) (Max +10)
+    let volScore = 0;
+    const bbUpper = indicators.bbUpper?.[lastIdx] ?? 0;
+    const bbLower = indicators.bbLower?.[lastIdx] ?? 0;
+    const bbMiddle = indicators.bbMiddle?.[lastIdx] ?? 1;
+    const bbWidth = (bbUpper - bbLower) / bbMiddle;
+    
+    // Check if BB is expanding vs contracting
+    const prevBbUpper = lastIdx > 0 ? (indicators.bbUpper?.[lastIdx - 1] ?? bbUpper) : bbUpper;
+    const prevBbLower = lastIdx > 0 ? (indicators.bbLower?.[lastIdx - 1] ?? bbLower) : bbLower;
+    const prevBbMiddle = lastIdx > 0 ? (indicators.bbMiddle?.[lastIdx - 1] ?? bbMiddle) : bbMiddle;
+    const prevBbWidth = (prevBbUpper - prevBbLower) / prevBbMiddle;
+    const isExpanding = bbWidth > prevBbWidth;
 
-    // 6. Performance Weighting Adjustments
+    if (isBreakoutStrat && isExpanding) {
+      volScore = 10;
+    } else if (isMeanReversionStrat && !isExpanding) {
+      volScore = 10;
+    }
+    score += volScore;
+
+    // 6. Strategy Performance Boost (from weighting engine)
+    let perfBoost = 0;
     if (strategyId) {
       perfBoost = PerformanceWeightingEngine.getStrategyBoost(strategyId);
-      finalScore += perfBoost;
+      score += perfBoost;
     }
 
-    finalScore = Math.min(100, Math.max(0, finalScore));
+    const finalScore = Math.min(100, Math.max(0, score));
 
     return {
-      trendScore,
-      momentumScore,
+      trendScore: winRateScore,
+      momentumScore: profitFactorScore,
       volumeScore,
       regimeScore,
-      confirmScore,
+      confirmScore: confirmScore + volScore,
       perfBoost,
       finalScore
     };

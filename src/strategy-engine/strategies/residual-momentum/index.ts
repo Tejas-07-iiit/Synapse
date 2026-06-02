@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -15,6 +15,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class ResidualMomentumStrategy implements TradingStrategy {
   public id = "residual-momentum";
+  public category: TradingMode = TradingMode.SCALPING;
+  public expectedHoldingTime = "5m-45m";
   public name = "Residual Momentum Strategy";
   public description = "Measures abnormal (residual) returns versus a regression baseline and trades on statistically significant momentum deviations.";
   public type = "Momentum";

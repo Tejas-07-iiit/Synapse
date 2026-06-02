@@ -1,9 +1,11 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class DowFactorMFIRSIStrategy implements TradingStrategy {
   public id = "dow-mfi-rsi";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Dow Factor MFI RSI Strategy";
   public description = "Trade momentum continuation in aligned Dow Theory structures validated by volume flow and RSI direction.";
   public type = "Momentum";

@@ -3,11 +3,12 @@ import { RiskEngine, RiskCheckSettings } from "../risk";
 import { useWalletStore } from "@/src/stores/walletStore";
 import { useSettingsStore } from "@/src/stores/settingsStore";
 import { AuditLogger } from "../../lib/audit/trading-audit";
+import prisma from "../../../lib/prisma";
 
 export interface PaperTradingSettings {
   autoTrading: boolean;
   maxOpenTrades: number;
-  riskPerTradePct: number;
+  preferredTradingMode?: "SCALPING" | "INTRADAY";
 }
 
 export interface DbClientHandler {
@@ -75,6 +76,9 @@ export class PaperTradingEngine {
           marketRegime: pos.marketRegime || undefined,
           indicatorSnapshot: pos.indicatorSnapshot || undefined,
           auditPayload: pos.auditPayload || undefined,
+          expiresAt: pos.expiresAt ? new Date(pos.expiresAt).getTime() : undefined,
+          exitReason: pos.exitReason || undefined,
+          confidenceScore: pos.confidenceScore || undefined,
         });
       }
       console.log(`[PaperTrading] Loaded ${positionsList.length} active positions from database.`);
@@ -98,6 +102,11 @@ export class PaperTradingEngine {
     );
 
     for (const pos of activePositions) {
+      if (pos.expiresAt && Date.now() >= new Date(pos.expiresAt).getTime()) {
+        await this.closePosition(pos.id, currentPrice, "TRADE_TIMEOUT");
+        continue;
+      }
+
       pos.currentPrice = currentPrice;
 
       // Calculate floating PnL
@@ -262,8 +271,53 @@ export class PaperTradingEngine {
         AuditLogger.logSystemError({ module: "PaperTradingEngine", message: "Database position lock check failed", errorDetails: e });
       }
 
-      let qty = 0;
-      let orderValueUsdt = 0;
+      // Calculate risk/block parameters beforehand
+      const alreadyOpenForStrategy = Array.from(this.positions.values()).some(
+        (p) => p.userId === userId && p.status === "OPEN" && p.strategyId === strategyId && strategyId !== "manual"
+      );
+      const alreadyOpenInSameDirection = Array.from(this.positions.values()).some(
+        (p) => p.userId === userId && p.status === "OPEN" && p.direction === direction && p.symbol !== sym
+      );
+
+      // Compute Daily Drawdown
+      let dailyDrawdownPercent = 0;
+      try {
+        if (this.dbHandler) {
+          const startOfToday = new Date();
+          startOfToday.setUTCHours(0, 0, 0, 0);
+
+          const closedTradesToday = await prisma.trade.findMany({
+            where: {
+              userId,
+              closedAt: {
+                gte: startOfToday,
+              },
+            },
+            select: {
+              netPnl: true,
+            },
+          });
+
+          const closedPnlToday = closedTradesToday.reduce((sum, t) => sum + t.netPnl, 0);
+
+          const openPositions = Array.from(this.positions.values()).filter(
+            (p) => p.userId === userId && p.status === "OPEN"
+          );
+          const floatingPnl = openPositions.reduce((sum, p) => sum + p.pnl, 0);
+
+          const totalDailyPnl = closedPnlToday + floatingPnl;
+          
+          const wallet = await prisma.wallet.findUnique({ where: { userId } });
+          const currentBalance = wallet ? wallet.balance : (explicitBalance !== undefined ? explicitBalance : 0);
+          const startOfDayBalance = currentBalance - closedPnlToday;
+
+          if (startOfDayBalance > 0 && totalDailyPnl < 0) {
+            dailyDrawdownPercent = (Math.abs(totalDailyPnl) / startOfDayBalance) * 100;
+          }
+        }
+      } catch (e) {
+        console.error("[PaperTradingEngine] Error calculating daily drawdown:", e);
+      }
 
       let balance = explicitBalance !== undefined ? explicitBalance : 0;
       if (explicitBalance === undefined) {
@@ -272,20 +326,55 @@ export class PaperTradingEngine {
       
       const settings = explicitSettings || useSettingsStore.getState();
 
+      let orderValueUsdt = 0;
+      let confidenceScore = 100;
+      let pct = 10; // default fallback percentage
+
+      let confidence = 70;
+      if (signalContext && signalContext.confidence !== undefined) {
+        confidence = signalContext.confidence;
+      }
+      confidenceScore = Math.round(confidence);
+
       if (sizeUsdt === null) {
-        orderValueUsdt = balance * (settings.riskPerTradePct / 100) * leverage;
+        if (confidence < 60) {
+          pct = 5 + (confidence / 60) * 5;
+        } else if (confidence <= 80) {
+          pct = 10 + ((confidence - 60) / 20) * 15;
+        } else {
+          pct = 25 + ((confidence - 80) / 20) * 5;
+        }
+
+        // Safety Rules for >30% sizing (Confidence > 90)
+        if (confidence > 90) {
+          const isSafetyMet =
+            marketRegime === "TRENDING" &&
+            dailyDrawdownPercent < 2 &&
+            !alreadyOpenInSameDirection;
+
+          if (isSafetyMet) {
+            pct = 30 + ((confidence - 90) / 10) * 20;
+          } else {
+            pct = 30; // clamp to recommended max of 30% if safety is not met
+          }
+        }
+
+        pct = Math.min(50, Math.max(5, pct));
+        orderValueUsdt = balance * (pct / 100) * leverage;
+        console.log(`[DYNAMIC_SIZING] Confidence: ${confidence} | Regime: ${marketRegime} | Drawdown: ${dailyDrawdownPercent.toFixed(2)}% | Calculated Pct: ${pct.toFixed(2)}% | Order size: $${orderValueUsdt.toFixed(2)}`);
       } else {
         orderValueUsdt = sizeUsdt;
+        pct = (orderValueUsdt / balance) * 100;
       }
       
-      console.log(`[POSITION_SIZING] Wallet balance: $${balance.toFixed(2)} | Risk per trade: ${settings.riskPerTradePct}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
+      console.log(`[POSITION_SIZING] Wallet balance: $${balance.toFixed(2)} | Risk per trade pct used: ${(orderValueUsdt / balance / leverage * 100).toFixed(2)}% | Leverage: ${leverage}x | Calculated order size: $${orderValueUsdt.toFixed(2)}`);
 
       if (orderValueUsdt <= 0 || isNaN(orderValueUsdt)) {
         console.log(`[POSITION_REJECTED] Invalid position size calculated: $${orderValueUsdt.toFixed(2)}. Aborting.`);
         return null;
       }
 
-      qty = orderValueUsdt / price;
+      const qty = orderValueUsdt / price;
 
       if (qty <= 0 || isNaN(qty)) {
         console.log(`[POSITION_REJECTED] Invalid quantity calculated: ${qty}. Aborting.`);
@@ -313,13 +402,25 @@ export class PaperTradingEngine {
 
       const userActivePositionsCount = this.getOpenPositions().filter(p => p.userId === userId).length;
 
+      // Compute total correlated exposure (sum of current open same-direction positions on other assets)
+      const correlatedExposureUsdt = Array.from(this.positions.values())
+        .filter((p) => p.userId === userId && p.status === "OPEN" && p.direction === direction && p.symbol !== sym)
+        .reduce((sum, p) => sum + (p.entryPrice * p.quantity), 0);
+      const totalCorrelatedExposure = correlatedExposureUsdt + orderValueUsdt;
+
+      const correlationBlocked = alreadyOpenInSameDirection && (
+        confidenceScore < 90 || totalCorrelatedExposure > balance * 0.50
+      );
+
       const riskResult = RiskEngine.validateOrder(
         dummyOrder, 
         userActivePositionsCount, 
         alreadyOpen,
         leverage,
         availableBalance,
-        explicitSettings
+        explicitSettings,
+        alreadyOpenForStrategy,
+        correlationBlocked
       );
       if (!riskResult.allowed) {
         AuditLogger.logRiskRejected({ userId, symbol: sym, reason: riskResult.reason || "Risk Engine rejected order" });
@@ -340,6 +441,13 @@ export class PaperTradingEngine {
           }
         }
       }
+
+      // Calculate expiresAt based on preferredTradingMode
+      const tradingMode = settings.preferredTradingMode || "INTRADAY";
+      const openedAtTime = Date.now();
+      const expiresAt = tradingMode === "SCALPING" 
+        ? new Date(openedAtTime + 45 * 60 * 1000) 
+        : new Date(openedAtTime + 8 * 60 * 60 * 1000);
 
       try {
         console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
@@ -377,6 +485,8 @@ export class PaperTradingEngine {
             marketRegime,
             indicatorSnapshot,
             auditPayload: finalAuditPayload,
+            expiresAt: expiresAt.toISOString(),
+            confidenceScore,
           });
         } else {
           // Save position to DB via API
@@ -402,6 +512,8 @@ export class PaperTradingEngine {
                 marketRegime,
                 indicatorSnapshot,
                 auditPayload: finalAuditPayload,
+                expiresAt: expiresAt.toISOString(),
+                confidenceScore,
               },
             }),
           });
@@ -438,10 +550,27 @@ export class PaperTradingEngine {
           marketRegime: dbPos.marketRegime || undefined,
           indicatorSnapshot: dbPos.indicatorSnapshot || undefined,
           auditPayload: dbPos.auditPayload || undefined,
+          expiresAt: expiresAt.getTime(),
+          confidenceScore,
         };
 
         this.positions.set(position.id, position);
-        console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit}`);
+        
+        // Temporary debug log for dynamic SL/TP verification
+        let atrVal = signalContext?.auditPayload?.marketSnapshot?.volatility || 
+                     (signalContext?.indicators?.atr ? signalContext.indicators.atr[signalContext.indicators.atr.length - 1] : 0);
+        if (!atrVal && stopLoss && price) {
+          const slMult = (settings.preferredTradingMode || "INTRADAY") === "SCALPING" ? 0.8 : 1.5;
+          atrVal = Math.abs(price - stopLoss) / slMult;
+        }
+        const mode = settings.preferredTradingMode || "INTRADAY";
+        
+        console.log(`\n[DYNAMIC-SLTP]\nUser: ${userId}\nMode: ${mode}\nStrategy: ${strategyName}\nATR: ${atrVal.toFixed(4)}\nEntry: ${price.toFixed(2)}\nSL: ${stopLoss ? stopLoss.toFixed(2) : "N/A"}\nTP: ${takeProfit ? takeProfit.toFixed(2) : "N/A"}\n`);
+
+        // Dynamic Position Sizing Debug Log
+        console.log(`\n[DYNAMIC POSITION SIZING]\nUser: ${userId}\nMode: ${mode}\nStrategy: ${strategyName}\nConfidence: ${confidenceScore}\nRegime: ${position.marketRegime || "UNKNOWN"}\nWallet: $${balance.toFixed(2)}\nAllocation: ${pct.toFixed(2)}%\nPosition Size: $${orderValueUsdt.toFixed(2)}\n`);
+
+        console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit} | Expires: ${expiresAt.toISOString()}`);
         
         // Update store balance to keep in sync
         if (typeof window !== "undefined") {
@@ -496,7 +625,7 @@ export class PaperTradingEngine {
       ? `Take Profit reached at $${exitPrice.toFixed(2)}.`
       : reason === "OPPOSITE_SIGNAL"
       ? `Position closed due to opposite signal generated by ${pos.strategyName || "strategy"}.`
-      : reason === "TIMEOUT"
+      : reason === "TIMEOUT" || reason === "TRADE_TIMEOUT"
       ? `Position closed due to timeout rule.`
       : reason === "RISK"
       ? `Position closed by Risk Engine guard.`

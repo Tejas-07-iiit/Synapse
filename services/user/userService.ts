@@ -27,11 +27,9 @@ export async function ensureUserExists(userId: string) {
         settings: {
           create: {
             autoTrading: true,
-            riskPerTradePct: 2.0,
             maxOpenTrades: 3,
-            defaultSlPct: 1.5,
-            defaultTpPct: 3.0,
             prefSymbol: "BTCUSDT",
+            preferredTradingMode: "INTRADAY",
           }
         }
       },
@@ -57,6 +55,7 @@ export async function ensureUserExists(userId: string) {
     await prisma.userSettings.create({
       data: {
         userId: user.id,
+        preferredTradingMode: "INTRADAY",
       }
     });
   }

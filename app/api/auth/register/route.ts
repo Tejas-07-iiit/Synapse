@@ -87,11 +87,9 @@ export async function POST(req: NextRequest) {
         settings: {
           create: {
             autoTrading: true,
-            riskPerTradePct: 2.0,
             maxOpenTrades: 3,
-            defaultSlPct: 1.5,
-            defaultTpPct: 3.0,
             prefSymbol: "BTCUSDT",
+            preferredTradingMode: "INTRADAY",
           }
         }
       },

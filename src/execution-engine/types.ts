@@ -21,6 +21,9 @@ export interface VirtualPosition {
   confidenceAtEntry?: number;
   marketRegime?: string;
   indicatorSnapshot?: any;
+  expiresAt?: string | number | Date | null;
+  exitReason?: string | null;
+  confidenceScore?: number | null;
   auditPayload?: any;
 }
 

@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -17,6 +17,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class RangeBreakoutHighStrategy implements TradingStrategy {
   public id = "range-breakout-high";
+  public category: TradingMode = TradingMode.SCALPING;
+  public expectedHoldingTime = "5m-45m";
   public name = "Range Breakout High Strategy";
   public description = "Detects consolidation ranges via Donchian Channels and triggers on breakouts with volume confirmation.";
   public type = "Breakout";

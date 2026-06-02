@@ -134,7 +134,7 @@ export interface MarketAnalytics {
   volatilityScore: "HIGH" | "LOW" | "NORMAL";
   momentumScore: "STRONG" | "WEAK" | "NEUTRAL";
   volumeStrength: "HIGH" | "LOW" | "NORMAL";
-  marketRegime: "BULLISH" | "BEARISH" | "SIDEWAYS" | "VOLATILE" | "ACCUMULATION" | "DISTRIBUTION" | "Bullish Trend" | "Bearish Trend" | "Ranging" | "Breakout" | "Distribution" | "Accumulation" | "High Volatility" | "Low Volatility";
+  marketRegime: "BULLISH" | "BEARISH" | "SIDEWAYS" | "VOLATILE" | "ACCUMULATION" | "DISTRIBUTION" | "Bullish Trend" | "Bearish Trend" | "Ranging" | "Breakout" | "Distribution" | "Accumulation" | "High Volatility" | "Low Volatility" | "TRENDING" | "RANGING" | "HIGH_VOLATILITY" | "LOW_VOLATILITY";
   emaAlignment: "BULLISH" | "BEARISH" | "NEUTRAL";
   bollingerPosition: "ABOVE_UPPER" | "BELOW_LOWER" | "IN_CHANNEL";
   macdStatus: "BULLISH_CROSSOVER" | "BEARISH_CROSSOVER" | "NEUTRAL";

@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { calculateSMA } from "../../indicators/sma";
 import { calculateATR } from "../../indicators/atr";
@@ -18,6 +18,8 @@ import { calculateATR } from "../../indicators/atr";
  */
 export class ZeiiermanVolatilityStrategy implements TradingStrategy {
   public id = "zeiierman-volatility";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Zeiierman Volatility";
   public description = "Volatility breakout strategy entering trades on band breaches confirmed by trend strength and volume expansion.";
   public type = "Volatility";

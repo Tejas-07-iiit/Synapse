@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -18,6 +18,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class HyperSupertrendStrategy implements TradingStrategy {
   public id = "hyper-supertrend";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Hyper Supertrend Strategy";
   public description = "Dual Supertrend confirmation system requiring both fast (10,2) and slow (12,3) Supertrends to align for high-conviction trend signals.";
   public type = "Trend Following";

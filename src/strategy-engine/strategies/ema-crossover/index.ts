@@ -1,9 +1,11 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { ConfidenceEngine } from "../../core/confidence-engine";
 
 export class EMACrossoverStrategy implements TradingStrategy {
   public id = "ema-crossover";
+  public category: TradingMode = TradingMode.SCALPING;
+  public expectedHoldingTime = "5m-45m";
   public name = "EMA Crossover Strategy";
   public description = "Triggers buy/sell orders based on Exponential Moving Average (12 and 26 period) crossovers.";
   public timeframe = "15m";

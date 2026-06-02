@@ -1,9 +1,11 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class ShortTermReversalStrategy implements TradingStrategy {
   public id = "short-term-reversal";
+  public category: TradingMode = TradingMode.SCALPING;
+  public expectedHoldingTime = "5m-45m";
   public name = "Short Term Reversal Strategy";
   public description = "Trade quick pullback reversals from EMA50 support or extension when RSI and Momentum indicate exhaustion.";
   public type = "Reversal";

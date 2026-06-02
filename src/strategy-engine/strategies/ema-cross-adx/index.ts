@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -20,6 +20,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class EMACrossADXStrategy implements TradingStrategy {
   public id = "ema-cross-adx";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "EMA Cross ADX Strategy";
   public description = "Trend-following strategy combining EMA20/EMA50 crossover with ADX strength filtering and MACD momentum confirmation.";
   public type = "Trend Following";

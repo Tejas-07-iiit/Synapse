@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -33,6 +33,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class T3NexusStrategy implements TradingStrategy {
   public id = "t3-nexus";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "T3 Nexus";
   public description = "Trend-following system using the Tillson T3 moving average with slope and acceleration indicators.";
   public type = "Trend Following";

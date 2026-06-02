@@ -1,3 +1,8 @@
+export enum TradingMode {
+  SCALPING = "SCALPING",
+  INTRADAY = "INTRADAY"
+}
+
 export interface Candle {
   time: number; // UTC timestamp in milliseconds
   open: number;
@@ -179,6 +184,8 @@ export interface TradingStrategy {
   enabled: boolean;
   indicatorsRequired: string[];
   supportedRegimes: string[];
+  category?: TradingMode;
+  expectedHoldingTime?: string;
 
   // Core Phase 4 methods
   analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[] };

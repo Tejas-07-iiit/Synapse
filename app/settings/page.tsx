@@ -49,11 +49,9 @@ export default function SettingsPage() {
   // Form states mapping directly to settings store (prefTimeframe removed)
   const [formData, setFormData] = useState({
     autoTrading: false,
-    riskPerTradePct: 2.0,
     maxOpenTrades: 3,
-    defaultSlPct: 1.5,
-    defaultTpPct: 3.0,
     prefSymbol: "BTCUSDT",
+    preferredTradingMode: "INTRADAY" as "SCALPING" | "INTRADAY",
   });
 
   useEffect(() => {
@@ -73,14 +71,12 @@ export default function SettingsPage() {
     if (!settings.loading && !settings.error) {
       setFormData({
         autoTrading: settings.autoTrading,
-        riskPerTradePct: settings.riskPerTradePct,
         maxOpenTrades: settings.maxOpenTrades,
-        defaultSlPct: settings.defaultSlPct,
-        defaultTpPct: settings.defaultTpPct,
         prefSymbol: settings.prefSymbol,
+        preferredTradingMode: settings.preferredTradingMode || "INTRADAY",
       });
     }
-  }, [settings.autoTrading, settings.riskPerTradePct, settings.maxOpenTrades, settings.defaultSlPct, settings.defaultTpPct, settings.prefSymbol, settings.loading, settings.error]);
+  }, [settings.autoTrading, settings.maxOpenTrades, settings.prefSymbol, settings.preferredTradingMode, settings.loading, settings.error]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -183,19 +179,18 @@ export default function SettingsPage() {
                     </select>
                   </div>
 
-                  {/* Target Risk per Trade (%) */}
+                  {/* Preferred Trading Mode Select */}
                   <div className="space-y-1.5">
-                    <label className="font-bold text-muted-foreground uppercase">Target Risk per Trade (%)</label>
-                    <input
-                      name="riskPerTradePct"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="10"
-                      value={formData.riskPerTradePct}
+                    <label className="font-bold text-muted-foreground uppercase">Preferred Trading Mode</label>
+                    <select
+                      name="preferredTradingMode"
+                      value={formData.preferredTradingMode}
                       onChange={handleChange}
                       className="w-full p-2.5 bg-secondary/50 border border-border rounded-xl text-foreground font-semibold focus:outline-none focus:border-primary"
-                    />
+                    >
+                      <option value="SCALPING">SCALPING (Fast 5m setups)</option>
+                      <option value="INTRADAY">INTRADAY (Standard 15m+ setups)</option>
+                    </select>
                   </div>
 
                   {/* Max Open Trades */}
@@ -213,35 +208,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  {/* Default Stop Loss % */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-muted-foreground uppercase">Default Stop Loss (%)</label>
-                    <input
-                      name="defaultSlPct"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="20"
-                      value={formData.defaultSlPct}
-                      onChange={handleChange}
-                      className="w-full p-2.5 bg-secondary/50 border border-border rounded-xl text-foreground font-semibold focus:outline-none focus:border-primary"
-                    />
-                  </div>
 
-                  {/* Default TP % */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-muted-foreground uppercase">Default Take Profit (%)</label>
-                    <input
-                      name="defaultTpPct"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="50"
-                      value={formData.defaultTpPct}
-                      onChange={handleChange}
-                      className="w-full p-2.5 bg-secondary/50 border border-border rounded-xl text-foreground font-semibold focus:outline-none focus:border-primary"
-                    />
-                  </div>
 
                   {/* Auto Trading Toggle */}
                   <div className="flex items-center justify-between p-2.5 bg-secondary/35 border border-border rounded-xl md:col-span-2">

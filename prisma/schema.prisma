@@ -39,6 +39,9 @@ model TradeSignal {
   blockReason      String?
   activePositionId String?
   
+  confidenceScore  Int?
+  marketRegime     String?
+  
   @@index([symbol, timeframe])
   @@index([strategyId])
   @@index([userId])
@@ -133,6 +136,10 @@ model Position {
   indicatorSnapshot Json?
   auditPayload      Json?
 
+  expiresAt         DateTime?
+  exitReason        String?
+  confidenceScore   Int?
+
   @@index([userId])
   @@index([symbol])
 }
@@ -176,6 +183,9 @@ model Trade {
   indicatorSnapshot Json?
   auditPayload      Json?
 
+  expiresAt         DateTime?
+  confidenceScore   Int?
+
   @@index([userId])
   @@index([symbol])
 }
@@ -205,6 +215,9 @@ model Signal {
   indicators   Json     // Store indicator snapshot at time of signal
   timestamp    DateTime
   createdAt    DateTime @default(now())
+
+  confidenceScore  Int?
+  marketRegime     String?
 
   @@index([symbol, timeframe])
   @@index([strategyId])
@@ -237,10 +250,14 @@ model UserSettings {
   userId           String   @unique
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   autoTrading      Boolean  @default(true)
-  riskPerTradePct  Float    @default(2.0)
   maxOpenTrades    Int      @default(3)
-  defaultSlPct     Float    @default(1.5)
-  defaultTpPct     Float    @default(3.0)
   prefSymbol       String   @default("BTCUSDT")
   updatedAt        DateTime @updatedAt
+
+  preferredTradingMode TradingMode @default(INTRADAY)
+}
+
+enum TradingMode {
+  SCALPING
+  INTRADAY
 }

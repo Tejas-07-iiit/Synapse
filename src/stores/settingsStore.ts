@@ -2,11 +2,9 @@ import { create } from "zustand";
 
 export interface UserSettings {
   autoTrading: boolean;
-  riskPerTradePct: number;
   maxOpenTrades: number;
-  defaultSlPct: number;
-  defaultTpPct: number;
   prefSymbol: string;
+  preferredTradingMode: "SCALPING" | "INTRADAY";
 }
 
 export interface SettingsState extends UserSettings {
@@ -19,11 +17,9 @@ export interface SettingsState extends UserSettings {
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   autoTrading: false,
-  riskPerTradePct: 2.0,
   maxOpenTrades: 3,
-  defaultSlPct: 1.5,
-  defaultTpPct: 3.0,
   prefSymbol: "BTCUSDT",
+  preferredTradingMode: "INTRADAY",
   loading: false,
   error: null,
 
@@ -35,11 +31,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       if (data.success && data.settings) {
         set({
           autoTrading: data.settings.autoTrading,
-          riskPerTradePct: data.settings.riskPerTradePct,
           maxOpenTrades: data.settings.maxOpenTrades,
-          defaultSlPct: data.settings.defaultSlPct,
-          defaultTpPct: data.settings.defaultTpPct,
           prefSymbol: data.settings.prefSymbol,
+          preferredTradingMode: data.settings.preferredTradingMode,
           loading: false,
         });
       } else {

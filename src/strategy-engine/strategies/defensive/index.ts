@@ -1,8 +1,10 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 export class DefensiveStrategy implements TradingStrategy {
   public id = "defensive";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Defensive Strategy";
   public description = "Trade ONLY high-probability trend continuation setups with strong filtering. Conservative and safety-oriented.";
   public type = "Defensive";

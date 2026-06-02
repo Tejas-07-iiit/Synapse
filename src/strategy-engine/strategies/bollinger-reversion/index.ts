@@ -1,9 +1,11 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class BollingerReversionStrategy implements TradingStrategy {
   public id = "bollinger-reversion";
+  public category: TradingMode = TradingMode.SCALPING;
+  public expectedHoldingTime = "5m-45m";
   public name = "Bollinger Reversion Strategy";
   public description = "Detect price exhaustion outside Bollinger Bands and trade reversions back toward equilibrium in ranging markets.";
   public type = "MeanReversion";

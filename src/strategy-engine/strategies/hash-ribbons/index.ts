@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -22,6 +22,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class HashRibbonsStrategy implements TradingStrategy {
   public id = "hash-ribbons";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Hash Ribbons Strategy";
   public description = "Detects Bitcoin miner capitulation and recovery using hashrate moving average crossovers for major bottom identification.";
   public type = "Sentiment";

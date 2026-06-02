@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
@@ -22,6 +22,8 @@ import { RegimeEngine } from "../../core/regime-engine";
  */
 export class MACrossoverVariableStrategy implements TradingStrategy {
   public id = "ma-crossover-var";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "MA Crossover Variable";
   public description = "Adaptive trend-following using EMA20/EMA50 crossovers filtered by SMA200 trend and slope.";
   public type = "Trend Following";

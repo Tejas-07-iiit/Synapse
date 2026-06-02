@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     const { action, data } = body;
 
     if (action === "open") {
-      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage, strategyId, strategyName, strategyCategory, entryReason, confidenceAtEntry, marketRegime, indicatorSnapshot, auditPayload } = data;
+      const { userId, symbol, direction, entryPrice, quantity, stopLoss, takeProfit, leverage, strategyId, strategyName, strategyCategory, entryReason, confidenceAtEntry, marketRegime, indicatorSnapshot, auditPayload, expiresAt, confidenceScore } = data;
 
       await ensureUserExists(userId);
 
@@ -157,6 +157,8 @@ export async function POST(request: Request) {
           marketRegime: marketRegime || null,
           indicatorSnapshot: indicatorSnapshot || null,
           auditPayload: finalAuditPayload,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          confidenceScore: confidenceScore || null,
         },
       });
 
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
           const finalLeverage = leverage || existingPos?.leverage || 1;
           const finalOpenedAt = data.openedAt ? new Date(data.openedAt) : (existingPos?.openedAt || new Date());
           const finalClosedAt = closedAt ? new Date(closedAt) : new Date();
+          const finalExitReason = data.exitReason || null;
 
           // 2. Update position to CLOSED
           await tx.position.update({
@@ -206,6 +209,7 @@ export async function POST(request: Request) {
               currentPrice: exitPrice,
               pnl,
               closedAt: finalClosedAt,
+              exitReason: finalExitReason || reason,
             },
           });
 
@@ -238,7 +242,6 @@ export async function POST(request: Request) {
           const finalConfidenceAtEntry = existingPos?.confidenceAtEntry || data.confidenceAtEntry || null;
           const finalMarketRegime = existingPos?.marketRegime || data.marketRegime || null;
           const finalIndicatorSnapshot = existingPos?.indicatorSnapshot || data.indicatorSnapshot || null;
-          const finalExitReason = data.exitReason || null;
 
           let finalAuditPayload = data.auditPayload || existingPos?.auditPayload || null;
           if (finalAuditPayload && typeof finalAuditPayload === "object") {
@@ -306,6 +309,8 @@ export async function POST(request: Request) {
               netPnl,
               feeRate: 0.001,
               auditPayload: finalAuditPayload,
+              expiresAt: existingPos?.expiresAt || null,
+              confidenceScore: existingPos?.confidenceScore || null,
             },
           });
 

@@ -1,4 +1,4 @@
-import { TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -21,6 +21,8 @@ import { SignalGenerator } from "../../core/signal-generator";
  */
 export class IchimokuCloudStrategy implements TradingStrategy {
   public id = "ichimoku-cloud";
+  public category: TradingMode = TradingMode.INTRADAY;
+  public expectedHoldingTime = "1h-8h";
   public name = "Ichimoku Cloud Strategy";
   public description = "Full Ichimoku Kinko Hyo with Tenkan/Kijun cross, cloud position, cloud colour, and Chikou Span confirmation.";
   public type = "Trend Following";

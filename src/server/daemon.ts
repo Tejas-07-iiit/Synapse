@@ -7,6 +7,15 @@ import { useMarketStore } from "../stores/marketStore";
 import { PerformanceWeightingEngine } from "../strategy-engine/core/performance-weighting";
 import { ConfidenceEngine } from "../strategy-engine/core/confidence-engine";
 import { AuditLogger } from "../lib/audit/trading-audit";
+import { strategyRegistry } from "../strategy-engine/core/registry";
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Daemon] Unhandled Promise Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[Daemon] Uncaught Exception thrown:", error);
+});
 
 const prisma = new PrismaClient();
 
@@ -18,40 +27,57 @@ async function runDaemon() {
   // 1. REGISTER DIRECT DATABASE HANDLER FOR PAPER TRADING ENGINE
   PaperTradingEngine.registerDbHandler({
     fetchActivePositions: async (userId: string) => {
-      return prisma.position.findMany({
-        where: { userId, status: "OPEN" },
-      });
+      try {
+        return await prisma.position.findMany({
+          where: { userId, status: "OPEN" },
+        });
+      } catch (err) {
+        console.error("[Daemon] fetchActivePositions DB Error:", err);
+        return [];
+      }
     },
     openPosition: async (data: any) => {
-      return prisma.position.create({
-        data: {
-          userId: data.userId,
-          symbol: data.symbol,
-          direction: data.direction,
-          entryPrice: data.entryPrice,
-          currentPrice: data.entryPrice,
-          quantity: data.quantity,
-          stopLoss: data.stopLoss,
-          takeProfit: data.takeProfit,
-          leverage: data.leverage,
-          pnl: 0.0,
-          status: "OPEN",
-          strategyId: data.strategyId || null,
-          strategyName: data.strategyName || null,
-          strategyCategory: data.strategyCategory || null,
-          entryReason: data.entryReason || null,
-          confidenceAtEntry: data.confidenceAtEntry || null,
-          marketRegime: data.marketRegime || null,
-          indicatorSnapshot: data.indicatorSnapshot || null,
-          auditPayload: data.auditPayload || null,
-        },
-      });
+      try {
+        return await prisma.position.create({
+          data: {
+            userId: data.userId,
+            symbol: data.symbol,
+            direction: data.direction,
+            entryPrice: data.entryPrice,
+            currentPrice: data.entryPrice,
+            quantity: data.quantity,
+            stopLoss: data.stopLoss,
+            takeProfit: data.takeProfit,
+            leverage: data.leverage,
+            pnl: 0.0,
+            status: "OPEN",
+            strategyId: data.strategyId || null,
+            strategyName: data.strategyName || null,
+            strategyCategory: data.strategyCategory || null,
+            entryReason: data.entryReason || null,
+            confidenceAtEntry: data.confidenceAtEntry || null,
+            marketRegime: data.marketRegime || null,
+            indicatorSnapshot: data.indicatorSnapshot || null,
+            auditPayload: data.auditPayload || null,
+            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+            confidenceScore: data.confidenceScore || null,
+          },
+        });
+      } catch (err) {
+        console.error("[Daemon] openPosition DB Error:", err);
+        return null;
+      }
     },
     updatePosition: async (id: string, currentPrice: number, pnl: number) => {
-      return prisma.position.update({
-        where: { id },
-        data: { currentPrice, pnl },
-      });
+      try {
+        return await prisma.position.update({
+          where: { id },
+          data: { currentPrice, pnl },
+        });
+      } catch (err) {
+        console.error("[Daemon] updatePosition DB Error:", err);
+        return null;
+      }
     },
     closePosition: async (data: any) => {
       const {
@@ -104,6 +130,7 @@ async function runDaemon() {
               currentPrice: exitPrice,
               pnl,
               closedAt: new Date(closedAt),
+              exitReason: exitReason || reason,
             },
           });
 
@@ -186,6 +213,8 @@ async function runDaemon() {
               netPnl,
               feeRate: 0.001,
               auditPayload: finalAuditPayload,
+              expiresAt: existingPos?.expiresAt || null,
+              confidenceScore: existingPos?.confidenceScore || null,
             },
           });
 
@@ -213,331 +242,318 @@ async function runDaemon() {
       PerformanceWeightingEngine.updatePerformanceScores().catch(() => {});
     },
     fetchWallet: async (userId: string) => {
-      return prisma.wallet.findUnique({
-        where: { userId },
-      });
+      try {
+        return await prisma.wallet.findUnique({
+          where: { userId },
+        });
+      } catch (err) {
+        console.error("[Daemon] fetchWallet DB Error:", err);
+        return null;
+      }
     },
   });
 
   // 2. REGISTER DIRECT DATABASE HANDLER FOR STRATEGY ENGINE
   strategyEngine.registerDbHandler({
     logStrategyRun: async (data: any) => {
-      const { strategyId, symbol, timeframe, result, durationMs } = data;
-      await prisma.strategyExecution.create({
-        data: {
-          strategyId,
-          symbol,
-          timeframe,
-          signalResult: result,
-          durationMs,
-          success: true,
-        },
-      });
-      await prisma.strategyResult.create({
-        data: {
-          strategyId,
-          symbol,
-          timeframe,
-          signalResult: result,
-          durationMs,
-          success: true,
-        },
-      });
+      try {
+        const { strategyId, symbol, timeframe, result, durationMs } = data;
+        await prisma.strategyExecution.create({
+          data: {
+            strategyId,
+            symbol,
+            timeframe,
+            signalResult: result,
+            durationMs,
+            success: true,
+          },
+        });
+        await prisma.strategyResult.create({
+          data: {
+            strategyId,
+            symbol,
+            timeframe,
+            signalResult: result,
+            durationMs,
+            success: true,
+          },
+        });
+      } catch (err) {
+        console.error("[Daemon] logStrategyRun DB Error:", err);
+      }
     },
     logSignals: async (signals: any[]) => {
-      for (const sig of signals) {
-        await prisma.tradeSignal.create({
-          data: {
-            symbol: sig.symbol,
-            timeframe: sig.timeframe,
-            strategyId: sig.strategyId,
-            direction: sig.signal,
-            confidence: sig.confidence,
-            entry: sig.entry,
-            stopLoss: sig.stopLoss,
-            takeProfit: sig.takeProfit,
-            timestamp: new Date(sig.timestamp),
-            reasoning: sig.reasoning,
-          },
-        });
-
-        await prisma.strategy.upsert({
-          where: { id: sig.strategyId },
-          update: {},
-          create: {
-            id: sig.strategyId,
-            name: sig.strategyName || "AI Strategy",
-            description: "Auto-registered strategy profile.",
-            enabled: true,
-          },
-        });
-
-        await prisma.signal.create({
-          data: {
-            strategyId: sig.strategyId,
-            symbol: sig.symbol,
-            timeframe: sig.timeframe,
-            signalType: sig.signal,
-            confidence: sig.confidence,
-            entry: sig.entry,
-            stopLoss: sig.stopLoss,
-            takeProfit: sig.takeProfit,
-            reasoning: sig.reasoning,
-            indicators: {
-              ...(sig.indicators || {}),
-              marketContext: sig.marketContext || {},
+      try {
+        for (const sig of signals) {
+          await prisma.tradeSignal.create({
+            data: {
+              symbol: sig.symbol,
+              timeframe: sig.timeframe,
+              strategyId: sig.strategyId,
+              direction: sig.signal,
+              confidence: sig.confidence,
+              entry: sig.entry,
+              stopLoss: sig.stopLoss,
+              takeProfit: sig.takeProfit,
+              timestamp: new Date(sig.timestamp),
+              reasoning: sig.reasoning,
             },
-            timestamp: new Date(sig.timestamp),
-          },
-        });
+          });
 
-        await prisma.signalLog.create({
-          data: {
-            symbol: sig.symbol,
-            timeframe: sig.timeframe,
-            strategyId: sig.strategyId,
-            direction: sig.signal,
-            confidence: sig.confidence,
-            reasoning: sig.reasoning,
-            indicators: {
-              ...(sig.indicators || {}),
-              marketContext: sig.marketContext || {},
+          await prisma.strategy.upsert({
+            where: { id: sig.strategyId },
+            update: {},
+            create: {
+              id: sig.strategyId,
+              name: sig.strategyName || "AI Strategy",
+              description: "Auto-registered strategy profile.",
+              enabled: true,
             },
-            timestamp: new Date(sig.timestamp),
-          },
-        });
+          });
+
+          await prisma.signal.create({
+            data: {
+              strategyId: sig.strategyId,
+              symbol: sig.symbol,
+              timeframe: sig.timeframe,
+              signalType: sig.signal,
+              confidence: sig.confidence,
+              entry: sig.entry,
+              stopLoss: sig.stopLoss,
+              takeProfit: sig.takeProfit,
+              reasoning: sig.reasoning,
+              indicators: {
+                ...(sig.indicators || {}),
+                marketContext: sig.marketContext || {},
+              },
+              timestamp: new Date(sig.timestamp),
+            },
+          });
+
+          await prisma.signalLog.create({
+            data: {
+              symbol: sig.symbol,
+              timeframe: sig.timeframe,
+              strategyId: sig.strategyId,
+              direction: sig.signal,
+              confidence: sig.confidence,
+              reasoning: sig.reasoning,
+              indicators: {
+                ...(sig.indicators || {}),
+                marketContext: sig.marketContext || {},
+              },
+              timestamp: new Date(sig.timestamp),
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[Daemon] logSignals DB Error:", err);
       }
     },
     logIndicatorSnapshot: async (data: any) => {
-      const { symbol, timeframe, timestamp, indicators } = data;
-      const idx = indicators.rsi.length - 1;
-      if (idx >= 0) {
-        await prisma.indicatorSnapshot.create({
-          data: {
-            symbol,
-            timeframe,
-            timestamp: new Date(timestamp),
-            rsi: indicators.rsi[idx],
-            ema12: indicators.ema12[idx],
-            ema26: indicators.ema26[idx],
-            ema20: indicators.ema20[idx],
-            sma50: indicators.sma50[idx],
-            macdLine: indicators.macdLine[idx],
-            signalLine: indicators.signalLine[idx],
-            macdHist: indicators.macdHist[idx],
-            bbUpper: indicators.bbUpper[idx],
-            bbMiddle: indicators.bbMiddle[idx],
-            bbLower: indicators.bbLower[idx],
-            atr: indicators.atr[idx],
-            vwap: indicators.vwap[idx],
-            volume: indicators.volumeMA[idx],
-          },
-        });
+      try {
+        const { symbol, timeframe, timestamp, indicators } = data;
+        const idx = indicators.rsi.length - 1;
+        if (idx >= 0) {
+          await prisma.indicatorSnapshot.create({
+            data: {
+              symbol,
+              timeframe,
+              timestamp: new Date(timestamp),
+              rsi: indicators.rsi[idx],
+              ema12: indicators.ema12[idx],
+              ema26: indicators.ema26[idx],
+              ema20: indicators.ema20[idx],
+              sma50: indicators.sma50[idx],
+              macdLine: indicators.macdLine[idx],
+              signalLine: indicators.signalLine[idx],
+              macdHist: indicators.macdHist[idx],
+              bbUpper: indicators.bbUpper[idx],
+              bbMiddle: indicators.bbMiddle[idx],
+              bbLower: indicators.bbLower[idx],
+              atr: indicators.atr[idx],
+              vwap: indicators.vwap[idx],
+              volume: indicators.volumeMA[idx],
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[Daemon] logIndicatorSnapshot DB Error:", err);
       }
     },
   });
 
   // 3. MULTI-USER AUTONOMOUS ORDER EXECUTION SYSTEM
   strategyEngine.registerCallback(async (symbol, timeframe, regime, signals, indicators, rawSignals) => {
-    const sym = symbol.toUpperCase();
-    const tf = timeframe.toLowerCase();
+    try {
+      const sym = symbol.toUpperCase();
+      const tf = timeframe.toLowerCase();
 
-    // Query database for all users that have autoTrading enabled
-    const usersWithAuto = await prisma.userSettings.findMany({
-      where: { autoTrading: true },
-      include: { user: true },
-    });
+      // Query database for all users that have autoTrading enabled
+      const usersWithAuto = await prisma.userSettings.findMany({
+        where: { autoTrading: true },
+        include: { user: true },
+      });
 
-    // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
-    const blockedRaw = (rawSignals || []).filter(r => r.blocked);
-    for (const rawSig of blockedRaw) {
-      for (const settings of usersWithAuto) {
-        try {
-          await prisma.tradeSignal.create({
-            data: {
-              symbol: sym,
-              timeframe: tf,
-              strategyId: rawSig.strategyId,
-              direction: rawSig.signalType || rawSig.signal,
-              confidence: rawSig.confidence,
-              entry: rawSig.entry,
-              stopLoss: rawSig.stopLoss || 0,
-              takeProfit: rawSig.takeProfit || 0,
-              timestamp: new Date(rawSig.timestamp),
-              reasoning: rawSig.reasoning,
-              userId: settings.userId,
-              blocked: true,
-              blockReason: rawSig.blockReason || "Strategy rejected by prioritization manager.",
-            }
-          });
-        } catch (dbErr) {
-          console.error("[Daemon] Failed to log prioritization rejection to DB:", dbErr);
+      // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
+      const blockedRaw = (rawSignals || []).filter(r => r.blocked);
+      for (const rawSig of blockedRaw) {
+        for (const settings of usersWithAuto) {
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: rawSig.strategyId,
+                direction: rawSig.signalType || rawSig.signal,
+                confidence: rawSig.confidence,
+                entry: rawSig.entry,
+                stopLoss: rawSig.stopLoss || 0,
+                takeProfit: rawSig.takeProfit || 0,
+                timestamp: new Date(rawSig.timestamp),
+                reasoning: rawSig.reasoning,
+                userId: settings.userId,
+                blocked: true,
+                blockReason: rawSig.blockReason || "Strategy rejected by prioritization manager.",
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log prioritization rejection to DB:", dbErr);
+          }
         }
       }
-    }
 
-    for (const sig of signals) {
-      if (sig.signal !== "LONG" && sig.signal !== "SHORT") {
+      // Process for each user independently
+      for (const settings of usersWithAuto) {
+        const userId = settings.userId;
+        const userMode = settings.preferredTradingMode; // "SCALPING" | "INTRADAY"
+
+        // Sync active positions from DB to memory for this user to ensure manual closures on the frontend are reflected
+        try {
+          await PaperTradingEngine.loadActivePositions(userId);
+        } catch (err) {
+          console.error(`[Daemon] Failed to sync active positions for user ${userId} in callback:`, err);
+        }
+
+      // 1. Filter signals matching preferredTradingMode
+      const matchedSignals = signals.filter(sig => {
+        if (sig.signal !== "LONG" && sig.signal !== "SHORT") return false;
+        const strat = strategyRegistry.getStrategy(sig.strategyId);
+        return strat?.category === userMode;
+      });
+
+      if (matchedSignals.length === 0) {
         continue;
       }
 
-      AuditLogger.logSignalGenerated({
-        strategyId: sig.strategyId,
-        strategyName: sig.strategyName || "Unknown Strategy",
-        symbol: sym,
-        timeframe: tf,
-        confidence: sig.confidence,
-        direction: sig.signal,
-        regime: regime
+      // 2. Rank signals
+      const rankedSignals = matchedSignals.map(sig => {
+        const strat = strategyRegistry.getStrategy(sig.strategyId);
+        const stats = PerformanceWeightingEngine.getStats(sig.strategyId);
+        const profitFactor = stats ? stats.profitFactor : 1.0;
+        const winRate = stats ? stats.winRate : 0.50;
+
+        const lastVal = (arr?: number[]) => {
+          if (!arr || arr.length === 0) return 0;
+          return arr[arr.length - 1];
+        };
+
+        const candlesCache = useMarketStore.getState().allCandles[`${sym}_${tf}`] || [];
+        const tickerCache = useMarketStore.getState().tickerData[sym] || null;
+        const stratContext = {
+          symbol: sym,
+          timeframe: tf,
+          candles: candlesCache,
+          indicators,
+          ticker: tickerCache
+        };
+
+        const lastCandle = candlesCache[candlesCache.length - 1];
+        const lastVol = lastCandle ? lastCandle.volume : 0;
+        const lastVolMA = lastVal(indicators.volumeMA) || 0;
+        const volumeRatio = lastVolMA > 0 ? Number((lastVol / lastVolMA).toFixed(2)) : 1.0;
+
+        // System-managed ATR stop loss and take profit multipliers
+        const lastIdx = indicators.atr ? indicators.atr.length - 1 : -1;
+        const atrVal = (lastIdx >= 0 && indicators.atr[lastIdx]) ? indicators.atr[lastIdx] : (sig.entry * 0.015);
+
+        const slMult = userMode === "SCALPING" ? 0.8 : 1.5;
+        const tpMult = userMode === "SCALPING" ? 1.2 : 3.0;
+
+        const atrSlDist = slMult * atrVal;
+        const atrTpDist = tpMult * atrVal;
+
+        const direction = sig.signal;
+        const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
+        const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
+
+        const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
+        const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
+
+        const risk = Math.abs(sig.entry - finalSl);
+        const reward = Math.abs(finalTp - sig.entry);
+        const riskRewardRatio = risk > 0 ? reward / risk : 1.5;
+
+        // Confidence calculation
+        const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
+        const confidenceScore = detailedConf.finalScore;
+
+        // Regime compatibility
+        const category = sig.strategyCategory || "Central Engine";
+        const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
+        const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
+        const isBreakoutStrat = category === "Breakout" || category === "Volatility";
+        const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
+
+        let regimeMatch = false;
+        if (regime === "TRENDING" && isTrendingStrat) regimeMatch = true;
+        else if ((regime === "RANGING" || regime === "LOW_VOLATILITY") && isMeanReversionStrat) regimeMatch = true;
+        else if (regime === "HIGH_VOLATILITY" && isBreakoutStrat) regimeMatch = true;
+
+        return {
+          sig,
+          confidenceScore,
+          profitFactor,
+          winRate,
+          regimeMatch,
+          riskRewardRatio,
+          finalSl,
+          finalTp,
+          detailedConf,
+          volumeRatio,
+          lastVol,
+          candlesCache,
+          tickerCache,
+          stratContext
+        };
       });
 
-      // Generate Entry Audit Payload
-      const lastVal = (arr?: number[]) => {
-        if (!arr || arr.length === 0) return 0;
-        return arr[arr.length - 1];
-      };
+      // Sort signals by:
+      // 1. Confidence Score
+      // 2. Profit Factor
+      // 3. Win Rate
+      // 4. Regime Match
+      // 5. Risk/Reward Ratio
+      rankedSignals.sort((a, b) => {
+        if (b.confidenceScore !== a.confidenceScore) {
+          return b.confidenceScore - a.confidenceScore;
+        }
+        if (b.profitFactor !== a.profitFactor) {
+          return b.profitFactor - a.profitFactor;
+        }
+        if (b.winRate !== a.winRate) {
+          return b.winRate - a.winRate;
+        }
+        if (a.regimeMatch !== b.regimeMatch) {
+          return a.regimeMatch ? -1 : 1; // True first
+        }
+        return b.riskRewardRatio - a.riskRewardRatio;
+      });
 
-      const candlesCache = useMarketStore.getState().allCandles[`${sym}_${tf}`] || [];
-      const tickerCache = useMarketStore.getState().tickerData[sym] || null;
-      const stratContext = {
-        symbol: sym,
-        timeframe: tf,
-        candles: candlesCache,
-        indicators,
-        ticker: tickerCache
-      };
-      
-      const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
-
-      const lastCandle = candlesCache[candlesCache.length - 1];
-      const lastVol = lastCandle ? lastCandle.volume : 0;
-      const lastVolMA = lastVal(indicators.volumeMA) || 0;
-      const volumeRatio = lastVolMA > 0 ? Number((lastVol / lastVolMA).toFixed(2)) : 1.0;
-
-      const competitionList = (rawSignals || []).map(r => {
-        return {
-          strategyId: r.strategyId,
-          strategyName: r.strategyName || r.strategyId,
-          confidence: r.confidence,
-          direction: r.signal,
-          reasoning: r.reasoning
-        };
-      }).sort((a, b) => b.confidence - a.confidence);
-
-      const otherStrategiesLost = (rawSignals || [])
-        .filter(r => r.strategyId !== sig.strategyId)
-        .map(r => {
-          let reason = "Signal did not match winning direction or had lower confidence score.";
-          if (r.signal === "HOLD") {
-            reason = "Strategy generated a HOLD signal (neutral outlook).";
-          } else if (r.signal !== sig.signal) {
-            reason = `Strategy proposed a ${r.signal} signal, which conflicted with the winning ${sig.signal} direction.`;
-          } else {
-            reason = `Proposed a ${r.signal} signal with ${r.confidence}% confidence, but was out-prioritized.`;
-          }
-          return {
-            strategyId: r.strategyId,
-            strategyName: r.strategyName || r.strategyId,
-            confidence: r.confidence,
-            direction: r.signal,
-            reason
-          };
-        });
-
-      // Calculate final TP and SL to be used in trade plan
-      const atrVal = (lastVal(indicators.atr)) || (sig.entry * 0.015);
-      const category = sig.strategyCategory || "Central Engine";
-      const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
-      const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
-      const isBreakoutStrat = category === "Breakout" || category === "Volatility";
-
-      let slMult = 2.0;
-      let tpMult = 4.0;
-      if (isTrendingStrat) {
-        slMult = 2.5;
-        tpMult = 5.0;
-      } else if (isBreakoutStrat) {
-        slMult = 2.0;
-        tpMult = 4.0;
-      } else if (isMeanReversionStrat) {
-        slMult = 1.5;
-        tpMult = 3.0;
-      }
-
-      const atrSlDist = slMult * atrVal;
-      const atrTpDist = tpMult * atrVal;
-
-      const atrSl = sig.signal === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
-      const atrTp = sig.signal === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
-
-      const finalSl = atrSl > 0 ? atrSl : (sig.signal === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
-      const finalTp = atrTp > 0 ? atrTp : (sig.signal === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
-
-      const risk = Math.abs(sig.entry - finalSl);
-      const reward = Math.abs(finalTp - sig.entry);
-      const riskRewardRatio = risk > 0 ? Number((reward / risk).toFixed(2)) : 1.5;
-
-      const entryAuditPayload = {
-        marketSnapshot: {
-          asset: sym,
-          timeframe: tf,
-          regime: regime || "UNKNOWN",
-          volatility: lastVal(indicators.atr),
-          volume: lastVol,
-          trendStrength: lastVal(indicators.adx),
-          summary: `Market regime classified as ${regime} with ${lastVal(indicators.adx) > 25 ? "strong" : "weak"} trend strength and ATR of ${lastVal(indicators.atr).toFixed(4)}.`
-        },
-        strategyCompetition: competitionList.length > 0 ? competitionList : [
-          { strategyId: sig.strategyId, strategyName: sig.strategyName || sig.strategyId, confidence: sig.confidence, direction: sig.signal, reasoning: sig.reasoning }
-        ],
-        winningStrategy: {
-          strategyId: sig.strategyId,
-          strategyName: sig.strategyName || sig.strategyId,
-          confidence: sig.confidence,
-          selectionReason: sig.reasoning ? sig.reasoning.join(". ") : "Highest confidence score with regime alignment."
-        },
-        confidenceBreakdown: {
-          trendScore: detailedConf.trendScore,
-          momentumScore: detailedConf.momentumScore,
-          volumeScore: detailedConf.volumeScore,
-          regimeScore: detailedConf.regimeScore,
-          confirmScore: detailedConf.confirmScore,
-          perfBoost: detailedConf.perfBoost,
-          finalScore: detailedConf.finalScore
-        },
-        tradeEvidence: {
-          rsi: lastVal(indicators.rsi),
-          ema20: lastVal(indicators.ema20),
-          sma50: lastVal(indicators.sma50),
-          macdHist: lastVal(indicators.macdHist),
-          adx: lastVal(indicators.adx),
-          atr: lastVal(indicators.atr),
-          volumeRatio
-        },
-        tradePlan: {
-          direction: sig.signal,
-          entryPrice: sig.entry,
-          stopLoss: finalSl,
-          takeProfit: finalTp,
-          riskRewardRatio,
-          sizeUsdt: 0,
-          quantity: 0
-        },
-        executionCosts: {
-          entryFee: 0,
-          exitFee: 0,
-          totalFees: 0,
-          grossPnl: 0,
-          netPnl: 0
-        },
-        otherStrategiesLost,
-        executiveSummary: `A autonomous ${sig.signal} position was opened on ${sym} at $${sig.entry}. Winning strategy ${sig.strategyName || sig.strategyId} achieved confidence score of ${sig.confidence}% in a ${regime} market structure.`
-      };
-
-      (sig as any).auditPayload = entryAuditPayload;
-
-      for (const settings of usersWithAuto) {
-        const userId = settings.userId;
+      // Now process each ranked signal for this user
+      for (const ranked of rankedSignals) {
+        const { sig, confidenceScore, finalSl, finalTp, riskRewardRatio, detailedConf, volumeRatio, lastVol } = ranked;
+        const direction = sig.signal as "LONG" | "SHORT";
 
         // Load wallet balance
         const wallet = await prisma.wallet.findUnique({ where: { userId } });
@@ -561,8 +577,8 @@ async function runDaemon() {
                 direction: sig.signal,
                 confidence: sig.confidence,
                 entry: sig.entry,
-                stopLoss: sig.stopLoss || 0,
-                takeProfit: sig.takeProfit || 0,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
@@ -589,8 +605,8 @@ async function runDaemon() {
                 direction: sig.signal,
                 confidence: sig.confidence,
                 entry: sig.entry,
-                stopLoss: sig.stopLoss || 0,
-                takeProfit: sig.takeProfit || 0,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
                 timestamp: new Date(sig.timestamp),
                 reasoning: sig.reasoning,
                 userId: userId,
@@ -640,8 +656,8 @@ async function runDaemon() {
                   direction: sig.signal,
                   confidence: sig.confidence,
                   entry: sig.entry,
-                  stopLoss: sig.stopLoss || 0,
-                  takeProfit: sig.takeProfit || 0,
+                  stopLoss: finalSl,
+                  takeProfit: finalTp,
                   timestamp: new Date(sig.timestamp),
                   reasoning: sig.reasoning,
                   userId: userId,
@@ -656,42 +672,124 @@ async function runDaemon() {
           }
         }
 
-        // C. Set strategy-specific ATR-based Stop Loss & Take Profit boundaries
-        const direction: "LONG" | "SHORT" = sig.signal;
-        
-        // Retrieve real-time ATR value for the current symbol
-        const lastIdx = indicators.atr ? indicators.atr.length - 1 : -1;
-        const atrVal = (lastIdx >= 0 && indicators.atr[lastIdx]) ? indicators.atr[lastIdx] : (sig.entry * 0.015);
-
-        const category = sig.strategyCategory || "Central Engine";
-        const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
-        const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
-        const isBreakoutStrat = category === "Breakout" || category === "Volatility";
-
-        let slMult = 2.0;
-        let tpMult = 4.0;
-        if (isTrendingStrat) {
-          slMult = 2.5;
-          tpMult = 5.0;
-        } else if (isBreakoutStrat) {
-          slMult = 2.0;
-          tpMult = 4.0;
-        } else if (isMeanReversionStrat) {
-          slMult = 1.5;
-          tpMult = 3.0;
+        // C. Check one-trade-per-strategy protection
+        const hasStratPosition = PaperTradingEngine.getOpenPositions().some(
+          (p) => p.userId === userId && p.status === "OPEN" && p.strategyId === sig.strategyId && sig.strategyId !== "manual"
+        );
+        if (hasStratPosition) {
+          const reason = `STRATEGY LIMIT: Active position already exists generated by strategy ${sig.strategyId}.`;
+          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: reason,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log strategy limit rejection to DB:", dbErr);
+          }
+          continue;
         }
 
-        const atrSlDist = slMult * atrVal;
-        const atrTpDist = tpMult * atrVal;
+        // Calculate daily drawdown and dynamic sizing beforehand
+        let dailyDrawdownPercent = 0;
+        try {
+          const startOfToday = new Date();
+          startOfToday.setUTCHours(0, 0, 0, 0);
+          const closedTradesToday = await prisma.trade.findMany({
+            where: { userId, closedAt: { gte: startOfToday } },
+            select: { netPnl: true }
+          });
+          const closedPnlToday = closedTradesToday.reduce((sum, t) => sum + t.netPnl, 0);
+          const openPositions = Array.from(PaperTradingEngine.getOpenPositions()).filter(p => p.userId === userId);
+          const floatingPnl = openPositions.reduce((sum, p) => sum + p.pnl, 0);
+          const totalDailyPnl = closedPnlToday + floatingPnl;
+          const startOfDayBalance = wallet.balance - closedPnlToday;
+          if (startOfDayBalance > 0 && totalDailyPnl < 0) {
+            dailyDrawdownPercent = (Math.abs(totalDailyPnl) / startOfDayBalance) * 100;
+          }
+        } catch (e) {}
 
-        const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
-        const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
+        const hasCorrelatedPosition = PaperTradingEngine.getOpenPositions().some(
+          (p) => p.userId === userId && p.status === "OPEN" && p.direction === direction && p.symbol !== sym
+        );
 
-        // Fallbacks if ATR SL/TP is not computed properly or is invalid
-        const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
-        const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
+        let pct = 5;
+        if (confidenceScore < 60) {
+          pct = 5 + (confidenceScore / 60) * 5;
+        } else if (confidenceScore <= 80) {
+          pct = 10 + ((confidenceScore - 60) / 20) * 15;
+        } else {
+          pct = 25 + ((confidenceScore - 80) / 20) * 5;
+        }
 
-        // D. Check Max Open Trades Limit (Risk Manager Check)
+        // Safety Rules for >30% sizing (Confidence > 90)
+        if (confidenceScore > 90) {
+          const isSafetyMet =
+            regime === "TRENDING" &&
+            dailyDrawdownPercent < 2 &&
+            !hasCorrelatedPosition;
+
+          if (isSafetyMet) {
+            pct = 30 + ((confidenceScore - 90) / 10) * 20;
+          } else {
+            pct = 30; // clamp to recommended max of 30% if safety is not met
+          }
+        }
+
+        pct = Math.min(50, Math.max(5, pct));
+        const estimatedSizeUsdt = wallet.balance * (pct / 100);
+
+        // D. Check correlation risk filter
+        const correlatedExposureUsdt = PaperTradingEngine.getOpenPositions()
+          .filter((p) => p.userId === userId && p.status === "OPEN" && p.direction === direction && p.symbol !== sym)
+          .reduce((sum, p) => sum + (p.entryPrice * p.quantity), 0);
+        const totalCorrelatedExposure = correlatedExposureUsdt + estimatedSizeUsdt;
+
+        const correlationBlocked = hasCorrelatedPosition && (
+          confidenceScore < 90 || totalCorrelatedExposure > wallet.balance * 0.50
+        );
+
+        if (correlationBlocked) {
+          const reason = `CORRELATION LIMIT: Already have open correlated positions and either confidence is too low (< 90) or total exposure would exceed 50% ($${totalCorrelatedExposure.toFixed(2)} > $${(wallet.balance * 0.50).toFixed(2)}).`;
+          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: reason,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log correlation limit rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
+        // E. Check Max Open Trades Limit
         const userActivePositionsCount = PaperTradingEngine.getOpenPositions().filter(p => p.userId === userId).length;
         if (userActivePositionsCount >= settings.maxOpenTrades) {
           const reason = `RISK MANAGEMENT BLOCK: Max open positions limit reached (${settings.maxOpenTrades}).`;
@@ -720,13 +818,13 @@ async function runDaemon() {
           continue;
         }
 
-        // E. Check Insufficient Margin (Risk Manager Check)
-        const dummyOrderQty = (wallet.balance * (settings.riskPerTradePct / 100)) / sig.entry;
-        const requiredMargin = dummyOrderQty * sig.entry;
+        // F. Check Insufficient Margin
+        const requiredMargin = estimatedSizeUsdt;
         const usedMargin = PaperTradingEngine.getOpenPositions()
           .filter(p => p.status === "OPEN" && p.userId === userId)
           .reduce((sum, p) => sum + (p.entryPrice * p.quantity) / p.leverage, 0);
         const availableBalance = wallet.balance - usedMargin;
+
         if (requiredMargin > availableBalance) {
           const reason = `RISK MANAGEMENT BLOCK: Insufficient margin (Required: $${requiredMargin.toFixed(2)}, Available: $${availableBalance.toFixed(2)}).`;
           AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
@@ -754,27 +852,125 @@ async function runDaemon() {
           continue;
         }
 
+        // Construct final audit payload for this user's execution
+        const lastVal = (arr?: number[]) => {
+          if (!arr || arr.length === 0) return 0;
+          return arr[arr.length - 1];
+        };
+        const competitionList = (rawSignals || []).map(r => {
+          return {
+            strategyId: r.strategyId,
+            strategyName: r.strategyName || r.strategyId,
+            confidence: r.confidence,
+            direction: r.signal,
+            reasoning: r.reasoning
+          };
+        }).sort((a, b) => b.confidence - a.confidence);
+
+        const otherStrategiesLost = (rawSignals || [])
+          .filter(r => r.strategyId !== sig.strategyId)
+          .map(r => {
+            let reason = "Signal did not match winning direction or had lower confidence score.";
+            if (r.signal === "HOLD") {
+              reason = "Strategy generated a HOLD signal (neutral outlook).";
+            } else if (r.signal !== sig.signal) {
+              reason = `Strategy proposed a ${r.signal} signal, which conflicted with the winning ${sig.signal} direction.`;
+            } else {
+              reason = `Proposed a ${r.signal} signal with ${r.confidence}% confidence, but was out-prioritized.`;
+            }
+            return {
+              strategyId: r.strategyId,
+              strategyName: r.strategyName || r.strategyId,
+              confidence: r.confidence,
+              direction: r.signal,
+              reason
+            };
+          });
+
+        const entryAuditPayload = {
+          marketSnapshot: {
+            asset: sym,
+            timeframe: tf,
+            regime: regime || "UNKNOWN",
+            volatility: lastVal(indicators.atr),
+            volume: lastVol,
+            trendStrength: lastVal(indicators.adx),
+            summary: `Market regime classified as ${regime} with ${lastVal(indicators.adx) > 25 ? "strong" : "weak"} trend strength and ATR of ${lastVal(indicators.atr).toFixed(4)}.`
+          },
+          strategyCompetition: competitionList.length > 0 ? competitionList : [
+            { strategyId: sig.strategyId, strategyName: sig.strategyName || sig.strategyId, confidence: sig.confidence, direction: sig.signal, reasoning: sig.reasoning }
+          ],
+          winningStrategy: {
+            strategyId: sig.strategyId,
+            strategyName: sig.strategyName || sig.strategyId,
+            confidence: sig.confidence,
+            selectionReason: sig.reasoning ? sig.reasoning.join(". ") : "Highest confidence score with regime alignment."
+          },
+          confidenceBreakdown: {
+            trendScore: detailedConf.trendScore,
+            momentumScore: detailedConf.momentumScore,
+            volumeScore: detailedConf.volumeScore,
+            regimeScore: detailedConf.regimeScore,
+            confirmScore: detailedConf.confirmScore,
+            perfBoost: detailedConf.perfBoost,
+            finalScore: detailedConf.finalScore
+          },
+          tradeEvidence: {
+            rsi: lastVal(indicators.rsi),
+            ema20: lastVal(indicators.ema20),
+            sma50: lastVal(indicators.sma50),
+            macdHist: lastVal(indicators.macdHist),
+            adx: lastVal(indicators.adx),
+            atr: lastVal(indicators.atr),
+            volumeRatio
+          },
+          tradePlan: {
+            direction: sig.signal,
+            entryPrice: sig.entry,
+            stopLoss: finalSl,
+            takeProfit: finalTp,
+            riskRewardRatio,
+            sizeUsdt: estimatedSizeUsdt,
+            quantity: estimatedSizeUsdt / sig.entry
+          },
+          executionCosts: {
+            entryFee: 0,
+            exitFee: 0,
+            totalFees: 0,
+            grossPnl: 0,
+            netPnl: 0
+          },
+          otherStrategiesLost,
+          executiveSummary: `An autonomous ${sig.signal} position was opened on ${sym} at $${sig.entry}. Winning strategy ${sig.strategyName || sig.strategyId} achieved confidence score of ${confidenceScore}% in a ${regime} market structure under ${userMode} mode.`
+        };
+
+        const enrichedSig = {
+          ...sig,
+          confidence: confidenceScore,
+          auditPayload: entryAuditPayload
+        };
+
         try {
           const position = await PaperTradingEngine.openPosition(
             userId,
             sym,
             direction,
             sig.entry,
-            null, // Auto-size based on risk settings and wallet balance
+            null, // Auto-size based on confidence
             finalSl,
             finalTp,
             1, // 1x leverage
-            wallet.balance, // explicitBalance
+            wallet.balance,
             {
               autoTrading: settings.autoTrading,
               maxOpenTrades: settings.maxOpenTrades,
-              riskPerTradePct: settings.riskPerTradePct,
-            }, // explicitSettings
-            sig // Pass signal context
+              preferredTradingMode: userMode,
+            },
+            enrichedSig
           );
 
           if (position) {
-            console.log(`[MULTI-TENANT DEBUG] TRADE GENERATED -> userId: ${userId}, strategyId: ${sig.strategyId}, positionId: ${position.id}, symbol: ${sym}, side: ${direction}, entry: ${sig.entry}, sizeUsdt: ${wallet.balance * (settings.riskPerTradePct / 100)}`);
+            console.log(`[MULTI-TENANT DEBUG] TRADE GENERATED -> userId: ${userId}, strategyId: ${sig.strategyId}, positionId: ${position.id}, symbol: ${sym}, side: ${direction}, entry: ${sig.entry}, sizeUsdt: ${estimatedSizeUsdt}`);
             AuditLogger.logTradeExecuted({
               userId,
               symbol: sym,
@@ -784,7 +980,7 @@ async function runDaemon() {
               tp: finalTp,
               quantity: position.quantity,
               strategyName: sig.strategyName || "Unknown Strategy",
-              confidence: sig.confidence
+              confidence: confidenceScore
             });
 
             // Log successful execution to TradeSignal DB
@@ -795,7 +991,7 @@ async function runDaemon() {
                   timeframe: tf,
                   strategyId: sig.strategyId,
                   direction: sig.signal,
-                  confidence: sig.confidence,
+                  confidence: confidenceScore,
                   entry: sig.entry,
                   stopLoss: finalSl,
                   takeProfit: finalTp,
@@ -804,6 +1000,8 @@ async function runDaemon() {
                   userId: userId,
                   blocked: false,
                   activePositionId: position.id,
+                  confidenceScore: confidenceScore,
+                  marketRegime: regime,
                 }
               });
             } catch (dbErr) {
@@ -814,6 +1012,9 @@ async function runDaemon() {
           AuditLogger.logSystemError({ module: "Daemon", message: `Autonomous trade placement failed for user ${userId}`, errorDetails: err });
         }
       }
+    }
+    } catch (err) {
+      console.error("[Daemon] Fatal error in strategyEngine callback:", err);
     }
   });
 

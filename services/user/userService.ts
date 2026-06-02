@@ -30,6 +30,7 @@ export async function ensureUserExists(userId: string) {
             maxOpenTrades: 3,
             prefSymbol: "BTCUSDT",
             preferredTradingMode: "INTRADAY",
+            riskPerTradePct: 2.0,
           }
         }
       },

@@ -52,6 +52,7 @@ export default function SettingsPage() {
     maxOpenTrades: 3,
     prefSymbol: "BTCUSDT",
     preferredTradingMode: "INTRADAY" as "SCALPING" | "INTRADAY",
+    riskPerTradePct: 2.0,
   });
 
   useEffect(() => {
@@ -74,9 +75,10 @@ export default function SettingsPage() {
         maxOpenTrades: settings.maxOpenTrades,
         prefSymbol: settings.prefSymbol,
         preferredTradingMode: settings.preferredTradingMode || "INTRADAY",
+        riskPerTradePct: settings.riskPerTradePct || 2.0,
       });
     }
-  }, [settings.autoTrading, settings.maxOpenTrades, settings.prefSymbol, settings.preferredTradingMode, settings.loading, settings.error]);
+  }, [settings.autoTrading, settings.maxOpenTrades, settings.prefSymbol, settings.preferredTradingMode, settings.riskPerTradePct, settings.loading, settings.error]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;

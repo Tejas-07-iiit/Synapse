@@ -252,6 +252,7 @@ model UserSettings {
   autoTrading      Boolean  @default(true)
   maxOpenTrades    Int      @default(3)
   prefSymbol       String   @default("BTCUSDT")
+  riskPerTradePct  Float    @default(2.0)
   updatedAt        DateTime @updatedAt
 
   preferredTradingMode TradingMode @default(INTRADAY)

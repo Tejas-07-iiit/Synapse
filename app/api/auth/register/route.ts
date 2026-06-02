@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
             maxOpenTrades: 3,
             prefSymbol: "BTCUSDT",
             preferredTradingMode: "INTRADAY",
+            riskPerTradePct: 2.0,
           }
         }
       },

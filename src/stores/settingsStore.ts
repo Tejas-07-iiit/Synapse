@@ -5,6 +5,7 @@ export interface UserSettings {
   maxOpenTrades: number;
   prefSymbol: string;
   preferredTradingMode: "SCALPING" | "INTRADAY";
+  riskPerTradePct: number;
 }
 
 export interface SettingsState extends UserSettings {
@@ -20,6 +21,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   maxOpenTrades: 3,
   prefSymbol: "BTCUSDT",
   preferredTradingMode: "INTRADAY",
+  riskPerTradePct: 2.0,
   loading: false,
   error: null,
 
@@ -34,6 +36,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
           maxOpenTrades: data.settings.maxOpenTrades,
           prefSymbol: data.settings.prefSymbol,
           preferredTradingMode: data.settings.preferredTradingMode,
+          riskPerTradePct: data.settings.riskPerTradePct || 2.0,
           loading: false,
         });
       } else {

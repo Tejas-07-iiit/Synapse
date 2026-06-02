@@ -173,146 +173,166 @@ export async function POST(request: Request) {
     } else if (action === "close") {
       const { id, exitPrice, pnl, closedAt, userId, symbol, direction, entryPrice, stopLoss, takeProfit, leverage, reason } = data;
 
-      // Try to find the position to inherit missing properties if needed
-      const existingPos = await prisma.position.findUnique({
-        where: { id },
-      });
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          // 1. Try to find the position to inherit missing properties if needed
+          const existingPos = await tx.position.findUnique({
+            where: { id },
+          });
 
-      const finalUserId = userId || existingPos?.userId || "default-user-id";
+          if (!existingPos) {
+            throw new Error("POSITION_NOT_FOUND");
+          }
 
-      await ensureUserExists(finalUserId);
+          if (existingPos.status === "CLOSED") {
+            return { alreadyClosed: true };
+          }
 
-      const finalSymbol = symbol || existingPos?.symbol || "BTCUSDT";
-      const finalDirection = direction || existingPos?.direction || "LONG";
-      const finalEntryPrice = entryPrice || existingPos?.entryPrice || exitPrice;
-      const finalStopLoss = stopLoss !== undefined ? stopLoss : existingPos?.stopLoss;
-      const finalTakeProfit = takeProfit !== undefined ? takeProfit : existingPos?.takeProfit;
-      const finalLeverage = leverage || existingPos?.leverage || 1;
-      const finalOpenedAt = data.openedAt ? new Date(data.openedAt) : (existingPos?.openedAt || new Date());
-      const finalClosedAt = closedAt ? new Date(closedAt) : new Date();
+          const finalUserId = userId || existingPos?.userId || "default-user-id";
+          const finalSymbol = symbol || existingPos?.symbol || "BTCUSDT";
+          const finalDirection = direction || existingPos?.direction || "LONG";
+          const finalEntryPrice = entryPrice || existingPos?.entryPrice || exitPrice;
+          const finalStopLoss = stopLoss !== undefined ? stopLoss : existingPos?.stopLoss;
+          const finalTakeProfit = takeProfit !== undefined ? takeProfit : existingPos?.takeProfit;
+          const finalLeverage = leverage || existingPos?.leverage || 1;
+          const finalOpenedAt = data.openedAt ? new Date(data.openedAt) : (existingPos?.openedAt || new Date());
+          const finalClosedAt = closedAt ? new Date(closedAt) : new Date();
 
-      await prisma.position.update({
-        where: { id },
-        data: {
-          status: "CLOSED",
-          currentPrice: exitPrice,
-          pnl,
-          closedAt: finalClosedAt,
-        },
-      });
+          // 2. Update position to CLOSED
+          await tx.position.update({
+            where: { id },
+            data: {
+              status: "CLOSED",
+              currentPrice: exitPrice,
+              pnl,
+              closedAt: finalClosedAt,
+            },
+          });
 
-      // Map reason to status
-      let tradeStatus = "CLOSED";
-      if (reason === "STOP_LOSS" || reason === "STOPPED") {
-        tradeStatus = "STOPPED";
-      } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
-        tradeStatus = "TP HIT";
-      }
+          // Map reason to status
+          let tradeStatus = "CLOSED";
+          if (reason === "STOP_LOSS" || reason === "STOPPED") {
+            tradeStatus = "STOPPED";
+          } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
+            tradeStatus = "TP HIT";
+          }
 
-      // Calculate ROI
-      const isLong = finalDirection === "LONG";
-      const priceDiff = isLong ? (exitPrice - finalEntryPrice) : (finalEntryPrice - exitPrice);
-      const roi = (priceDiff / finalEntryPrice) * 100 * finalLeverage;
+          // Calculate ROI
+          const isLong = finalDirection === "LONG";
+          const priceDiff = isLong ? (exitPrice - finalEntryPrice) : (finalEntryPrice - exitPrice);
+          const roi = (priceDiff / finalEntryPrice) * 100 * finalLeverage;
 
-      const finalQuantity = data.quantity || existingPos?.quantity || 0;
-      const entryValue = finalEntryPrice * finalQuantity;
-      const exitValue = exitPrice * finalQuantity;
-      const entryFee = entryValue * 0.001;
-      const exitFee = exitValue * 0.001;
-      const totalFees = entryFee + exitFee;
-      const grossPnl = pnl;
-      const netPnl = grossPnl - totalFees;
+          const finalQuantity = data.quantity || existingPos?.quantity || 0;
+          const entryValue = finalEntryPrice * finalQuantity;
+          const exitValue = exitPrice * finalQuantity;
+          const entryFee = entryValue * 0.001;
+          const exitFee = exitValue * 0.001;
+          const totalFees = entryFee + exitFee;
+          const grossPnl = pnl;
+          const netPnl = grossPnl - totalFees;
 
-      const finalStrategyId = existingPos?.strategyId || data.strategyId || null;
-      const finalStrategyName = existingPos?.strategyName || data.strategyName || "Central Engine";
-      const finalStrategyCategory = existingPos?.strategyCategory || data.strategyCategory || null;
-      const finalEntryReason = existingPos?.entryReason || data.entryReason || null;
-      const finalConfidenceAtEntry = existingPos?.confidenceAtEntry || data.confidenceAtEntry || null;
-      const finalMarketRegime = existingPos?.marketRegime || data.marketRegime || null;
-      const finalIndicatorSnapshot = existingPos?.indicatorSnapshot || data.indicatorSnapshot || null;
-      const finalExitReason = data.exitReason || null;
+          const finalStrategyId = existingPos?.strategyId || data.strategyId || null;
+          const finalStrategyName = existingPos?.strategyName || data.strategyName || "Central Engine";
+          const finalStrategyCategory = existingPos?.strategyCategory || data.strategyCategory || null;
+          const finalEntryReason = existingPos?.entryReason || data.entryReason || null;
+          const finalConfidenceAtEntry = existingPos?.confidenceAtEntry || data.confidenceAtEntry || null;
+          const finalMarketRegime = existingPos?.marketRegime || data.marketRegime || null;
+          const finalIndicatorSnapshot = existingPos?.indicatorSnapshot || data.indicatorSnapshot || null;
+          const finalExitReason = data.exitReason || null;
 
-      let finalAuditPayload = data.auditPayload || existingPos?.auditPayload || null;
-      if (finalAuditPayload && typeof finalAuditPayload === "object") {
-        finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
-      } else {
-        finalAuditPayload = generateManualAuditPayload({
-          symbol: finalSymbol,
-          direction: finalDirection,
-          entryPrice: finalEntryPrice,
-          quantity: finalQuantity,
-          stopLoss: finalStopLoss,
-          takeProfit: finalTakeProfit,
-          leverage: finalLeverage,
-          marketRegime: finalMarketRegime
-        });
-      }
+          let finalAuditPayload = data.auditPayload || existingPos?.auditPayload || null;
+          if (finalAuditPayload && typeof finalAuditPayload === "object") {
+            finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
+          } else {
+            finalAuditPayload = generateManualAuditPayload({
+              symbol: finalSymbol,
+              direction: finalDirection,
+              entryPrice: finalEntryPrice,
+              quantity: finalQuantity,
+              stopLoss: finalStopLoss,
+              takeProfit: finalTakeProfit,
+              leverage: finalLeverage,
+              marketRegime: finalMarketRegime
+            });
+          }
 
-      // Update exitOutcome
-      finalAuditPayload.exitOutcome = {
-        exitPrice,
-        exitReason: finalExitReason || reason,
-        durationMs: new Date(finalClosedAt).getTime() - new Date(finalOpenedAt).getTime(),
-        closedAt: new Date(finalClosedAt).getTime(),
-      };
-
-      finalAuditPayload.executionCosts = {
-        entryFee,
-        exitFee,
-        totalFees,
-        grossPnl,
-        netPnl,
-      };
-
-      if (finalUserId) {
-        await prisma.trade.create({
-          data: {
-            userId: finalUserId,
-            symbol: finalSymbol,
-            strategyId: finalStrategyId,
-            strategyName: finalStrategyName,
-            strategyCategory: finalStrategyCategory,
-            entryReason: finalEntryReason,
-            exitReason: finalExitReason,
-            confidenceAtEntry: finalConfidenceAtEntry,
-            confidence: finalConfidenceAtEntry || 0.8,
-            marketRegime: finalMarketRegime,
-            indicatorSnapshot: finalIndicatorSnapshot,
-            direction: finalDirection,
-            entryPrice: finalEntryPrice,
+          // Update exitOutcome
+          finalAuditPayload.exitOutcome = {
             exitPrice,
-            currentPrice: exitPrice,
-            stopLoss: finalStopLoss,
-            takeProfit: finalTakeProfit,
-            quantity: finalQuantity,
-            leverage: finalLeverage,
-            pnl,
-            roi,
-            status: tradeStatus,
-            openedAt: finalOpenedAt,
-            closedAt: finalClosedAt,
-            executionType: "PAPER",
+            exitReason: finalExitReason || reason,
+            durationMs: new Date(finalClosedAt).getTime() - new Date(finalOpenedAt).getTime(),
+            closedAt: new Date(finalClosedAt).getTime(),
+          };
+
+          finalAuditPayload.executionCosts = {
             entryFee,
             exitFee,
             totalFees,
             grossPnl,
             netPnl,
-            feeRate: 0.001,
-            auditPayload: finalAuditPayload,
-          },
+          };
+
+          await tx.trade.create({
+            data: {
+              userId: finalUserId,
+              symbol: finalSymbol,
+              strategyId: finalStrategyId,
+              strategyName: finalStrategyName,
+              strategyCategory: finalStrategyCategory,
+              entryReason: finalEntryReason,
+              exitReason: finalExitReason,
+              confidenceAtEntry: finalConfidenceAtEntry,
+              confidence: finalConfidenceAtEntry || 0.8,
+              marketRegime: finalMarketRegime,
+              indicatorSnapshot: finalIndicatorSnapshot,
+              direction: finalDirection,
+              entryPrice: finalEntryPrice,
+              exitPrice,
+              currentPrice: exitPrice,
+              stopLoss: finalStopLoss,
+              takeProfit: finalTakeProfit,
+              quantity: finalQuantity,
+              leverage: finalLeverage,
+              pnl,
+              roi,
+              status: tradeStatus,
+              openedAt: finalOpenedAt,
+              closedAt: finalClosedAt,
+              executionType: "PAPER",
+              entryFee,
+              exitFee,
+              totalFees,
+              grossPnl,
+              netPnl,
+              feeRate: 0.001,
+              auditPayload: finalAuditPayload,
+            },
+          });
+
+          // Update Wallet Balance and Realized PnL
+          await tx.wallet.update({
+            where: { userId: finalUserId },
+            data: {
+              balance: { increment: netPnl },
+              realizedPnl: { increment: netPnl },
+            }
+          });
+
+          return { success: true };
         });
 
-        // Update Wallet Balance and Realized PnL
-        await prisma.wallet.update({
-          where: { userId: finalUserId },
-          data: {
-            balance: { increment: netPnl },
-            realizedPnl: { increment: netPnl },
-          }
-        });
+        if (result.alreadyClosed) {
+          console.warn(`[API-Positions] Blocked duplicate position close request for position ID ${id}`);
+          return NextResponse.json({ success: true, message: "Position already closed" });
+        }
+
+        return NextResponse.json({ success: true });
+      } catch (err: any) {
+        if (err.message === "POSITION_NOT_FOUND") {
+          return NextResponse.json({ success: false, error: "Position not found" }, { status: 404 });
+        }
+        throw err;
       }
-
-      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });

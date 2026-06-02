@@ -250,7 +250,17 @@ export default function PortfolioPage() {
   }, [closedTrades, filterByDate]);
 
   // Section 1 Math: Wallet Balance, Profit, Loss, PnL
-  const walletBalance = wallet.balance;
+  const usedMargin = useMemo(() => {
+    let total = 0;
+    activePositions.forEach((pos) => {
+      total += (pos.entryPrice * pos.quantity) / (pos.leverage || 1);
+    });
+    return total;
+  }, [activePositions]);
+
+  const availableBalance = useMemo(() => {
+    return wallet.balance - usedMargin;
+  }, [wallet.balance, usedMargin]);
 
   const startingCapital = useMemo(() => {
     return wallet.totalDeposited > 0 ? wallet.totalDeposited : 10000.0;
@@ -274,11 +284,10 @@ export default function PortfolioPage() {
     let sum = 0;
     filteredActivePositions.forEach((pos) => {
       const livePrice = tickerData[pos.symbol]?.price || pos.currentPrice || pos.entryPrice;
-      const leverage = pos.leverage || 1;
       const isLong = pos.direction === "LONG";
       const pnl = isLong 
-        ? (livePrice - pos.entryPrice) * pos.quantity * leverage
-        : (pos.entryPrice - livePrice) * pos.quantity * leverage;
+        ? (livePrice - pos.entryPrice) * pos.quantity
+        : (pos.entryPrice - livePrice) * pos.quantity;
       sum += pnl;
     });
     return sum;
@@ -677,7 +686,7 @@ export default function PortfolioPage() {
             <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-2">
               <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">Total Wallet Balance</span>
               <div>
-                <span className="text-2xl font-black text-foreground">${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="text-2xl font-black text-foreground">${availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 <span className="text-[10px] text-muted-foreground block mt-1">Available Trading Balance</span>
               </div>
             </div>

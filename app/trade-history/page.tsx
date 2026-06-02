@@ -251,12 +251,16 @@ export default function TradeHistoryPage() {
       const currentVal = currentPrice * pos.quantity;
       
       const pnl = isLong 
-        ? (currentVal - entryVal) * leverage
-        : (entryVal - currentVal) * leverage;
+        ? (currentVal - entryVal)
+        : (entryVal - currentVal);
         
       const roi = isLong
         ? ((currentPrice - pos.entryPrice) / pos.entryPrice) * 100 * leverage
         : ((pos.entryPrice - currentPrice) / pos.entryPrice) * 100 * leverage;
+
+      const entryFee = entryVal * 0.001;
+      const exitFee = currentVal * 0.001;
+      const totalFees = entryFee + exitFee;
 
       list.push({
         id: pos.id,
@@ -283,6 +287,11 @@ export default function TradeHistoryPage() {
         marketRegime: (pos as any).marketRegime || null,
         indicatorSnapshot: (pos as any).indicatorSnapshot || null,
         auditPayload: (pos as any).auditPayload || null,
+        entryFee,
+        exitFee,
+        totalFees,
+        grossPnl: pnl,
+        netPnl: pnl - totalFees,
       });
     });
 
@@ -780,7 +789,7 @@ export default function TradeHistoryPage() {
                             {trade.takeProfit ? `$${trade.takeProfit.toLocaleString()}` : "--"}
                           </td>
                           <td className="px-5 py-4 text-right text-muted-foreground font-semibold">
-                            {trade.status === "OPEN" ? "--" : `$${(trade.totalFees ?? 0).toFixed(2)}`}
+                            {`$${(trade.totalFees ?? 0).toFixed(2)}`}
                           </td>
                           <td className={`px-5 py-4 text-right font-extrabold`}>
                             <div className={`flex flex-col items-end ${isProfit ? "text-emerald-500" : "text-destructive"}`}>

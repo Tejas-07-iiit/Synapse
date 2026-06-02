@@ -79,118 +79,135 @@ async function runDaemon() {
         auditPayload,
       } = data;
 
-      // Update position to CLOSED
-      await prisma.position.update({
-        where: { id },
-        data: {
-          status: "CLOSED",
-          currentPrice: exitPrice,
-          pnl,
-          closedAt: new Date(closedAt),
-        },
-      });
-
-      // Map reason to status
-      let tradeStatus = "CLOSED";
-      if (reason === "STOP_LOSS" || reason === "STOPPED" || reason === "SL HIT") {
-        tradeStatus = "STOPPED";
-      } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
-        tradeStatus = "TP HIT";
-      }
-
-      // Calculate ROI
-      const isLong = direction === "LONG";
-      const priceDiff = isLong ? exitPrice - entryPrice : entryPrice - exitPrice;
-      const roi = (priceDiff / entryPrice) * 100 * leverage;
-
-      const finalQuantity = data.quantity || 0;
-      const entryValue = entryPrice * finalQuantity;
-      const exitValue = exitPrice * finalQuantity;
-      const entryFee = entryValue * 0.001;
-      const exitFee = exitValue * 0.001;
-      const totalFees = entryFee + exitFee;
-      const grossPnl = pnl;
-      const netPnl = grossPnl - totalFees;
-
-      let finalAuditPayload = auditPayload || null;
-      if (finalAuditPayload && typeof finalAuditPayload === "object") {
-        finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
-      } else {
-        finalAuditPayload = {};
-      }
-
-      finalAuditPayload.exitOutcome = {
-        exitPrice,
-        exitReason: exitReason || reason,
-        durationMs: new Date(closedAt).getTime() - new Date(openedAt).getTime(),
-        closedAt: new Date(closedAt).getTime(),
-      };
-
-      finalAuditPayload.executionCosts = {
-        entryFee,
-        exitFee,
-        totalFees,
-        grossPnl,
-        netPnl,
-      };
-
-      // Create Trade History log
       try {
-        await prisma.trade.create({
-          data: {
-            userId,
-            symbol,
-            strategyName: strategyName || "Central Engine",
-            strategyId: strategyId || null,
-            strategyCategory: strategyCategory || null,
-            entryReason: entryReason || null,
-            exitReason: exitReason || null,
-            confidenceAtEntry: confidenceAtEntry || null,
-            confidence: confidenceAtEntry || 0.8,
-            marketRegime: marketRegime || null,
-            indicatorSnapshot: indicatorSnapshot || null,
-            direction,
-            entryPrice,
+        await prisma.$transaction(async (tx) => {
+          // Check if position is already closed in DB
+          const existingPos = await tx.position.findUnique({
+            where: { id },
+          });
+
+          if (!existingPos) {
+            console.warn(`[Daemon] Position ${id} not found in DB for closure.`);
+            return;
+          }
+
+          if (existingPos.status === "CLOSED") {
+            console.log(`[Daemon] Position ${id} (${symbol}) is already CLOSED in DB. Skipping duplicate DB updates.`);
+            return;
+          }
+
+          // Update position to CLOSED
+          await tx.position.update({
+            where: { id },
+            data: {
+              status: "CLOSED",
+              currentPrice: exitPrice,
+              pnl,
+              closedAt: new Date(closedAt),
+            },
+          });
+
+          // Map reason to status
+          let tradeStatus = "CLOSED";
+          if (reason === "STOP_LOSS" || reason === "STOPPED" || reason === "SL HIT") {
+            tradeStatus = "STOPPED";
+          } else if (reason === "TAKE_PROFIT" || reason === "TP HIT") {
+            tradeStatus = "TP HIT";
+          }
+
+          // Calculate ROI
+          const isLong = direction === "LONG";
+          const priceDiff = isLong ? exitPrice - entryPrice : entryPrice - exitPrice;
+          const roi = (priceDiff / entryPrice) * 100 * leverage;
+
+          const finalQuantity = data.quantity || 0;
+          const entryValue = entryPrice * finalQuantity;
+          const exitValue = exitPrice * finalQuantity;
+          const entryFee = entryValue * 0.001;
+          const exitFee = exitValue * 0.001;
+          const totalFees = entryFee + exitFee;
+          const grossPnl = pnl;
+          const netPnl = grossPnl - totalFees;
+
+          let finalAuditPayload = auditPayload || null;
+          if (finalAuditPayload && typeof finalAuditPayload === "object") {
+            finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
+          } else {
+            finalAuditPayload = {};
+          }
+
+          finalAuditPayload.exitOutcome = {
             exitPrice,
-            currentPrice: exitPrice,
-            stopLoss,
-            takeProfit,
-            quantity: finalQuantity,
-            leverage,
-            pnl,
-            roi,
-            status: tradeStatus,
-            openedAt: new Date(openedAt),
-            closedAt: new Date(closedAt),
-            executionType: "PAPER",
+            exitReason: exitReason || reason,
+            durationMs: new Date(closedAt).getTime() - new Date(openedAt).getTime(),
+            closedAt: new Date(closedAt).getTime(),
+          };
+
+          finalAuditPayload.executionCosts = {
             entryFee,
             exitFee,
             totalFees,
             grossPnl,
             netPnl,
-            feeRate: 0.001,
-            auditPayload: finalAuditPayload,
-          },
-        });
-        
-        AuditLogger.logTradeClosed({ userId, symbol, entry: entryPrice, exit: exitPrice, pnl, reason, strategyName });
-        if (tradeStatus === "TP HIT") {
-          AuditLogger.logTakeProfitHit({ userId, symbol, entry: entryPrice, exit: exitPrice, profit: pnl, roi, strategyName });
-        } else if (tradeStatus === "STOPPED") {
-          AuditLogger.logStopLossHit({ userId, symbol, entry: entryPrice, exit: exitPrice, loss: pnl, roi, strategyName });
-        }
-      } catch (err) {
-        AuditLogger.logDatabaseError({ action: "createTrade", message: "Failed to log trade history", errorDetails: err });
-      }
+          };
 
-      // Update Wallet realized balance
-      await prisma.wallet.update({
-        where: { userId },
-        data: {
-          balance: { increment: netPnl },
-          realizedPnl: { increment: netPnl },
-        },
-      });
+          // Create Trade History log
+          await tx.trade.create({
+            data: {
+              userId,
+              symbol,
+              strategyName: strategyName || "Central Engine",
+              strategyId: strategyId || null,
+              strategyCategory: strategyCategory || null,
+              entryReason: entryReason || null,
+              exitReason: exitReason || null,
+              confidenceAtEntry: confidenceAtEntry || null,
+              confidence: confidenceAtEntry || 0.8,
+              marketRegime: marketRegime || null,
+              indicatorSnapshot: indicatorSnapshot || null,
+              direction,
+              entryPrice,
+              exitPrice,
+              currentPrice: exitPrice,
+              stopLoss,
+              takeProfit,
+              quantity: finalQuantity,
+              leverage,
+              pnl,
+              roi,
+              status: tradeStatus,
+              openedAt: new Date(openedAt),
+              closedAt: new Date(closedAt),
+              executionType: "PAPER",
+              entryFee,
+              exitFee,
+              totalFees,
+              grossPnl,
+              netPnl,
+              feeRate: 0.001,
+              auditPayload: finalAuditPayload,
+            },
+          });
+
+          // Update Wallet realized balance
+          await tx.wallet.update({
+            where: { userId },
+            data: {
+              balance: { increment: netPnl },
+              realizedPnl: { increment: netPnl },
+            },
+          });
+
+          AuditLogger.logTradeClosed({ userId, symbol, entry: entryPrice, exit: exitPrice, pnl, reason, strategyName });
+          if (tradeStatus === "TP HIT") {
+            AuditLogger.logTakeProfitHit({ userId, symbol, entry: entryPrice, exit: exitPrice, profit: pnl, roi, strategyName });
+          } else if (tradeStatus === "STOPPED") {
+            AuditLogger.logStopLossHit({ userId, symbol, entry: entryPrice, exit: exitPrice, loss: pnl, roi, strategyName });
+          }
+        });
+      } catch (err) {
+        AuditLogger.logDatabaseError({ action: "closePositionTransaction", message: "Failed to atomically close position, trade, and update wallet", errorDetails: err });
+      }
 
       // Recalculate strategy weights in background
       PerformanceWeightingEngine.updatePerformanceScores().catch(() => {});

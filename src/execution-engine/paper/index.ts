@@ -104,9 +104,9 @@ export class PaperTradingEngine {
       const entryVal = pos.entryPrice * pos.quantity;
       const currentVal = currentPrice * pos.quantity;
       if (pos.direction === "LONG") {
-        pos.pnl = (currentVal - entryVal) * pos.leverage;
+        pos.pnl = (currentVal - entryVal);
       } else {
-        pos.pnl = (entryVal - currentVal) * pos.leverage;
+        pos.pnl = (entryVal - currentVal);
       }
 
       // Update in DB (non-blocking) via API, throttled to once every 10 seconds

@@ -72,6 +72,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error("Logout error on client:", err);
     } finally {
       set({ user: null, isAuthenticated: false, isLoading: false });
+      // Hard redirect to login page to ensure cookie is cleared and middleware runs
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
     }
   },
 

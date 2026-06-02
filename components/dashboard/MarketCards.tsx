@@ -43,7 +43,7 @@ export default function MarketCards() {
         if (data.success) {
           setActivePositions(data.positions || []);
         }
-        fetchWallet(user.id).catch(() => {});
+        fetchWallet(user.id, true).catch(() => {});
       } catch (err) {
         console.error("Failed to fetch active positions", err);
       }

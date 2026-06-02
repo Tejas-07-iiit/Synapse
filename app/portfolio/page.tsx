@@ -150,6 +150,7 @@ export default function PortfolioPage() {
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
+  const seriesInstanceRef = useRef<any>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -176,7 +177,7 @@ export default function PortfolioPage() {
         setClosedTrades(tradeData.trades || []);
       }
 
-      await useWalletStore.getState().fetchWallet(user.id);
+      await useWalletStore.getState().fetchWallet(user.id, silent);
       setError(null);
     } catch (err) {
       console.error("[Portfolio] Error fetching data:", err);
@@ -511,12 +512,6 @@ export default function PortfolioPage() {
   useEffect(() => {
     if (!chartContainerRef.current || !hasSufficientCurveData) return;
 
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.applyOptions({ autoSize: false });
-      chartInstanceRef.current.remove();
-      chartInstanceRef.current = null;
-    }
-
     const isDark = resolvedTheme === "dark";
     const colors = {
       text: isDark ? "#a1a1aa" : "#64748b",
@@ -545,60 +540,99 @@ export default function PortfolioPage() {
       };
     }
 
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { color: "transparent" },
-        textColor: colors.text,
-        fontFamily: "var(--font-sans), sans-serif",
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: colors.grid },
-        horzLines: { color: colors.grid },
-      },
-      rightPriceScale: {
-        borderVisible: false,
-        alignLabels: true,
-      },
-      timeScale: {
-        borderVisible: false,
-        timeVisible: true,
-        fixLeftEdge: true,
-        tickMarkFormatter: tickMarkFormatter,
-      },
-      crosshair: {
-        vertLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
-        horzLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
-      },
-      autoSize: true,
-    });
+    let chart = chartInstanceRef.current;
+    let areaSeries = seriesInstanceRef.current;
 
-    const areaSeries = chart.addSeries(AreaSeries, {
-      lineColor: colors.line,
-      topColor: colors.areaTop,
-      bottomColor: colors.areaBottom,
-      lineWidth: 2,
-      lineType: LineType.Curved,
-      crosshairMarkerVisible: true,
-      crosshairMarkerRadius: 4,
-      crosshairMarkerBorderColor: "#fff",
-      crosshairMarkerBackgroundColor: colors.line,
-    });
+    if (!chart) {
+      chart = createChart(chartContainerRef.current, {
+        layout: {
+          background: { color: "transparent" },
+          textColor: colors.text,
+          fontFamily: "var(--font-sans), sans-serif",
+          fontSize: 11,
+        },
+        grid: {
+          vertLines: { color: colors.grid },
+          horzLines: { color: colors.grid },
+        },
+        rightPriceScale: {
+          borderVisible: false,
+          alignLabels: true,
+        },
+        timeScale: {
+          borderVisible: false,
+          timeVisible: true,
+          fixLeftEdge: true,
+          tickMarkFormatter: tickMarkFormatter,
+        },
+        crosshair: {
+          vertLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
+          horzLine: { color: colors.crosshair, labelBackgroundColor: "#18181b" },
+        },
+        autoSize: true,
+      });
+
+      areaSeries = chart.addSeries(AreaSeries, {
+        lineColor: colors.line,
+        topColor: colors.areaTop,
+        bottomColor: colors.areaBottom,
+        lineWidth: 2,
+        lineType: LineType.Curved,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 4,
+        crosshairMarkerBorderColor: "#fff",
+        crosshairMarkerBackgroundColor: colors.line,
+      });
+
+      chartInstanceRef.current = chart;
+      seriesInstanceRef.current = areaSeries;
+
+      setTimeout(() => {
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.timeScale().fitContent();
+        }
+      }, 100);
+    } else {
+      chart.applyOptions({
+        layout: {
+          textColor: colors.text,
+        },
+        grid: {
+          vertLines: { color: colors.grid },
+          horzLines: { color: colors.grid },
+        },
+        timeScale: {
+          tickMarkFormatter: tickMarkFormatter,
+        },
+        crosshair: {
+          vertLine: { color: colors.crosshair },
+          horzLine: { color: colors.crosshair },
+        }
+      });
+
+      areaSeries.applyOptions({
+        lineColor: colors.line,
+        topColor: colors.areaTop,
+        bottomColor: colors.areaBottom,
+        crosshairMarkerBackgroundColor: colors.line,
+      });
+    }
 
     areaSeries.setData(equityCurveData);
 
-    chartInstanceRef.current = chart;
-
-    setTimeout(() => {
-      chart.timeScale().fitContent();
-    }, 100);
-
-    return () => {
-      chart.applyOptions({ autoSize: false });
-      chart.remove();
-      chartInstanceRef.current = null;
-    };
   }, [equityCurveData, hasSufficientCurveData, resolvedTheme, selectedDateFilter]);
+
+  // Handle unmount cleanup
+  useEffect(() => {
+    return () => {
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.applyOptions({ autoSize: false });
+        chartInstanceRef.current.remove();
+        chartInstanceRef.current = null;
+        seriesInstanceRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <>

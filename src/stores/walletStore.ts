@@ -8,7 +8,7 @@ export interface WalletState {
   loading: boolean;
   error: string | null;
   
-  fetchWallet: (userId: string) => Promise<void>;
+  fetchWallet: (userId: string, silent?: boolean) => Promise<void>;
   updateBalance: (pnl: number) => void;
 }
 
@@ -20,8 +20,8 @@ export const useWalletStore = create<WalletState>((set) => ({
   loading: false,
   error: null,
 
-  fetchWallet: async (userId: string) => {
-    set({ loading: true, error: null });
+  fetchWallet: async (userId: string, silent = false) => {
+    if (!silent) set({ loading: true, error: null });
     try {
       const res = await fetch(`/api/wallet?userId=${encodeURIComponent(userId)}`);
       const data = await res.json();

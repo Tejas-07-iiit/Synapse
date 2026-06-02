@@ -445,7 +445,7 @@ export class PaperTradingEngine {
         
         // Update store balance to keep in sync
         if (typeof window !== "undefined") {
-          useWalletStore.getState().fetchWallet(userId).catch(() => {});
+          useWalletStore.getState().fetchWallet(userId, true).catch(() => {});
         }
 
         return position;
@@ -590,7 +590,7 @@ export class PaperTradingEngine {
 
       // Update store balance to keep in sync
       if (pos.userId && typeof window !== "undefined") {
-        useWalletStore.getState().fetchWallet(pos.userId).catch(() => {});
+        useWalletStore.getState().fetchWallet(pos.userId, true).catch(() => {});
       }
 
       return true;

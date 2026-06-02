@@ -203,10 +203,10 @@ export default function TradeHistoryPage() {
     }
   }, [isAuthenticated, authLoading, router]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!user?.id) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [posRes, tradeRes] = await Promise.all([
         fetch(`/api/positions?userId=${user.id}&type=active`),
         fetch(`/api/positions?userId=${user.id}&type=closed`),
@@ -224,15 +224,21 @@ export default function TradeHistoryPage() {
       setError(null);
     } catch (err) {
       console.error("[TradeHistory] Error fetching data:", err);
-      setError("Failed to fetch trade records. Please try again.");
+      if (!silent) setError("Failed to fetch trade records. Please try again.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
-      fetchData();
+      fetchData(false);
+      
+      const interval = setInterval(() => {
+        fetchData(true);
+      }, 5000);
+      
+      return () => clearInterval(interval);
     }
   }, [user?.id, fetchData]);
 

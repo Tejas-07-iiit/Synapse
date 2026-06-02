@@ -992,19 +992,19 @@ export default function TradeHistoryPage() {
           hour12: true
         }) : "N/A";
 
-        // Destructure audit sections
+        // Destructure audit sections with fallbacks
         const {
-          marketSnapshot,
-          strategyCompetition,
-          winningStrategy,
-          confidenceBreakdown,
-          tradeEvidence,
-          tradePlan,
-          executionCosts,
-          otherStrategiesLost,
-          exitOutcome,
-          executiveSummary
-        } = audit;
+          marketSnapshot = {},
+          strategyCompetition = [],
+          winningStrategy = {},
+          confidenceBreakdown = {},
+          tradeEvidence = {},
+          tradePlan = {},
+          executionCosts = {},
+          otherStrategiesLost = [],
+          exitOutcome = {},
+          executiveSummary = ""
+        } = audit || {};
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">

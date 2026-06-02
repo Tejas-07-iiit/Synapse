@@ -7,7 +7,7 @@ The core reason two different user accounts are receiving **identical trades** (
 Currently, the system is designed as a **Centralized Strategy Broadcaster** rather than a **Per-User Execution Engine**. 
 1. The `StrategyEngine` (in `src/server/daemon.ts`) acts as a global singleton. It evaluates the market once per tick and generates a single set of trade signals.
 2. The daemon calculates a universal Stop Loss (SL) and Take Profit (TP) globally based on ATR indicators, **completely ignoring** user-specific preferences (`defaultSlPct`, `defaultTpPct` from `UserSettings`).
-3. It then loops over all users with `autoTrading: true` (`for (const settings of usersWithAuto)`) and executes the exact same global trade parameters for every subscribed user.
+3. It then loops over all users with `autoTrading: true` (`for (const settings of usersWithAuto)`) and executes the exact same global trade parameters for every subscribed user. 
 4. Position size is calculated correctly per-user based on their individual wallet balance and risk percentage, which is why only the fees and position size differ.
 
 ## 2. Files Involved & Exact Code Locations

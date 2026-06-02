@@ -129,3 +129,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "100");
+
+    const dbSignals = await prisma.tradeSignal.findMany({
+      orderBy: { timestamp: "desc" },
+      take: limit,
+    });
+
+    const mapped = dbSignals.map((s) => ({
+      id: s.id,
+      symbol: s.symbol,
+      timeframe: s.timeframe,
+      strategyId: s.strategyId,
+      signal: s.direction,
+      confidence: s.confidence,
+      entry: s.entry,
+      stopLoss: s.stopLoss,
+      takeProfit: s.takeProfit,
+      timestamp: new Date(s.timestamp).getTime(),
+      reasoning: s.reasoning,
+    }));
+
+    return NextResponse.json({ success: true, signals: mapped });
+  } catch (error) {
+    console.error("[API-Signals] Error fetching signals:", error);
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+  }
+}

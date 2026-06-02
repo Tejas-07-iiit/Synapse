@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useSignalStore } from "@/src/stores/signalStore";
 import { TrendingUp, TrendingDown, Clock, ShieldAlert, Zap } from "lucide-react";
 
@@ -11,6 +11,13 @@ interface SignalPanelProps {
 export default function SignalPanel({ className }: SignalPanelProps) {
   const activeSignals = useSignalStore((state) => state.activeSignals);
   const clearSignals = useSignalStore((state) => state.clearSignals);
+  const fetchSignals = useSignalStore((state) => (state as any).fetchSignals);
+
+  useEffect(() => {
+    if (fetchSignals) {
+      fetchSignals();
+    }
+  }, [fetchSignals]);
 
   const formatTime = (timestamp: number) => {
     const diff = Date.now() - timestamp;
@@ -96,11 +103,18 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {sig.blocked && (
-                      <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1.5">
-                        <span className="w-1 h-1 bg-amber-500 rounded-full animate-pulse"></span>
-                        BLOCKED
-                      </span>
+                    {sig.signal !== "HOLD" && (
+                      sig.blocked ? (
+                        <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                          REJECTED
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                          EXECUTED
+                        </span>
+                      )
                     )}
                     {isLong && (
                       <span className="flex items-center gap-0.5 bg-green-500/10 text-green-500 text-[10px] font-extrabold px-2 py-0.5 rounded border border-green-500/20">
@@ -222,16 +236,24 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                   )}
                 </div>
 
-                {/* Reasoning text */}
-                <div className="text-[11px] text-muted-foreground leading-relaxed pl-1 border-l-2 border-primary/15">
-                  {sig.reasoning.join(" ")}
-                  {sig.blocked && (
-                    <div className="mt-1 text-[10px] font-semibold text-amber-400 flex flex-wrap items-center gap-1 bg-amber-500/5 border border-amber-500/10 p-1.5 rounded-lg">
-                      <span>ACTIVE POSITION EXISTS: Trade execution locked for {sig.symbol}</span>
-                      {sig.activePositionId && (
-                        <span className="text-[9px] text-muted-foreground font-mono font-normal bg-muted px-1.5 py-0.5 rounded">(ID: {sig.activePositionId.slice(0, 8)}...)</span>
-                      )}
-                    </div>
+                 {/* Reasoning text */}
+                <div className="text-[11px] text-muted-foreground leading-relaxed pl-1 border-l-2 border-primary/15 space-y-2">
+                  <div>{sig.reasoning.join(" ")}</div>
+                  {sig.signal !== "HOLD" && (
+                    sig.blocked ? (
+                      <div className="text-[10px] font-semibold text-amber-400 flex flex-col gap-1 bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg">
+                        <span className="font-bold uppercase tracking-wider text-[8px] text-amber-500">Signal Rejection Reason:</span>
+                        <span>ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open for {sig.symbol}.</span>
+                        {sig.activePositionId && (
+                          <span className="text-[9px] text-muted-foreground font-mono font-normal bg-muted px-1.5 py-0.5 rounded w-max">Active Position ID: {sig.activePositionId.slice(0, 8)}...</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-semibold text-emerald-400 flex flex-col gap-1 bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg">
+                        <span className="font-bold uppercase tracking-wider text-[8px] text-emerald-500">Signal Execution Reason:</span>
+                        <span>STRATEGY ALIGNED: Signal successfully executed. Position opened with ATR-based Stop Loss and Take Profit levels applied.</span>
+                      </div>
+                    )
                   )}
                 </div>
 

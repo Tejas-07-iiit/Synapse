@@ -7,6 +7,7 @@ interface SignalState {
   addSignal: (signal: StrategySignal) => void;
   setSignals: (signals: StrategySignal[]) => void;
   clearSignals: () => void;
+  fetchSignals: () => Promise<void>;
 }
 
 export const useSignalStore = create<SignalState>((set) => ({
@@ -31,4 +32,15 @@ export const useSignalStore = create<SignalState>((set) => ({
 
   setSignals: (signals) => set({ activeSignals: signals }),
   clearSignals: () => set({ activeSignals: [] }),
+  fetchSignals: async () => {
+    try {
+      const res = await fetch("/api/signals?limit=100");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.signals)) {
+        set({ activeSignals: data.signals });
+      }
+    } catch (e) {
+      console.error("Failed to fetch signals:", e);
+    }
+  },
 }));

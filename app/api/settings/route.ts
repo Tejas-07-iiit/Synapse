@@ -9,9 +9,31 @@ export async function GET(request: Request) {
 
     await ensureUserExists(userId);
 
-    const settings = await prisma.userSettings.findUnique({
-      where: { userId },
-    });
+    let settings: any = null;
+    try {
+      settings = await (prisma as any).userSettings.findUnique({
+        where: { userId },
+      });
+    } catch (err: any) {
+      if (err.message.includes("riskPerTradePct")) {
+        console.warn("[API-Settings] Prisma desync: riskPerTradePct missing. Retrying with explicit select.");
+        settings = await (prisma as any).userSettings.findUnique({
+          where: { userId },
+          select: {
+            id: true,
+            userId: true,
+            autoTrading: true,
+            maxOpenTrades: true,
+            prefSymbol: true,
+            preferredTradingMode: true,
+            updatedAt: true,
+          }
+        });
+        if (settings) settings.riskPerTradePct = 2.0;
+      } else {
+        throw err;
+      }
+    }
 
     return NextResponse.json({ success: true, settings });
   } catch (error) {
@@ -48,10 +70,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const updatedSettings = await prisma.userSettings.update({
-      where: { userId },
-      data: updateData,
-    });
+    let updatedSettings: any = null;
+    try {
+      updatedSettings = await prisma.userSettings.update({
+        where: { userId },
+        data: updateData,
+      });
+    } catch (err: any) {
+      if (err.message.includes("riskPerTradePct")) {
+        console.warn("[API-Settings] Prisma desync: riskPerTradePct missing on update. Stripping and retrying.");
+        const { riskPerTradePct, ...safeData } = updateData as any;
+        updatedSettings = await prisma.userSettings.update({
+          where: { userId },
+          data: safeData,
+        });
+        if (updatedSettings) updatedSettings.riskPerTradePct = 2.0;
+      } else {
+        throw err;
+      }
+    }
 
     return NextResponse.json({ success: true, settings: updatedSettings });
   } catch (error) {

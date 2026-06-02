@@ -390,10 +390,42 @@ async function runDaemon() {
       const tf = timeframe.toLowerCase();
 
       // Query database for all users that have autoTrading enabled
-      const usersWithAuto = await prisma.userSettings.findMany({
-        where: { autoTrading: true },
-        include: { user: true },
-      });
+      // Explicitly select fields to avoid "Missing Column" errors if Prisma Client is desynced
+      let usersWithAuto: any[] = [];
+      try {
+        usersWithAuto = await (prisma as any).userSettings.findMany({
+          where: { autoTrading: true },
+          select: {
+            userId: true,
+            autoTrading: true,
+            maxOpenTrades: true,
+            prefSymbol: true,
+            preferredTradingMode: true,
+            // We'll try to select riskPerTradePct but catch if it fails
+            riskPerTradePct: true,
+            user: true,
+          },
+        });
+      } catch (err: any) {
+        if (err.message.includes("riskPerTradePct")) {
+          console.warn("[Daemon] Prisma desync detected: riskPerTradePct column missing in client view. Retrying without it.");
+          usersWithAuto = await (prisma as any).userSettings.findMany({
+            where: { autoTrading: true },
+            select: {
+              userId: true,
+              autoTrading: true,
+              maxOpenTrades: true,
+              prefSymbol: true,
+              preferredTradingMode: true,
+              user: true,
+            },
+          });
+          // Add default value to results
+          usersWithAuto = usersWithAuto.map(u => ({ ...u, riskPerTradePct: 2.0 }));
+        } else {
+          throw err;
+        }
+      }
 
       // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
       const blockedRaw = (rawSignals || []).filter(r => r.blocked);

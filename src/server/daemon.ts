@@ -774,6 +774,7 @@ async function runDaemon() {
           );
 
           if (position) {
+            console.log(`[MULTI-TENANT DEBUG] TRADE GENERATED -> userId: ${userId}, strategyId: ${sig.strategyId}, positionId: ${position.id}, symbol: ${sym}, side: ${direction}, entry: ${sig.entry}, sizeUsdt: ${wallet.balance * (settings.riskPerTradePct / 100)}`);
             AuditLogger.logTradeExecuted({
               userId,
               symbol: sym,

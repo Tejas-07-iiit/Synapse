@@ -479,7 +479,7 @@ export default function TradeHistoryPage() {
             </div>
             
             <button 
-              onClick={fetchData} 
+              onClick={() => fetchData(false)} 
               className="px-4 py-2 bg-secondary/80 hover:bg-secondary text-foreground text-xs font-black uppercase tracking-wider rounded-xl border border-border transition duration-200"
             >
               Refresh Records

@@ -26,8 +26,8 @@ export class IchimokuCloudStrategy implements TradingStrategy {
   public name = "Ichimoku Cloud Strategy";
   public description = "Full Ichimoku Kinko Hyo with Tenkan/Kijun cross, cloud position, cloud colour, and Chikou Span confirmation.";
   public type = "Trend Following";
-  public timeframe = "1h";
-  public timeframes = ["15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];

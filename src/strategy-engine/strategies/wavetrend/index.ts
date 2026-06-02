@@ -26,8 +26,8 @@ export class WaveTrendStrategy implements TradingStrategy {
   public name = "WaveTrend Oscillator Strategy";
   public description = "LazyBear WaveTrend oscillator for momentum shifts and trend reversals with overbought/oversold zone detection.";
   public type = "Momentum";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr", "rsi"];

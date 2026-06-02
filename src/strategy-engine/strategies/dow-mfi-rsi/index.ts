@@ -10,7 +10,7 @@ export class DowFactorMFIRSIStrategy implements TradingStrategy {
   public description = "Trade momentum continuation in aligned Dow Theory structures validated by volume flow and RSI direction.";
   public type = "Momentum";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "volumeMA", "mfi"];

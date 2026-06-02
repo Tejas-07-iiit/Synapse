@@ -26,7 +26,7 @@ export class EMACrossADXStrategy implements TradingStrategy {
   public description = "Trend-following strategy combining EMA20/EMA50 crossover with ADX strength filtering and MACD momentum confirmation.";
   public type = "Trend Following";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "sma50", "adx", "macdHist", "macdLine", "signalLine", "atr"];

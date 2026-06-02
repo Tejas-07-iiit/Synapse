@@ -9,8 +9,8 @@ export class GridStrategy implements TradingStrategy {
   public name = "Grid Strategy";
   public description = "Trade oscillations inside structured market ranges. Best in ranging, sideways markets.";
   public type = "Grid";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "macdHist", "adx"];

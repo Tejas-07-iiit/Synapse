@@ -25,8 +25,8 @@ export class VolatilityRegimeStrategy implements TradingStrategy {
   public name = "Volatility Regime";
   public description = "Adaptive strategy classifying volatility regimes using rolling ATR rankings, entering trends only under favorable volatility environments.";
   public type = "Volatility";
-  public timeframe = "1h";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "adx", "ema20", "sma50"];

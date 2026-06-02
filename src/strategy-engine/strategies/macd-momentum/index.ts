@@ -8,8 +8,8 @@ export class MACDMomentumStrategy implements TradingStrategy {
   public expectedHoldingTime = "5m-45m";
   public name = "MACD Momentum Strategy";
   public description = "Triggers on MACD Line / Signal Line crossovers and checks Histogram expansion to capitalize on trend acceleration.";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["macdLine", "signalLine", "macdHist"];

@@ -9,8 +9,8 @@ export class RallyBaseDropStrategy implements TradingStrategy {
   public name = "Rally Base Drop Strategy";
   public description = "Trade institutional supply/demand zone reactions (Rally-Base-Drop and Drop-Base-Rally patterns).";
   public type = "SupplyDemand";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["atr", "volumeMA"];

@@ -9,8 +9,8 @@ export class SRSweepStrategy implements TradingStrategy {
   public name = "Support Resistance Sweep Strategy";
   public description = "Detect stop-hunts and liquidity grabs sweeping 52-period highs/lows. Best in ranging and liquidity-hunt environments.";
   public type = "LiquiditySweep";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "volumeMA"];

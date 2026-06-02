@@ -27,7 +27,7 @@ export class HeikenAshiSwingStrategy implements TradingStrategy {
   public description = "Trend-following using Heiken Ashi candle transformations with ATR expansion for swing trade capture.";
   public type = "Trend Following";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];

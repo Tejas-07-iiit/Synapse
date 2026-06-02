@@ -24,7 +24,7 @@ export class HyperSupertrendStrategy implements TradingStrategy {
   public description = "Dual Supertrend confirmation system requiring both fast (10,2) and slow (12,3) Supertrends to align for high-conviction trend signals.";
   public type = "Trend Following";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];

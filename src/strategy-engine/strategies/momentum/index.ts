@@ -8,8 +8,8 @@ export class MomentumStrategy implements TradingStrategy {
   public name = "Momentum Strategy";
   public description = "Capture strong directional continuation moves with trend confirmation.";
   public type = "Momentum";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "macdLine", "signalLine", "macdHist", "bbUpper", "bbMiddle", "bbLower"];

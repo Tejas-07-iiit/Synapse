@@ -23,8 +23,8 @@ export class SqueezeMomentumStrategy implements TradingStrategy {
   public name = "Squeeze Momentum";
   public description = "Volatility breakout strategy entering trades on Bollinger/Keltner squeeze releases confirmed by momentum direction.";
   public type = "Volatility";
-  public timeframe = "1h";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr"];

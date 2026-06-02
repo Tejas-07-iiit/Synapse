@@ -9,8 +9,8 @@ export class DonchianBreakoutStrategy implements TradingStrategy {
   public name = "Donchian Breakout Strategy";
   public description = "Capture strong momentum breakouts from established Donchian Ranges. Best in breakout/trending markets.";
   public type = "Breakout";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["donchianUpper", "donchianLower", "adx", "atr", "volumeMA"];

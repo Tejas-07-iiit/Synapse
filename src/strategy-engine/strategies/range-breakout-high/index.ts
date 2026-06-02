@@ -22,8 +22,8 @@ export class RangeBreakoutHighStrategy implements TradingStrategy {
   public name = "Range Breakout High Strategy";
   public description = "Detects consolidation ranges via Donchian Channels and triggers on breakouts with volume confirmation.";
   public type = "Breakout";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "bbUpper", "bbMiddle", "bbLower", "volumeMA"];

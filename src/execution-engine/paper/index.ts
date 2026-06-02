@@ -442,9 +442,11 @@ export class PaperTradingEngine {
         }
       }
 
-      // Calculate expiresAt based on preferredTradingMode
+      // Calculate expiresAt based on preferredTradingMode architecture
       const tradingMode = settings.preferredTradingMode || "INTRADAY";
       const openedAtTime = Date.now();
+      
+      // ARCHITECTURE: Scalping (45m timeout) | Intraday (8h timeout)
       const expiresAt = tradingMode === "SCALPING" 
         ? new Date(openedAtTime + 45 * 60 * 1000) 
         : new Date(openedAtTime + 8 * 60 * 60 * 1000);

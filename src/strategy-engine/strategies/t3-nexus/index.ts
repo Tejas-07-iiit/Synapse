@@ -39,7 +39,7 @@ export class T3NexusStrategy implements TradingStrategy {
   public description = "Trend-following system using the Tillson T3 moving average with slope and acceleration indicators.";
   public type = "Trend Following";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr"];

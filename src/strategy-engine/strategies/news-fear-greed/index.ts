@@ -28,8 +28,8 @@ export class NewsFearGreedStrategy implements TradingStrategy {
   public name = "News Fear & Greed Strategy";
   public description = "Contrarian market psychology strategy combining Fear & Greed Index, news sentiment, and technical confirmation.";
   public type = "Sentiment";
-  public timeframe = "1h";
-  public timeframes = ["15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "ema20", "atr", "macdHist"];

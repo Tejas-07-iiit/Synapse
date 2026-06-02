@@ -20,8 +20,8 @@ export class ParabolicRSIStrategy implements TradingStrategy {
   public name = "Parabolic RSI Strategy";
   public description = "Applies Parabolic SAR logic to RSI values to detect momentum trend reversals within the oscillator.";
   public type = "Momentum";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr"];

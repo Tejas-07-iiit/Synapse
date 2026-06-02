@@ -101,8 +101,12 @@ class MarketEngine {
       // Unsubscribe from previous streams if timeframe has changed
       if (this.initializedTimeframe && this.initializedTimeframe !== tf) {
         const oldStreams = coinsList.flatMap(s => [
+          `${s.toLowerCase()}@kline_1m`,
+          `${s.toLowerCase()}@kline_3m`,
           `${s.toLowerCase()}@kline_5m`,
           `${s.toLowerCase()}@kline_15m`,
+          `${s.toLowerCase()}@kline_30m`,
+          `${s.toLowerCase()}@kline_1h`,
           `${s.toLowerCase()}@kline_${this.initializedTimeframe}`
         ]);
         marketWsService.unsubscribe(oldStreams);
@@ -124,7 +128,8 @@ class MarketEngine {
       }
 
       // 2. Fetch historical candles for all coins from REST and compute initial indicators
-      const timeframesToLoad = new Set<string>(["5m", "15m", tf]);
+      // REQUIRED ARCHITECTURE: Scalping (1m, 3m, 5m) + Intraday (15m, 30m, 1h)
+      const timeframesToLoad = new Set<string>(["1m", "3m", "5m", "15m", "30m", "1h", tf]);
       for (const coin of coinsList) {
         for (const t of timeframesToLoad) {
           let candles = marketCache.get(coin, t);
@@ -161,8 +166,12 @@ class MarketEngine {
 
       // 5. Subscribe to kline streams for ALL symbols simultaneously
       const streams = coinsList.flatMap(s => [
+        `${s.toLowerCase()}@kline_1m`,
+        `${s.toLowerCase()}@kline_3m`,
         `${s.toLowerCase()}@kline_5m`,
         `${s.toLowerCase()}@kline_15m`,
+        `${s.toLowerCase()}@kline_30m`,
+        `${s.toLowerCase()}@kline_1h`,
         `${s.toLowerCase()}@kline_${tf}`
       ]);
       marketWsService.subscribe(streams);
@@ -199,9 +208,26 @@ class MarketEngine {
 
     if (!this.unsubscribeWsCandles) {
       this.unsubscribeWsCandles = marketWsService.registerCandleCallback((symbol, tf, candle, isClosed) => {
+        const tfLower = tf.toLowerCase();
+        if (this.auditStats.received[tfLower as keyof typeof this.auditStats.received] !== undefined) {
+          this.auditStats.received[tfLower as keyof typeof this.auditStats.received]++;
+        }
+
+        const now = Date.now();
+        if (now - this.lastAuditLog > 60000) {
+          console.log(`\n[SCALPING AUDIT]`);
+          console.log(`1m candles received: ${this.auditStats.received["1m"]}`);
+          console.log(`3m candles received: ${this.auditStats.received["3m"]}`);
+          console.log(`5m candles received: ${this.auditStats.received["5m"]}`);
+          console.log(`Strategies evaluated: ${this.auditStats.evaluations}`);
+          console.log(`Signals generated: ${this.auditStats.signals}`);
+          console.log(`----------------------------------\n`);
+          this.lastAuditLog = now;
+          // Note: we don't reset received/closed to see totals since boot, or we could reset here.
+        }
+
         const store = useMarketStore.getState();
         const symUpper = symbol.toUpperCase();
-        const tfLower = tf.toLowerCase();
 
         // 1. Update the symbol-specific candle cache
         store.updateLastCandleForSymbol(symUpper, tfLower, candle);
@@ -247,27 +273,40 @@ class MarketEngine {
   private onCandleClose(symbol: string, timeframe: string) {
     console.log(`[CandleLifecycle] 🔴 Candle Closed for ${symbol} (${timeframe})`);
     
-    if (timeframe === "5m") {
-      this.on5mCandleClose(symbol);
-    } else if (timeframe === "15m") {
-      this.on15mCandleClose(symbol);
+    const scalpingTfs = ["1m", "3m", "5m"];
+    const intradayTfs = ["15m", "30m", "1h"];
+
+    if (scalpingTfs.includes(timeframe)) {
+      this.onScalpingCandleClose(symbol, timeframe);
+    } else if (intradayTfs.includes(timeframe)) {
+      this.onIntradayCandleClose(symbol, timeframe);
     } else {
       this.onOtherCandleClose(symbol, timeframe);
     }
   }
 
-  private async on5mCandleClose(symbol: string) {
+  private lastAuditLog = Date.now();
+  private auditStats = {
+    received: { "1m": 0, "3m": 0, "5m": 0, "15m": 0, "30m": 0, "1h": 0 },
+    closed: { "1m": 0, "3m": 0, "5m": 0, "15m": 0, "30m": 0, "1h": 0 },
+    signals: 0,
+    evaluations: 0
+  };
+
+  private async onScalpingCandleClose(symbol: string, timeframe: string) {
+    this.auditStats.closed[timeframe as keyof typeof this.auditStats.closed]++;
     const store = useMarketStore.getState();
-    const updatedCandles = store.allCandles[`${symbol}_5m`] || [];
+    const updatedCandles = store.allCandles[`${symbol}_${timeframe}`] || [];
     const ticker = store.tickerData[symbol] || null;
-    await this.recalculate(symbol, "5m", updatedCandles, ticker, true);
+    await this.recalculate(symbol, timeframe, updatedCandles, ticker, true);
   }
- 
-  private async on15mCandleClose(symbol: string) {
+
+  private async onIntradayCandleClose(symbol: string, timeframe: string) {
+    this.auditStats.closed[timeframe as keyof typeof this.auditStats.closed]++;
     const store = useMarketStore.getState();
-    const updatedCandles = store.allCandles[`${symbol}_15m`] || [];
+    const updatedCandles = store.allCandles[`${symbol}_${timeframe}`] || [];
     const ticker = store.tickerData[symbol] || null;
-    await this.recalculate(symbol, "15m", updatedCandles, ticker, true);
+    await this.recalculate(symbol, timeframe, updatedCandles, ticker, true);
   }
  
   private async onOtherCandleClose(symbol: string, timeframe: string) {
@@ -301,7 +340,9 @@ class MarketEngine {
     }
     
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
+    this.auditStats.evaluations++;
     const { signals, indicators: currentIndicators } = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
+    this.auditStats.signals += (signals || []).length;
 
     const marketStore = useMarketStore.getState();
     const signalStore = useSignalStore.getState();
@@ -414,8 +455,12 @@ class MarketEngine {
       : ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
 
     const streams = coinsList.flatMap(s => [
+      `${s.toLowerCase()}@kline_1m`,
+      `${s.toLowerCase()}@kline_3m`,
       `${s.toLowerCase()}@kline_5m`,
       `${s.toLowerCase()}@kline_15m`,
+      `${s.toLowerCase()}@kline_30m`,
+      `${s.toLowerCase()}@kline_1h`,
       `${s.toLowerCase()}@kline_${this.activeTimeframe}`
     ]);
     marketWsService.unsubscribe(streams);

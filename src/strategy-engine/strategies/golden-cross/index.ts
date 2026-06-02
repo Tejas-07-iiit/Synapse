@@ -22,8 +22,8 @@ export class GoldenCrossStrategy implements TradingStrategy {
   public name = "Golden Cross Strategy";
   public description = "Institutional trend-following using SMA50/SMA200 crossovers for major trend reversal identification.";
   public type = "Trend Following";
-  public timeframe = "1h";
-  public timeframes = ["15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["sma50", "atr", "rsi"];

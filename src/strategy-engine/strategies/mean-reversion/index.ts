@@ -8,8 +8,8 @@ export class MeanReversionStrategy implements TradingStrategy {
   public name = "Mean Reversion Strategy";
   public description = "Detect temporary price deviations from equilibrium and trade reversals back toward mean price.";
   public type = "Mean-Reversion";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50"];

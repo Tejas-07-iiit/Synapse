@@ -8,8 +8,8 @@ export class EMACrossoverStrategy implements TradingStrategy {
   public expectedHoldingTime = "5m-45m";
   public name = "EMA Crossover Strategy";
   public description = "Triggers buy/sell orders based on Exponential Moving Average (12 and 26 period) crossovers.";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["ema12", "ema26"];

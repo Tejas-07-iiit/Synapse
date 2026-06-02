@@ -27,8 +27,8 @@ export class HashRibbonsStrategy implements TradingStrategy {
   public name = "Hash Ribbons Strategy";
   public description = "Detects Bitcoin miner capitulation and recovery using hashrate moving average crossovers for major bottom identification.";
   public type = "Sentiment";
-  public timeframe = "4h";
-  public timeframes = ["1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols = ["BTCUSDT"]; // BTC only
   public enabled = true;
   public indicatorsRequired = ["atr", "rsi", "ema20"];

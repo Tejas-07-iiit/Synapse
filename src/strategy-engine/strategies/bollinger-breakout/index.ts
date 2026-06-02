@@ -9,8 +9,8 @@ export class BollingerBreakoutStrategy implements TradingStrategy {
   public name = "Bollinger Breakout Strategy";
   public description = "Capture volatility expansion breakouts when price closes outside the Bollinger Bands under high volume and rising ADX.";
   public type = "Breakout";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["bbUpper", "bbMiddle", "bbLower", "adx", "atr", "volumeMA"];

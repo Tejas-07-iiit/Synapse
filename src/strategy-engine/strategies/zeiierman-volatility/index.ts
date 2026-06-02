@@ -23,8 +23,8 @@ export class ZeiiermanVolatilityStrategy implements TradingStrategy {
   public name = "Zeiierman Volatility";
   public description = "Volatility breakout strategy entering trades on band breaches confirmed by trend strength and volume expansion.";
   public type = "Volatility";
-  public timeframe = "1h";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["atr", "adx", "volumeMA"];

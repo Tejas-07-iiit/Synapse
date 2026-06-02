@@ -9,8 +9,8 @@ export class ShortTermReversalStrategy implements TradingStrategy {
   public name = "Short Term Reversal Strategy";
   public description = "Trade quick pullback reversals from EMA50 support or extension when RSI and Momentum indicate exhaustion.";
   public type = "Reversal";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "momentum"];

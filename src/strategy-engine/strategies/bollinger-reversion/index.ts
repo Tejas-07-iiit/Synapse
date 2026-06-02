@@ -9,8 +9,8 @@ export class BollingerReversionStrategy implements TradingStrategy {
   public name = "Bollinger Reversion Strategy";
   public description = "Detect price exhaustion outside Bollinger Bands and trade reversions back toward equilibrium in ranging markets.";
   public type = "MeanReversion";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["bbUpper", "bbMiddle", "bbLower", "adx", "rsi", "atr"];

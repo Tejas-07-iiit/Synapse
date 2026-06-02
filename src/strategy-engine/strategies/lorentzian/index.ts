@@ -64,7 +64,7 @@ export class LorentzianStrategy implements TradingStrategy {
   public description = "Statistical similarity classification strategy that matches current market state with historical nearest neighbors to predict trend direction.";
   public type = "Lorentzian";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "adx", "atr"];

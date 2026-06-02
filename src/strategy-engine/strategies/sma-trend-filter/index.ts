@@ -27,8 +27,8 @@ export class SMATrendFilterStrategy implements TradingStrategy {
   public name = "SMA Trend Filter";
   public description = "Trend-following system trading in the direction of SMA50/SMA200 macro alignment with RSI filters.";
   public type = "Trend Following";
-  public timeframe = "1h";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["sma50", "rsi", "atr"];

@@ -25,7 +25,7 @@ export class TimeSeriesMomentumStrategy implements TradingStrategy {
   public description = "Captures trend persistence using 12-period momentum and ADX trend strength filtering.";
   public type = "Momentum";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["adx", "momentum", "atr", "rsi"];

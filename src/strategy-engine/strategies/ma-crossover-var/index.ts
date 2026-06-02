@@ -27,8 +27,8 @@ export class MACrossoverVariableStrategy implements TradingStrategy {
   public name = "MA Crossover Variable";
   public description = "Adaptive trend-following using EMA20/EMA50 crossovers filtered by SMA200 trend and slope.";
   public type = "Trend Following";
-  public timeframe = "1h";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "15m";
+  public timeframes = ["15m", "30m", "1h"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["ema20", "atr"];

@@ -9,7 +9,7 @@ export class DefensiveStrategy implements TradingStrategy {
   public description = "Trade ONLY high-probability trend continuation setups with strong filtering. Conservative and safety-oriented.";
   public type = "Defensive";
   public timeframe = "15m";
-  public timeframes = ["5m", "15m"];
+  public timeframes = ["15m", "30m", "1h"];
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "ema20", "sma50", "macdLine", "signalLine", "macdHist", "supportLevels", "resistanceLevels"];

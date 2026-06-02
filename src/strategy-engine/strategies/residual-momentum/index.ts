@@ -20,8 +20,8 @@ export class ResidualMomentumStrategy implements TradingStrategy {
   public name = "Residual Momentum Strategy";
   public description = "Measures abnormal (residual) returns versus a regression baseline and trades on statistically significant momentum deviations.";
   public type = "Momentum";
-  public timeframe = "15m";
-  public timeframes = ["5m", "15m", "1h", "4h"];
+  public timeframe = "1m";
+  public timeframes = ["1m", "3m", "5m"];
   public symbols: string[] = [];
   public enabled = true;
   public indicatorsRequired = ["rsi", "ema20", "sma50", "atr"];

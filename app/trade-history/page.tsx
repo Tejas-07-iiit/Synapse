@@ -1007,14 +1007,14 @@ export default function TradeHistoryPage() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-            <div className="bg-[#0b0c10] border border-[#1b2030] rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] text-foreground">
+            <div className="bg-card dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] text-foreground">
               
               {/* Title / Header */}
-              <div className="px-6 py-5 border-b border-[#1b2030] flex items-center justify-between bg-gradient-to-r from-[#11131c] to-[#0b0c10]">
+              <div className="px-6 py-5 border-b border-border dark:border-[#1b2030] flex items-center justify-between bg-muted/50 dark:bg-gradient-to-r dark:from-[#11131c] dark:to-[#0b0c10]">
                 <div>
                   <div className="flex items-center gap-3">
                     <h3 className="text-base font-extrabold text-foreground tracking-tight">Trade Intelligence Report</h3>
-                    <div className="flex items-center gap-1.5 bg-[#1b2030] px-2.5 py-0.5 rounded-full border border-border/30 text-xs">
+                    <div className="flex items-center gap-1.5 bg-background dark:bg-[#1b2030] px-2.5 py-0.5 rounded-full border border-border/30 text-xs">
                       <span className="font-extrabold">{selectedTrade.symbol}</span>
                       <span className="text-muted-foreground">•</span>
                       <span className={`font-extrabold uppercase ${selectedTrade.direction === "LONG" ? "text-emerald-500" : "text-destructive"}`}>
@@ -1051,35 +1051,35 @@ export default function TradeHistoryPage() {
                   <div className="space-y-6">
                     
                     {/* Section 2: Market Snapshot */}
-                    <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                    <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                         <Activity size={13} className="text-primary" /> Market Snapshot
                       </h4>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-[#0b0c10] border border-[#1b2030] p-2.5 rounded-lg">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-2.5 rounded-lg">
                           <span className="text-[9px] font-black text-muted-foreground uppercase block">Regime</span>
                           <span className="font-extrabold text-foreground">{marketSnapshot.regime}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] p-2.5 rounded-lg">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-2.5 rounded-lg">
                           <span className="text-[9px] font-black text-muted-foreground uppercase block">Volatility (ATR)</span>
                           <span className="font-extrabold text-foreground">{Number(marketSnapshot.volatility).toFixed(4)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] p-2.5 rounded-lg">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-2.5 rounded-lg">
                           <span className="text-[9px] font-black text-muted-foreground uppercase block">Volume</span>
                           <span className="font-extrabold text-foreground">${Number(marketSnapshot.volume).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] p-2.5 rounded-lg">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-2.5 rounded-lg">
                           <span className="text-[9px] font-black text-muted-foreground uppercase block">Trend Strength (ADX)</span>
                           <span className="font-extrabold text-foreground">{Number(marketSnapshot.trendStrength).toFixed(1)}</span>
                         </div>
                       </div>
-                      <p className="text-[11px] font-medium text-muted-foreground bg-[#0b0c10]/40 border border-[#1b2030]/60 p-2.5 rounded-lg mt-2">
+                      <p className="text-[11px] font-medium text-muted-foreground bg-background/50 dark:bg-[#0b0c10]/40 border border-border/50 dark:border-[#1b2030]/60 p-2.5 rounded-lg mt-2">
                         {marketSnapshot.summary}
                       </p>
                     </div>
 
                     {/* Section 5: Confidence Score Breakdown */}
-                    <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                    <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                         <Award size={13} className="text-primary" /> Confidence Score Breakdown
                       </h4>
@@ -1090,7 +1090,7 @@ export default function TradeHistoryPage() {
                             <span className="text-muted-foreground">Trend Alignment</span>
                             <span className="text-foreground">{confidenceBreakdown.trendScore}/25</span>
                           </div>
-                          <div className="w-full bg-[#0b0c10] rounded-full h-1.5">
+                          <div className="w-full bg-background dark:bg-[#0b0c10] rounded-full h-1.5 border border-border dark:border-none">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(confidenceBreakdown.trendScore / 25) * 100}%` }}></div>
                           </div>
                         </div>
@@ -1100,7 +1100,7 @@ export default function TradeHistoryPage() {
                             <span className="text-muted-foreground">Momentum Alignment</span>
                             <span className="text-foreground">{confidenceBreakdown.momentumScore}/20</span>
                           </div>
-                          <div className="w-full bg-[#0b0c10] rounded-full h-1.5">
+                          <div className="w-full bg-background dark:bg-[#0b0c10] rounded-full h-1.5 border border-border dark:border-none">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(confidenceBreakdown.momentumScore / 20) * 100}%` }}></div>
                           </div>
                         </div>
@@ -1110,7 +1110,7 @@ export default function TradeHistoryPage() {
                             <span className="text-muted-foreground">Volume Expansion</span>
                             <span className="text-foreground">{confidenceBreakdown.volumeScore}/15</span>
                           </div>
-                          <div className="w-full bg-[#0b0c10] rounded-full h-1.5">
+                          <div className="w-full bg-background dark:bg-[#0b0c10] rounded-full h-1.5 border border-border dark:border-none">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(confidenceBreakdown.volumeScore / 15) * 100}%` }}></div>
                           </div>
                         </div>
@@ -1120,7 +1120,7 @@ export default function TradeHistoryPage() {
                             <span className="text-muted-foreground">Regime Category Fit</span>
                             <span className="text-foreground">{confidenceBreakdown.regimeScore}/20</span>
                           </div>
-                          <div className="w-full bg-[#0b0c10] rounded-full h-1.5">
+                          <div className="w-full bg-background dark:bg-[#0b0c10] rounded-full h-1.5 border border-border dark:border-none">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(confidenceBreakdown.regimeScore / 20) * 100}%` }}></div>
                           </div>
                         </div>
@@ -1130,13 +1130,13 @@ export default function TradeHistoryPage() {
                             <span className="text-muted-foreground">Confirmation Indicators</span>
                             <span className="text-foreground">{confidenceBreakdown.confirmScore}/20</span>
                           </div>
-                          <div className="w-full bg-[#0b0c10] rounded-full h-1.5">
+                          <div className="w-full bg-background dark:bg-[#0b0c10] rounded-full h-1.5 border border-border dark:border-none">
                             <div className="bg-primary h-1.5 rounded-full" style={{ width: `${(confidenceBreakdown.confirmScore / 20) * 100}%` }}></div>
                           </div>
                         </div>
 
                         {confidenceBreakdown.perfBoost !== 0 && (
-                          <div className="bg-[#0b0c10] border border-[#1b2030] p-2 rounded-lg flex justify-between items-center text-[11px]">
+                          <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-2 rounded-lg flex justify-between items-center text-[11px]">
                             <span className="text-muted-foreground">Performance Boost Weighting:</span>
                             <span className={`font-extrabold ${confidenceBreakdown.perfBoost > 0 ? "text-emerald-500" : "text-destructive"}`}>
                               {confidenceBreakdown.perfBoost > 0 ? "+" : ""}{confidenceBreakdown.perfBoost} pts
@@ -1152,36 +1152,36 @@ export default function TradeHistoryPage() {
                     </div>
 
                     {/* Section 6: Trade Evidence */}
-                    <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                    <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                         <Activity size={13} className="text-primary" /> Trade Evidence at Entry
                       </h4>
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">RSI:</span>
                           <span className="font-extrabold text-foreground">{Number(tradeEvidence.rsi).toFixed(2)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">EMA20:</span>
                           <span className="font-extrabold text-foreground">${Number(tradeEvidence.ema20).toFixed(2)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">EMA50:</span>
                           <span className="font-extrabold text-foreground">${Number(tradeEvidence.sma50 || tradeEvidence.ema50).toFixed(2)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">MACD Hist:</span>
                           <span className="font-extrabold text-foreground">{Number(tradeEvidence.macdHist).toFixed(4)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">ADX:</span>
                           <span className="font-extrabold text-foreground">{Number(tradeEvidence.adx).toFixed(2)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between">
                           <span className="text-muted-foreground">ATR:</span>
                           <span className="font-extrabold text-foreground">{Number(tradeEvidence.atr).toFixed(4)}</span>
                         </div>
-                        <div className="bg-[#0b0c10] border border-[#1b2030] px-2 py-1.5 rounded flex justify-between col-span-2">
+                        <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] px-2 py-1.5 rounded flex justify-between col-span-2">
                           <span className="text-muted-foreground">Volume Ratio (Candle/MA):</span>
                           <span className="font-extrabold text-foreground">{Number(tradeEvidence.volumeRatio).toFixed(2)}x</span>
                         </div>
@@ -1194,30 +1194,30 @@ export default function TradeHistoryPage() {
                   <div className="space-y-6">
                     
                     {/* Section 4: Winning Strategy */}
-                    <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                    <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                         <Award size={13} className="text-primary" /> Winning Strategy Selection
                       </h4>
-                      <div className="bg-[#0b0c10] border border-[#1b2030] p-3 rounded-lg flex items-center justify-between">
+                      <div className="bg-background dark:bg-[#0b0c10] border border-border dark:border-[#1b2030] p-3 rounded-lg flex items-center justify-between">
                         <div>
                           <span className="text-[10px] font-black uppercase text-primary block">Winning Agent</span>
                           <span className="font-extrabold text-foreground text-sm">{winningStrategy.strategyName}</span>
                         </div>
-                        <div className="bg-[#1b2030] border border-border/30 px-3 py-1 rounded-full text-center">
+                        <div className="bg-muted/50 dark:bg-[#1b2030] border border-border/30 px-3 py-1 rounded-full text-center">
                           <span className="text-[9px] font-black text-muted-foreground uppercase block leading-none">Confidence</span>
                           <span className="font-extrabold text-primary text-sm leading-none">{winningStrategy.confidence}%</span>
                         </div>
                       </div>
                       <div className="text-xs">
                         <span className="text-[9px] font-black uppercase text-muted-foreground block mb-1">Reason for Selection</span>
-                        <p className="bg-[#0b0c10]/40 border border-[#1b2030] p-2.5 rounded-lg leading-relaxed text-muted-foreground">
+                        <p className="bg-background/40 dark:bg-[#0b0c10]/40 border border-border/50 dark:border-[#1b2030] p-2.5 rounded-lg leading-relaxed text-muted-foreground">
                           {winningStrategy.selectionReason}
                         </p>
                       </div>
                     </div>
 
                     {/* Section 3: Strategy Competition */}
-                    <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                    <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                         <Activity size={13} className="text-primary" /> Strategy Competition
                       </h4>
@@ -1227,7 +1227,7 @@ export default function TradeHistoryPage() {
                             <div key={i} className={`p-2.5 rounded-lg border flex items-center justify-between transition-all ${
                               strat.strategyId === winningStrategy.strategyId
                                 ? "bg-primary/10 border-primary/40 shadow-sm"
-                                : "bg-[#0b0c10]/60 border-[#1b2030] opacity-80"
+                                : "bg-background/60 dark:bg-[#0b0c10]/60 border-border dark:border-[#1b2030] opacity-80"
                             }`}>
                               <div>
                                 <span className="font-extrabold text-xs block text-foreground truncate max-w-[200px]" title={strat.strategyName}>
@@ -1253,16 +1253,16 @@ export default function TradeHistoryPage() {
 
                     {/* Section 9: Why Other Strategies Lost */}
                     {otherStrategiesLost && otherStrategiesLost.length > 0 && (
-                      <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                      <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                         <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5 flex items-center gap-1.5">
                           <AlertCircle size={13} className="text-primary" /> Why Other Strategies Lost
                         </h4>
                         <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                           {otherStrategiesLost.filter(Boolean).map((lost: any, i: number) => (
-                            <div key={i} className="p-2.5 bg-[#0b0c10]/40 border border-[#1b2030] rounded-lg text-xs leading-relaxed">
+                            <div key={i} className="p-2.5 bg-background/40 dark:bg-[#0b0c10]/40 border border-border dark:border-[#1b2030] rounded-lg text-xs leading-relaxed">
                               <div className="flex justify-between items-center mb-1">
                                 <span className="font-extrabold text-foreground truncate max-w-[150px]" title={lost.strategyName}>{lost.strategyName}</span>
-                                <span className="text-[9px] font-extrabold text-muted-foreground bg-[#1b2030] px-1.5 py-0.5 rounded border border-border/30 uppercase">
+                                <span className="text-[9px] font-extrabold text-muted-foreground bg-muted dark:bg-[#1b2030] px-1.5 py-0.5 rounded border border-border/30 uppercase">
                                   {lost.direction} • {lost.confidence}%
                                 </span>
                               </div>
@@ -1281,7 +1281,7 @@ export default function TradeHistoryPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
                   {/* Section 7: Trade Plan */}
-                  <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                  <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                     <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5">
                       Trade Plan & Risk
                     </h4>
@@ -1320,7 +1320,7 @@ export default function TradeHistoryPage() {
                   </div>
 
                   {/* Section 8: Execution Costs */}
-                  <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                  <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                     <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5">
                       Execution Costs & PnL
                     </h4>
@@ -1359,7 +1359,7 @@ export default function TradeHistoryPage() {
                   </div>
 
                   {/* Section 9: Exit Outcome */}
-                  <div className="bg-[#11131c]/50 border border-[#1b2030] rounded-xl p-4 space-y-3">
+                  <div className="bg-muted/30 dark:bg-[#11131c]/50 border border-border dark:border-[#1b2030] rounded-xl p-4 space-y-3">
                     <h4 className="text-xs font-black uppercase tracking-wider text-muted-foreground border-b border-border/10 pb-1.5">
                       Exit Outcome
                     </h4>
@@ -1392,7 +1392,7 @@ export default function TradeHistoryPage() {
                       </div>
                       <div className="text-xs pt-1.5">
                         <span className="text-[9px] font-black uppercase text-muted-foreground block mb-1">Exit Explanation</span>
-                        <p className="bg-[#0b0c10]/40 border border-[#1b2030] p-2 rounded-lg text-muted-foreground text-[11px] leading-relaxed">
+                        <p className="bg-background/40 dark:bg-[#0b0c10]/40 border border-border/50 dark:border-[#1b2030] p-2 rounded-lg text-muted-foreground text-[11px] leading-relaxed">
                           {exitOutcome.exitReason || "Trade is still active and monitoring SL/TP targets."}
                         </p>
                       </div>
@@ -1404,10 +1404,10 @@ export default function TradeHistoryPage() {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-[#1b2030] bg-[#11131c]/25 flex justify-end">
+              <div className="px-6 py-4 border-t border-border dark:border-[#1b2030] bg-muted/20 dark:bg-[#11131c]/25 flex justify-end">
                 <button 
                   onClick={() => setSelectedTrade(null)} 
-                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-primary/30"
+                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-primary-foreground font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer border border-primary/30"
                 >
                   Close Report
                 </button>

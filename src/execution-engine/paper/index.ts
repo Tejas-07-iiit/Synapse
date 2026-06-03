@@ -53,6 +53,13 @@ export class PaperTradingEngine {
         }
       }
       for (const pos of positionsList) {
+        let timeframe: string | undefined = undefined;
+        if (pos.auditPayload && typeof pos.auditPayload === "object") {
+          const payload = pos.auditPayload as any;
+          if (payload.timeframe) {
+            timeframe = payload.timeframe;
+          }
+        }
         this.positions.set(pos.id, {
           id: pos.id,
           userId: pos.userId,
@@ -79,6 +86,7 @@ export class PaperTradingEngine {
           expiresAt: pos.expiresAt ? new Date(pos.expiresAt).getTime() : undefined,
           exitReason: pos.exitReason || undefined,
           confidenceScore: pos.confidenceScore || undefined,
+          timeframe: timeframe,
         });
       }
       console.log(`[PaperTrading] Loaded ${positionsList.length} active positions from database.`);
@@ -95,13 +103,40 @@ export class PaperTradingEngine {
    * Evaluates incoming real-time price updates against open positions.
    * Checks stopLoss and takeProfit conditions to trigger auto-liquidations/exits.
    */
-  public static async updatePrices(symbol: string, currentPrice: number, currentHigh?: number, currentLow?: number) {
+  public static async updatePrices(
+    symbol: string,
+    currentPrice: number,
+    currentHigh?: number,
+    currentLow?: number,
+    triggerTimeframe?: string,
+    candleOpenTime?: number,
+    candleCloseTime?: number
+  ) {
     const sym = symbol.toUpperCase();
     const activePositions = Array.from(this.positions.values()).filter(
       (p) => p.symbol === sym && p.status === "OPEN"
     );
 
     for (const pos of activePositions) {
+      const triggerSource = triggerTimeframe === undefined ? "Live Ticks" : "Candle Update";
+
+      // 1. Timeframe Isolation Guard
+      if (triggerTimeframe !== undefined && pos.timeframe !== undefined && pos.timeframe !== triggerTimeframe) {
+        console.log(`[POSITION_MONITOR] [EVALUATION_SKIPPED_TIMEFRAME] Position ID: ${pos.id} | Symbol: ${pos.symbol} | Strategy: ${pos.strategyName || "N/A"} | Position Timeframe: ${pos.timeframe} | Trigger Timeframe: ${triggerTimeframe} | Trigger Source: ${triggerSource} | Current Price: ${currentPrice} | SL: ${pos.stopLoss} | TP: ${pos.takeProfit}`);
+        continue;
+      }
+
+      // 2. Prevent Historical Candle Contamination Guard
+      if (candleOpenTime !== undefined && candleCloseTime !== undefined) {
+        if (candleOpenTime < pos.openedAt || candleCloseTime < pos.openedAt) {
+          console.log(`[POSITION_MONITOR] [EVALUATION_SKIPPED_PREENTRY_CANDLE] Position ID: ${pos.id} | Symbol: ${pos.symbol} | Strategy: ${pos.strategyName || "N/A"} | Position Timeframe: ${pos.timeframe || "N/A"} | Trigger Timeframe: ${triggerTimeframe || "N/A"} | Trigger Source: ${triggerSource} | Current Price: ${currentPrice} | SL: ${pos.stopLoss} | TP: ${pos.takeProfit}`);
+          continue;
+        }
+      }
+
+      // 3. Evaluation Allowed Log
+      console.log(`[POSITION_MONITOR] [EVALUATION_ALLOWED] Position ID: ${pos.id} | Symbol: ${pos.symbol} | Strategy: ${pos.strategyName || "N/A"} | Position Timeframe: ${pos.timeframe || "N/A"} | Trigger Timeframe: ${triggerTimeframe || "N/A"} | Trigger Source: ${triggerSource} | Current Price: ${currentPrice} | SL: ${pos.stopLoss} | TP: ${pos.takeProfit}`);
+
       pos.currentPrice = currentPrice;
 
       // Calculate floating PnL
@@ -186,6 +221,11 @@ export class PaperTradingEngine {
       }
 
       if (shouldClose) {
+        if (exitReason === "STOP_LOSS") {
+          console.log(`[POSITION_MONITOR] [STOP_LOSS_TRIGGERED] Position ID: ${pos.id} | Symbol: ${pos.symbol} | Strategy: ${pos.strategyName || "N/A"} | Position Timeframe: ${pos.timeframe || "N/A"} | Trigger Timeframe: ${triggerTimeframe || "N/A"} | Trigger Source: ${triggerSource} | Current Price: ${currentPrice} | SL: ${pos.stopLoss} | TP: ${pos.takeProfit}`);
+        } else if (exitReason === "TAKE_PROFIT") {
+          console.log(`[POSITION_MONITOR] [TAKE_PROFIT_TRIGGERED] Position ID: ${pos.id} | Symbol: ${pos.symbol} | Strategy: ${pos.strategyName || "N/A"} | Position Timeframe: ${pos.timeframe || "N/A"} | Trigger Timeframe: ${triggerTimeframe || "N/A"} | Trigger Source: ${triggerSource} | Current Price: ${currentPrice} | SL: ${pos.stopLoss} | TP: ${pos.takeProfit}`);
+        }
         await this.closePosition(pos.id, executionPrice, exitReason);
       }
     }
@@ -225,6 +265,25 @@ export class PaperTradingEngine {
       const marketRegime = signalContext?.marketContext?.regime || "UNKNOWN";
       const indicatorSnapshot = signalContext?.indicators || {};
       const auditPayload = signalContext?.auditPayload || null;
+
+      // 1.4 TIMEFRAME VALIDATION GUARD
+      const timeframe = signalContext?.timeframe;
+      if (!timeframe) {
+        console.warn(`[POSITION_TIMEFRAME_MISSING] Rejecting position open. Symbol: ${sym} | Direction: ${direction} | Strategy: ${strategyName}`);
+        return null;
+      }
+
+      // 1.45 INVALID ENTRY VALIDATION GUARD
+      if (stopLoss !== null) {
+        if (direction === "LONG" && price <= stopLoss) {
+          console.warn(`[POSITION_MONITOR] [INVALID_ENTRY_REJECTED] Position ID: PENDING | Symbol: ${sym} | Strategy: ${strategyName} | Position Timeframe: ${timeframe} | Trigger Timeframe: N/A | Trigger Source: N/A | Current Price: ${price} | SL: ${stopLoss} | TP: ${takeProfit}`);
+          return null;
+        }
+        if (direction === "SHORT" && price >= stopLoss) {
+          console.warn(`[POSITION_MONITOR] [INVALID_ENTRY_REJECTED] Position ID: PENDING | Symbol: ${sym} | Strategy: ${strategyName} | Position Timeframe: ${timeframe} | Trigger Timeframe: N/A | Trigger Source: N/A | Current Price: ${price} | SL: ${stopLoss} | TP: ${takeProfit}`);
+          return null;
+        }
+      }
 
       // 1.5 CHECK COOLDOWN
       const cooldownExpiry = this.symbolCooldowns.get(sym) || 0;
@@ -444,8 +503,11 @@ export class PaperTradingEngine {
         console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
         let dbPos: any = null;
 
-        // Enrich auditPayload with final sizing
+        // Enrich auditPayload with final sizing and timeframe
         let finalAuditPayload = auditPayload;
+        if (!finalAuditPayload) {
+          finalAuditPayload = {};
+        }
         if (finalAuditPayload) {
           try {
             finalAuditPayload = JSON.parse(JSON.stringify(finalAuditPayload));
@@ -453,6 +515,7 @@ export class PaperTradingEngine {
               finalAuditPayload.tradePlan.sizeUsdt = Number(orderValueUsdt.toFixed(2));
               finalAuditPayload.tradePlan.quantity = Number(qty.toFixed(6));
             }
+            finalAuditPayload.timeframe = timeframe;
           } catch (e) {
             console.error("[PaperTrading] Failed to enrich auditPayload sizing:", e);
           }
@@ -543,6 +606,7 @@ export class PaperTradingEngine {
           auditPayload: dbPos.auditPayload || undefined,
           expiresAt: expiresAt ? expiresAt.getTime() : undefined,
           confidenceScore,
+          timeframe: timeframe,
         };
 
         this.positions.set(position.id, position);

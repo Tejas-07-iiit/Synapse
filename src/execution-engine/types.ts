@@ -25,6 +25,7 @@ export interface VirtualPosition {
   exitReason?: string | null;
   confidenceScore?: number | null;
   auditPayload?: any;
+  timeframe?: string;
 }
 
 export interface VirtualOrder {

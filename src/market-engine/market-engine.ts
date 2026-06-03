@@ -242,8 +242,28 @@ class MarketEngine {
         // 1. Update the symbol-specific candle cache
         store.updateLastCandleForSymbol(symUpper, tfLower, candle);
 
-        // Forward kline high/low extremes to paper trading engine to perfectly catch wick liquidations
-        PaperTradingEngine.updatePrices(symUpper, candle.close, candle.high, candle.low);
+        // Calculate candle timeframe duration in milliseconds
+        let durationMs = 0;
+        if (tfLower.endsWith("m")) {
+          durationMs = parseInt(tfLower) * 60 * 1000;
+        } else if (tfLower.endsWith("h")) {
+          durationMs = parseInt(tfLower) * 60 * 60 * 1000;
+        } else if (tfLower.endsWith("d")) {
+          durationMs = parseInt(tfLower) * 24 * 60 * 60 * 1000;
+        }
+        const candleOpenTime = candle.time;
+        const candleCloseTime = candleOpenTime + durationMs - 1;
+
+        // Forward kline high/low extremes to paper trading engine to perfectly catch wick liquidations with timeframe and timeframe boundaries
+        PaperTradingEngine.updatePrices(
+          symUpper,
+          candle.close,
+          candle.high,
+          candle.low,
+          tfLower,
+          candleOpenTime,
+          candleCloseTime
+        );
 
         // 2. If it's the active symbol and timeframe, update the active candles for UI
         if (symUpper === this.activeSymbol && tfLower === this.activeTimeframe) {

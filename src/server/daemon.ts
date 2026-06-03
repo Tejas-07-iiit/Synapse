@@ -389,40 +389,41 @@ async function runDaemon() {
       const sym = symbol.toUpperCase();
       const tf = timeframe.toLowerCase();
 
+      console.log(`[FLOW_04] Daemon callback triggered for ${sym} (${tf}) | Total Global Signals: ${signals.length}`);
+
       // Query database for all users that have autoTrading enabled
       // We use a robust approach to handle potential Prisma Client desyncs
       let usersWithAuto: any[] = [];
       try {
-        // Try raw SQL first to bypass any Client validation errors regarding missing columns
-        // We use double quotes for all identifiers to be safe with PostgreSQL case-sensitivity
-        usersWithAuto = await prisma.$queryRawUnsafe(`
-          SELECT s.*, 
-                 (SELECT row_to_json(u) FROM "synapse"."User" u WHERE u."id" = s."userId") as user
-          FROM "synapse"."UserSettings" s
-          WHERE s."autoTrading" = true
-        `);
-      } catch (rawErr) {
-        console.warn("[Daemon] Raw SQL settings fetch failed, trying fallback raw SQL:", rawErr);
-        try {
-          // Try without schema prefix in case search_path is already set
-          usersWithAuto = await prisma.$queryRawUnsafe(`
-            SELECT s.*, 
-                   (SELECT row_to_json(u) FROM "User" u WHERE u."id" = s."userId") as user
-            FROM "UserSettings" s
-            WHERE s."autoTrading" = true
-          `);
-        } catch (rawErr2) {
-          console.error("[Daemon] All raw SQL attempts failed, trying standard Prisma query:", rawErr2);
-          try {
-            usersWithAuto = await (prisma as any).userSettings.findMany({
-              where: { autoTrading: true },
-              include: { user: true },
-            });
-          } catch (stdErr: any) {
-             console.error("[Daemon] All attempts to fetch active users failed. Skipping this candle.", stdErr);
-             return;
-          }
-        }
+        // Try standard Prisma Client query first to be schema-agnostic and automatically handle mapping
+        usersWithAuto = await prisma.userSettings.findMany({
+          where: { autoTrading: true },
+          include: { user: true },
+        });
+      } catch (err: any) {
+         console.warn("[Daemon] Standard Prisma settings fetch failed, trying fallback raw SQL:", err);
+         try {
+           // Fallback to raw SQL without schema prefix to respect PostgreSQL search_path
+           usersWithAuto = await prisma.$queryRawUnsafe(`
+             SELECT s.*, 
+                    (SELECT row_to_json(u) FROM "User" u WHERE u."id" = s."userId") as user
+             FROM "UserSettings" s
+             WHERE s."autoTrading" = true
+           `);
+         } catch (rawErr) {
+           console.error("[Daemon] All raw SQL attempts failed, trying schema-prefixed query:", rawErr);
+           try {
+             usersWithAuto = await prisma.$queryRawUnsafe(`
+               SELECT s.*, 
+                      (SELECT row_to_json(u) FROM "synapse"."User" u WHERE u."id" = s."userId") as user
+               FROM "synapse"."UserSettings" s
+               WHERE s."autoTrading" = true
+             `);
+           } catch (stdErr: any) {
+              console.error("[Daemon] All attempts to fetch active users failed. Skipping this candle.", stdErr);
+              return;
+           }
+         }
       }
 
       // Final sanitization of the riskPerTradePct field
@@ -430,6 +431,8 @@ async function runDaemon() {
         ...u,
         riskPerTradePct: u.riskPerTradePct !== undefined ? u.riskPerTradePct : 2.0
       }));
+
+      console.log(`[FLOW_05] User settings loaded. Active users count: ${usersWithAuto.length}`);
 
       // A. Log strategy-level rejections (like regime mismatch) to DB for all active users
       const blockedRaw = (rawSignals || []).filter(r => r.blocked);
@@ -485,7 +488,42 @@ async function runDaemon() {
           console.error(`[Daemon] Failed to sync active positions for user ${userId} in callback:`, err);
         }
 
-      // 1. Filter signals matching preferredTradingMode
+      // 1. Log category mismatch rejections for transparency
+      const unmatchedSignals = signals.filter(sig => {
+        if (sig.signal !== "LONG" && sig.signal !== "SHORT") return false;
+        const strat = strategyRegistry.getStrategy(sig.strategyId);
+        return strat?.category !== userMode;
+      });
+
+      for (const sig of unmatchedSignals) {
+        try {
+          const strat = strategyRegistry.getStrategy(sig.strategyId);
+          const stratCategory = strat?.category || "Unknown";
+          await prisma.tradeSignal.create({
+            data: {
+              symbol: sym,
+              timeframe: tf,
+              strategyId: sig.strategyId,
+              direction: sig.signal,
+              confidence: sig.confidence,
+              entry: sig.entry,
+              stopLoss: sig.stopLoss || 0,
+              takeProfit: sig.takeProfit || 0,
+              timestamp: new Date(),
+              reasoning: sig.reasoning,
+              userId: userId,
+              tradingMode: userMode,
+              blocked: true,
+              blockReason: `CATEGORY MISMATCH: Strategy category is ${stratCategory} but user preferred mode is ${userMode}.`,
+              marketRegime: regime,
+            }
+          });
+        } catch (dbErr) {
+          console.error("[Daemon] Failed to log category rejection to DB:", dbErr);
+        }
+      }
+
+      // Filter signals matching preferredTradingMode
       const matchedSignals = signals.filter(sig => {
         if (sig.signal !== "LONG" && sig.signal !== "SHORT") return false;
         const strat = strategyRegistry.getStrategy(sig.strategyId);
@@ -548,6 +586,7 @@ async function runDaemon() {
         // Confidence calculation
         const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
         const confidenceScore = detailedConf.finalScore;
+        console.log(`[FLOW_06] Confidence scoring executed for user: ${userId} | Strategy: ${sig.strategyId} | Score: ${confidenceScore}`);
 
         // Regime compatibility
         const category = sig.strategyCategory || "Central Engine";
@@ -575,7 +614,8 @@ async function runDaemon() {
           lastVol,
           candlesCache,
           tickerCache,
-          stratContext
+          stratContext,
+          atrVal
         };
       });
 
@@ -601,170 +641,19 @@ async function runDaemon() {
         return b.riskRewardRatio - a.riskRewardRatio;
       });
 
+      console.log(`[FLOW_07] Signals filtered and ranked. Matched signals count: ${rankedSignals.length}`);
+
       // Now process each ranked signal for this user
       for (const ranked of rankedSignals) {
-        const { sig, confidenceScore, finalSl, finalTp, riskRewardRatio, detailedConf, volumeRatio, lastVol } = ranked;
+        const { sig, confidenceScore, finalSl, finalTp, riskRewardRatio, detailedConf, volumeRatio, lastVol, atrVal } = ranked;
         const direction = sig.signal as "LONG" | "SHORT";
+
+        console.log(`[FLOW_08] Running risk validation for signal: ${sig.strategyId} ${direction} on ${sym} for user ${userId}`);
 
         // Load wallet balance
         const wallet = await prisma.wallet.findUnique({ where: { userId } });
         if (!wallet) {
-          continue;
-        }
-
-        // Check position limits
-        const existingOpen = PaperTradingEngine.getOpenPositions().find(
-          (p) => p.symbol === sym && p.status === "OPEN" && p.userId === userId
-        );
-
-        if (existingOpen) {
-          console.log(`  - [REJECTED_POSITION_EXISTS] ${sym} already has an open position for user ${userId}`);
-          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason: `Active position already exists for user ${userId}` });
-          try {
-            await prisma.tradeSignal.create({
-              data: {
-                symbol: sym,
-                timeframe: tf,
-                strategyId: sig.strategyId,
-                direction: sig.signal,
-                confidence: sig.confidence,
-                entry: sig.entry,
-                stopLoss: finalSl,
-                takeProfit: finalTp,
-                timestamp: new Date(sig.timestamp),
-                reasoning: sig.reasoning,
-                userId: userId,
-                tradingMode: userMode,
-                blocked: true,
-                blockReason: "ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open.",
-                activePositionId: existingOpen.id,
-                confidenceScore: confidenceScore,
-                marketRegime: regime,
-                atr: atrVal,
-                positionSizeUsdt: estimatedSizeUsdt,
-              }
-            });
-          } catch (dbErr) {
-            console.error("[Daemon] Failed to log active position rejection to DB:", dbErr);
-          }
-          continue;
-        }
-
-        // A. Check quarantine status
-        if (PerformanceWeightingEngine.isQuarantined(sig.strategyId)) {
-          console.log(`  - [REJECTED_QUARANTINE] Strategy ${sig.strategyId} is quarantined.`);
-          AuditLogger.logQuarantineBlocked({ userId, symbol: sym, strategyId: sig.strategyId });
-          try {
-            await prisma.tradeSignal.create({
-              data: {
-                symbol: sym,
-                timeframe: tf,
-                strategyId: sig.strategyId,
-                direction: sig.signal,
-                confidence: sig.confidence,
-                entry: sig.entry,
-                stopLoss: finalSl,
-                takeProfit: finalTp,
-                timestamp: new Date(sig.timestamp),
-                reasoning: sig.reasoning,
-                userId: userId,
-                blocked: true,
-                blockReason: "STRATEGY QUARANTINED: Strategy was quarantined due to poor recent performance metrics.",
-              }
-            });
-          } catch (dbErr) {
-            console.error("[Daemon] Failed to log quarantine rejection to DB:", dbErr);
-          }
-          continue;
-        }
-
-        // B. Check symbol cooldowns
-        const lastTrade = await prisma.trade.findFirst({
-          where: {
-            userId,
-            symbol: sym,
-            executionType: "PAPER",
-          },
-          orderBy: {
-            closedAt: "desc",
-          },
-        });
-
-        if (lastTrade) {
-          const timeSinceCloseMs = Date.now() - new Date(lastTrade.closedAt).getTime();
-          let cooldownMinutes = 0;
-          if (lastTrade.status === "STOPPED") {
-            cooldownMinutes = 30;
-          } else if (lastTrade.status === "TP HIT") {
-            cooldownMinutes = 5;
-          } else { // "CLOSED"
-            cooldownMinutes = 10;
-          }
-
-          const cooldownMs = cooldownMinutes * 60 * 1000;
-          if (timeSinceCloseMs < cooldownMs) {
-            const remainingMins = Math.ceil((cooldownMs - timeSinceCloseMs) / (60 * 1000));
-            console.log(`  - [REJECTED_COOLDOWN] Symbol ${sym} in cooldown for ${remainingMins}m`);
-            AuditLogger.logCooldownBlocked({ userId, symbol: sym, remainingMinutes: remainingMins, lastStatus: lastTrade.status });
-            try {
-              await prisma.tradeSignal.create({
-                data: {
-                  symbol: sym,
-                  timeframe: tf,
-                  strategyId: sig.strategyId,
-                  direction: sig.signal,
-                  confidence: sig.confidence,
-                  entry: sig.entry,
-                  stopLoss: finalSl,
-                  takeProfit: finalTp,
-                  timestamp: new Date(sig.timestamp),
-                  reasoning: sig.reasoning,
-                  userId: userId,
-                  blocked: true,
-                  blockReason: `COOLDOWN ACTIVE: Cooldown active (${remainingMins}m remaining, last status: ${lastTrade.status}).`,
-                }
-              });
-            } catch (dbErr) {
-              console.error("[Daemon] Failed to log cooldown rejection to DB:", dbErr);
-            }
-            continue;
-          }
-        }
-
-        // C. Check one-trade-per-strategy protection
-        const hasStratPosition = PaperTradingEngine.getOpenPositions().some(
-          (p) => p.userId === userId && p.status === "OPEN" && p.strategyId === sig.strategyId && sig.strategyId !== "manual"
-        );
-        if (hasStratPosition) {
-          const reason = `STRATEGY LIMIT: Active position already exists generated by strategy ${sig.strategyId}.`;
-          console.log(`  - [REJECTED_STRATEGY_LIMIT] ${reason}`);
-          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason });
-          try {
-            await prisma.tradeSignal.create({
-              data: {
-                symbol: sym,
-                timeframe: tf,
-                strategyId: sig.strategyId,
-                direction: sig.signal,
-                confidence: sig.confidence,
-                entry: sig.entry,
-                stopLoss: finalSl,
-                takeProfit: finalTp,
-                timestamp: new Date(sig.timestamp),
-                reasoning: sig.reasoning,
-                userId: userId,
-                tradingMode: userMode,
-                blocked: true,
-                blockReason: reason,
-                confidenceScore: confidenceScore,
-                marketRegime: regime,
-                atr: atrVal,
-                positionSizeUsdt: estimatedSizeUsdt,
-              }
-            });
-          } catch (dbErr) {
-            console.error("[Daemon] Failed to log strategy limit rejection to DB:", dbErr);
-          }
+          console.log(`  - [REJECTED_NO_WALLET] User ${userId} has no wallet`);
           continue;
         }
 
@@ -817,6 +706,168 @@ async function runDaemon() {
         pct = Math.min(50, Math.max(5, pct));
         const estimatedSizeUsdt = wallet.balance * (pct / 100);
 
+        console.log(`[FLOW_09] Risk checks initialized. Estimated size: $${estimatedSizeUsdt.toFixed(2)} (${pct}% of balance $${wallet.balance.toFixed(2)})`);
+
+        // Check position limits
+        const existingOpen = PaperTradingEngine.getOpenPositions().find(
+          (p) => p.symbol === sym && p.status === "OPEN" && p.userId === userId
+        );
+
+        if (existingOpen) {
+          console.log(`  - [REJECTED_POSITION_EXISTS] ${sym} already has an open position for user ${userId}`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Active position exists`);
+          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason: `Active position already exists for user ${userId}` });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                tradingMode: userMode,
+                blocked: true,
+                blockReason: "ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open.",
+                activePositionId: existingOpen.id,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log active position rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
+        // A. Check quarantine status
+        if (PerformanceWeightingEngine.isQuarantined(sig.strategyId)) {
+          console.log(`  - [REJECTED_QUARANTINE] Strategy ${sig.strategyId} is quarantined.`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Quarantined`);
+          AuditLogger.logQuarantineBlocked({ userId, symbol: sym, strategyId: sig.strategyId });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                blocked: true,
+                blockReason: "STRATEGY QUARANTINED: Strategy was quarantined due to poor recent performance metrics.",
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log quarantine rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
+        // B. Check symbol cooldowns
+        const lastTrade = await prisma.trade.findFirst({
+          where: {
+            userId,
+            symbol: sym,
+            executionType: "PAPER",
+          },
+          orderBy: {
+            closedAt: "desc",
+          },
+        });
+
+        if (lastTrade) {
+          const timeSinceCloseMs = Date.now() - new Date(lastTrade.closedAt).getTime();
+          let cooldownMinutes = 0;
+          if (lastTrade.status === "STOPPED") {
+            cooldownMinutes = 30;
+          } else if (lastTrade.status === "TP HIT") {
+            cooldownMinutes = 5;
+          } else { // "CLOSED"
+            cooldownMinutes = 10;
+          }
+
+          const cooldownMs = cooldownMinutes * 60 * 1000;
+          if (timeSinceCloseMs < cooldownMs) {
+            const remainingMins = Math.ceil((cooldownMs - timeSinceCloseMs) / (60 * 1000));
+            console.log(`  - [REJECTED_COOLDOWN] Symbol ${sym} in cooldown for ${remainingMins}m`);
+            console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Cooldown active`);
+            AuditLogger.logCooldownBlocked({ userId, symbol: sym, remainingMinutes: remainingMins, lastStatus: lastTrade.status });
+            try {
+              await prisma.tradeSignal.create({
+                data: {
+                  symbol: sym,
+                  timeframe: tf,
+                  strategyId: sig.strategyId,
+                  direction: sig.signal,
+                  confidence: sig.confidence,
+                  entry: sig.entry,
+                  stopLoss: finalSl,
+                  takeProfit: finalTp,
+                  timestamp: new Date(sig.timestamp),
+                  reasoning: sig.reasoning,
+                  userId: userId,
+                  blocked: true,
+                  blockReason: `COOLDOWN ACTIVE: Cooldown active (${remainingMins}m remaining, last status: ${lastTrade.status}).`,
+                }
+              });
+            } catch (dbErr) {
+              console.error("[Daemon] Failed to log cooldown rejection to DB:", dbErr);
+            }
+            continue;
+          }
+        }
+
+        // C. Check one-trade-per-strategy protection
+        const hasStratPosition = PaperTradingEngine.getOpenPositions().some(
+          (p) => p.userId === userId && p.status === "OPEN" && p.strategyId === sig.strategyId && sig.strategyId !== "manual"
+        );
+        if (hasStratPosition) {
+          const reason = `STRATEGY LIMIT: Active position already exists generated by strategy ${sig.strategyId}.`;
+          console.log(`  - [REJECTED_STRATEGY_LIMIT] ${reason}`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Strategy limit reached`);
+          AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason });
+          try {
+            await prisma.tradeSignal.create({
+              data: {
+                symbol: sym,
+                timeframe: tf,
+                strategyId: sig.strategyId,
+                direction: sig.signal,
+                confidence: sig.confidence,
+                entry: sig.entry,
+                stopLoss: finalSl,
+                takeProfit: finalTp,
+                timestamp: new Date(sig.timestamp),
+                reasoning: sig.reasoning,
+                userId: userId,
+                tradingMode: userMode,
+                blocked: true,
+                blockReason: reason,
+                confidenceScore: confidenceScore,
+                marketRegime: regime,
+                atr: atrVal,
+                positionSizeUsdt: estimatedSizeUsdt,
+              }
+            });
+          } catch (dbErr) {
+            console.error("[Daemon] Failed to log strategy limit rejection to DB:", dbErr);
+          }
+          continue;
+        }
+
         // D. Check correlation risk filter
         const correlatedExposureUsdt = PaperTradingEngine.getOpenPositions()
           .filter((p) => p.userId === userId && p.status === "OPEN" && p.direction === direction && p.symbol !== sym)
@@ -830,6 +881,7 @@ async function runDaemon() {
         if (correlationBlocked) {
           const reason = `CORRELATION LIMIT: Already have open correlated positions and either confidence is too low (< 90) or total exposure would exceed 50% ($${totalCorrelatedExposure.toFixed(2)} > $${(wallet.balance * 0.50).toFixed(2)}).`;
           console.log(`  - [REJECTED_CORRELATION] ${reason}`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Correlation limit exceeded`);
           AuditLogger.logSignalRejected({ strategyId: sig.strategyId, symbol: sym, reason });
           try {
             await prisma.tradeSignal.create({
@@ -865,6 +917,7 @@ async function runDaemon() {
         if (userActivePositionsCount >= settings.maxOpenTrades) {
           const reason = `RISK MANAGEMENT BLOCK: Max open positions limit reached (${settings.maxOpenTrades}).`;
           console.log(`  - [REJECTED_MAX_OPEN] ${reason}`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Max open trades reached`);
           AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
           try {
             await prisma.tradeSignal.create({
@@ -905,6 +958,7 @@ async function runDaemon() {
         if (requiredMargin > availableBalance) {
           const reason = `RISK MANAGEMENT BLOCK: Insufficient margin (Required: $${requiredMargin.toFixed(2)}, Available: $${availableBalance.toFixed(2)}).`;
           console.log(`  - [REJECTED_MARGIN] ${reason}`);
+          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Insufficient margin`);
           AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
           try {
             await prisma.tradeSignal.create({
@@ -1034,6 +1088,7 @@ async function runDaemon() {
         };
 
         try {
+          console.log(`[FLOW_10] Calling openPosition for user: ${userId}, symbol: ${sym}, direction: ${direction}, size: ${estimatedSizeUsdt}`);
           const position = await PaperTradingEngine.openPosition(
             userId,
             sym,
@@ -1053,6 +1108,8 @@ async function runDaemon() {
           );
 
           if (position) {
+            console.log(`[FLOW_11] Position opened successfully: ${position.id}`);
+            console.log(`[SIGNAL_EXECUTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Direction: ${direction}`);
             console.log(`[MULTI-TENANT DEBUG] TRADE GENERATED -> userId: ${userId}, strategyId: ${sig.strategyId}, positionId: ${position.id}, symbol: ${sym}, side: ${direction}, entry: ${sig.entry}, sizeUsdt: ${estimatedSizeUsdt}`);
             AuditLogger.logTradeExecuted({
               userId,

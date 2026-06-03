@@ -22,9 +22,6 @@ export async function GET(request: Request) {
       where,
       orderBy: { timestamp: "desc" },
       take: limit,
-      include: {
-        // Optional: include user if needed, but tradeSignal only has userId string
-      }
     });
 
     const mapped = dbSignals.map((s) => ({

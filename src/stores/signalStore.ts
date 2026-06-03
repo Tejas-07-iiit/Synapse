@@ -43,7 +43,7 @@ export const useSignalStore = create<SignalState>((set) => ({
         set({ activeSignals: data.signals });
       }
     } catch (e) {
-      console.error("Failed to fetch signals:", e);
+      console.warn("Failed to fetch signals:", e);
     }
   },
 }));

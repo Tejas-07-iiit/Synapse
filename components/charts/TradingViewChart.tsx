@@ -33,6 +33,7 @@ interface ActivePosition {
   stopLoss: number | null;
   takeProfit: number | null;
   openedAt: string;
+  auditPayload?: any;
 }
 
 // --- TRADING OVERLAY (ZONES) ---
@@ -206,7 +207,7 @@ export default function TradingViewChart() {
           setActivePositions(data.positions);
         }
       } catch (err) {
-        console.error("Failed to fetch positions:", err);
+        console.warn("Failed to fetch positions:", err);
       }
     };
 
@@ -299,39 +300,46 @@ export default function TradingViewChart() {
 
     // 2. AI SIGNALS (Projected Levels)
     // Find the latest signal for this symbol that isn't too old (e.g., within 24h)
-    const latestSignal = activeSignals.find(s => s.symbol.toUpperCase() === currentSymbol);
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const latestSignal = activeSignals.find(s => 
+      s.symbol.toUpperCase() === currentSymbol &&
+      (Date.now() - s.timestamp) < ONE_DAY_MS
+    );
     const hasActivePosition = activePositions.some(pos => pos.symbol.toUpperCase() === currentSymbol);
 
-    if (latestSignal && !hasActivePosition && latestSignal.signalType !== "HOLD") {
-      const isLong = latestSignal.signalType === "LONG";
-      const color = isLong ? "#00D4FF" : "#FF5252";
-      
-      p.push({
-        id: `signal-${latestSignal.timestamp}-entry`,
-        price: latestSignal.entry,
-        color: color,
-        title: `AI PROJ ENTRY`,
-      });
-      p.push({
-        id: `signal-${latestSignal.timestamp}-tp`,
-        price: latestSignal.takeProfit,
-        color: "#22c55e",
-        title: `AI PROJ TP`,
-      });
-      p.push({
-        id: `signal-${latestSignal.timestamp}-sl`,
-        price: latestSignal.stopLoss,
-        color: "#ef4444",
-        title: `AI PROJ SL`,
-      });
+    if (latestSignal && !hasActivePosition) {
+      const sigType = latestSignal.signalType || latestSignal.signal;
+      if (sigType && sigType !== "HOLD") {
+        const isLong = sigType === "LONG";
+        const color = isLong ? "#00D4FF" : "#FF5252";
+        
+        p.push({
+          id: `signal-${latestSignal.timestamp}-entry`,
+          price: latestSignal.entry,
+          color: color,
+          title: `AI PROJ ENTRY`,
+        });
+        p.push({
+          id: `signal-${latestSignal.timestamp}-tp`,
+          price: latestSignal.takeProfit,
+          color: "#22c55e",
+          title: `AI PROJ TP`,
+        });
+        p.push({
+          id: `signal-${latestSignal.timestamp}-sl`,
+          price: latestSignal.stopLoss,
+          color: "#ef4444",
+          title: `AI PROJ SL`,
+        });
 
-      m.push({
-        time: latestSignal.timestamp,
-        position: isLong ? "belowBar" : "aboveBar",
-        color: color,
-        shape: isLong ? "arrowUp" : "arrowDown",
-        text: `AI ${latestSignal.signalType} (${latestSignal.confidence}%)`,
-      });
+        m.push({
+          time: latestSignal.timestamp,
+          position: isLong ? "belowBar" : "aboveBar",
+          color: color,
+          shape: isLong ? "arrowUp" : "arrowDown",
+          text: `AI ${sigType} (${latestSignal.confidence}%)`,
+        });
+      }
     }
 
     return { markers: m, priceLines: p, overlays: o };

@@ -105,13 +105,13 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {sig.signal !== "HOLD" && (
-                      sig.blocked ? (
-                        <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                          REJECTED
-                        </span>
-                      ) : (
+                    {sig.blocked ? (
+                      <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black px-2 py-0.5 rounded border border-amber-500/20 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                        REJECTED
+                      </span>
+                    ) : (
+                      sig.signal !== "HOLD" && (
                         <span className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                           EXECUTED
@@ -241,16 +241,16 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                  {/* Reasoning text */}
                 <div className="text-[11px] text-muted-foreground leading-relaxed pl-1 border-l-2 border-primary/15 space-y-2">
                   <div>{sig.reasoning.join(" ")}</div>
-                  {sig.signal !== "HOLD" && (
-                    sig.blocked ? (
-                      <div className="text-[10px] font-semibold text-amber-400 flex flex-col gap-1 bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg">
-                        <span className="font-bold uppercase tracking-wider text-[8px] text-amber-500">Signal Rejection Reason:</span>
-                        <span>ACTIVE POSITION EXISTS: The trade execution was rejected because a position is already open for {sig.symbol}.</span>
-                        {sig.activePositionId && (
-                          <span className="text-[9px] text-muted-foreground font-mono font-normal bg-muted px-1.5 py-0.5 rounded w-max">Active Position ID: {sig.activePositionId.slice(0, 8)}...</span>
-                        )}
-                      </div>
-                    ) : (
+                  {sig.blocked ? (
+                    <div className="text-[10px] font-semibold text-amber-400 flex flex-col gap-1 bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg">
+                      <span className="font-bold uppercase tracking-wider text-[8px] text-amber-500">Signal Rejection Reason:</span>
+                      <span>{sig.blockReason || `The trade execution was rejected because a position is already open for ${sig.symbol}.`}</span>
+                      {sig.activePositionId && (
+                        <span className="text-[9px] text-muted-foreground font-mono font-normal bg-muted px-1.5 py-0.5 rounded w-max">Active Position ID: {sig.activePositionId.slice(0, 8)}...</span>
+                      )}
+                    </div>
+                  ) : (
+                    sig.signal !== "HOLD" && (
                       <div className="text-[10px] font-semibold text-emerald-400 flex flex-col gap-1 bg-emerald-500/5 border border-emerald-500/10 p-2 rounded-lg">
                         <span className="font-bold uppercase tracking-wider text-[8px] text-emerald-500">Signal Execution Reason:</span>
                         <span>STRATEGY ALIGNED: Signal successfully executed. Position opened with ATR-based Stop Loss and Take Profit levels applied.</span>

@@ -97,4 +97,28 @@ export class RegimeEngine {
     if (regime === "LOW_VOLATILITY") return "RANGING";
     return "RANGING";
   }
+
+  /**
+   * Helper to check if a classified regime matches a list of supported regimes (with mapping support).
+   */
+  public static matches(classified: MarketRegime, supported: string[]): boolean {
+    if (!supported || supported.length === 0) return true;
+
+    const c = classified.toUpperCase();
+
+    return supported.some(s => {
+      const norm = s.toUpperCase().replace(/_/g, " ").trim();
+      
+      // 1. Direct or normalized match (e.g. "RANGING" === "RANGING" or "LOW_VOLATILITY" === "LOW_VOLATILITY")
+      if (norm === c || norm.replace(/\s+/g, "_") === c) return true;
+
+      // 2. Broad regime mappings
+      if (c === "TRENDING" && (norm.includes("TREND") || norm.includes("TRENDING"))) return true;
+      if (c === "RANGING" && (norm.includes("RANGE") || norm.includes("RANGING") || norm.includes("ACCUMULATION") || norm.includes("DISTRIBUTION"))) return true;
+      if (c === "HIGH_VOLATILITY" && (norm.includes("VOLATIL") || norm.includes("BREAKOUT"))) return true;
+      if (c === "LOW_VOLATILITY" && (norm.includes("VOLATIL") || norm.includes("SQUEEZE") || norm.includes("RANGING") || norm.includes("RANGE"))) return true;
+
+      return false;
+    });
+  }
 }

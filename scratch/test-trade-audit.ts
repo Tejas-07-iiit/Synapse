@@ -44,8 +44,6 @@ async function testTradeAuditPipeline() {
       data: {
         userId,
         autoTrading: true,
-        defaultSlPct: 2.0,
-        defaultTpPct: 4.0,
         maxOpenTrades: 3,
         riskPerTradePct: 5.0,
       },

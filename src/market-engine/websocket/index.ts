@@ -130,11 +130,11 @@ class WebSocketService {
       };
 
       this.socket.onerror = (err: any) => {
-        console.error("[WS-Engine] Binance Market WebSocket error:", err);
+        console.warn("[WS-Engine] Binance Market WebSocket error:", err);
         store.setWsConnectionState(false, "WebSocket connection error");
       };
     } catch (err) {
-      console.error("[WS-Engine] Binance Market WebSocket setup failed:", err);
+      console.warn("[WS-Engine] Binance Market WebSocket setup failed:", err);
       store.setWsConnectionState(false, (err as Error).message);
       this.triggerReconnect();
     }
@@ -209,6 +209,15 @@ class WebSocketService {
       }
       this.socket = null;
     }
+  }
+
+  public isConnected(): boolean {
+    const WS = this.getWSConstructor();
+    return !!(this.socket && this.socket.readyState === WS.OPEN);
+  }
+
+  public getSubscribedStreams(): string[] {
+    return Array.from(this.activeStreams.keys());
   }
 
   private resubscribeActiveStreams() {

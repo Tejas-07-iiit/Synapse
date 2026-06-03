@@ -64,7 +64,7 @@ export default function DashboardShell() {
           store.updateTicker(sym, ticker as unknown as TickerInfo);
         }
       } catch (err) {
-        console.error("[Dashboard] Failed to load initial REST tickers:", err);
+        console.warn("[Dashboard] Failed to load initial REST tickers:", err);
       }
     };
 

@@ -45,7 +45,7 @@ export default function MarketCards() {
         }
         fetchWallet(user.id, true).catch(() => {});
       } catch (err) {
-        console.error("Failed to fetch active positions", err);
+        console.warn("Failed to fetch active positions", err);
       }
     };
     fetchData();

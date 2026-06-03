@@ -130,22 +130,32 @@ class MarketEngine {
       // 2. Fetch historical candles for all coins from REST and compute initial indicators
       // REQUIRED ARCHITECTURE: Scalping (1m, 3m, 5m) + Intraday (15m, 30m, 1h)
       const timeframesToLoad = new Set<string>(["1m", "3m", "5m", "15m", "30m", "1h", tf]);
+      const loadTasks: Promise<void>[] = [];
+
       for (const coin of coinsList) {
         for (const t of timeframesToLoad) {
-          let candles = marketCache.get(coin, t);
-          if (!candles) {
-            candles = await fetchHistoricalCandles(coin, t, 1000);
-            marketCache.set(coin, t, candles);
-          }
+          loadTasks.push((async () => {
+            try {
+              let candles = marketCache.get(coin, t);
+              if (!candles) {
+                candles = await fetchHistoricalCandles(coin, t, 1000);
+                marketCache.set(coin, t, candles);
+              }
 
-          // Store in the symbol-level cache
-          useMarketStore.getState().setCandlesForSymbol(coin, t, candles);
+              // Store in the symbol-level cache
+              useMarketStore.getState().setCandlesForSymbol(coin, t, candles);
 
-          // Run initial calculation (with isClosed = false, isHistoricalBackfill = true)
-          const ticker = useMarketStore.getState().tickerData[coin] || null;
-          await this.recalculate(coin, t, candles, ticker, false, true);
+              // Run initial calculation (with isClosed = false, isHistoricalBackfill = true)
+              const ticker = useMarketStore.getState().tickerData[coin] || null;
+              await this.recalculate(coin, t, candles, ticker, false, true);
+            } catch (err) {
+              console.warn(`[MarketEngine] Failed to pre-load ${coin} (${t}):`, err);
+            }
+          })());
         }
       }
+
+      await Promise.all(loadTasks);
 
       // 3. Load the active candles and indicators of the selected symbol for UI chart
       const latestState = useMarketStore.getState();
@@ -271,6 +281,7 @@ class MarketEngine {
   }
 
   private onCandleClose(symbol: string, timeframe: string) {
+    console.log(`[FLOW_01] Candle Closed for ${symbol} (${timeframe})`);
     console.log(`[CandleLifecycle] 🔴 Candle Closed for ${symbol} (${timeframe})`);
     
     const scalpingTfs = ["1m", "3m", "5m"];
@@ -336,13 +347,13 @@ class MarketEngine {
     const tfKey = `${sym}_${tf}`;
 
     if (!isHistoricalBackfill) {
+        console.log(`[FLOW_02] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
         console.log(`[MARKET_ENGINE] Recalculating indicators & evaluating strategies for ${sym} (${tf}) | isClosed: ${isClosed}`);
     }
     
     // 1. Evaluate strategies, compute indicators, and fetch prioritized signals
     this.auditStats.evaluations++;
     const { signals, indicators: currentIndicators } = await strategyEngine.processTick(sym, tf, candles, ticker, isClosed);
-    this.auditStats.signals += (signals || []).length;
 
     const marketStore = useMarketStore.getState();
     const signalStore = useSignalStore.getState();
@@ -392,8 +403,11 @@ class MarketEngine {
         return;
     }
 
+    this.auditStats.signals += (signals || []).length;
+
     // 3. Update signalStore with new prioritized signals
     for (const sig of signals) {
+      console.log(`[SIGNAL_GENERATED] Symbol: ${sig.symbol} | Strategy: ${sig.strategyId} | Type: ${sig.signal} | Confidence: ${sig.confidence}%`);
       const isTradeDirection = sig.signal === "LONG" || sig.signal === "SHORT";
       if (isTradeDirection) {
         const targetUserId = typeof window !== "undefined"
@@ -409,6 +423,7 @@ class MarketEngine {
           
           console.log(`[POSITION_LOCK] ${sym} blocked → existing active trade found`);
           console.log(`[TRADE_REJECTED] Reason: Active position already exists for ${sym}`);
+          console.log(`[SIGNAL_REJECTED] User: ${targetUserId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Active position exists`);
         }
       }
 

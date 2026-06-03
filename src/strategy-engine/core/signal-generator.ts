@@ -58,7 +58,7 @@ export class SignalGenerator {
     const high = lastIdx >= 0 ? candles[lastIdx].high : 0;
     const low = lastIdx >= 0 ? candles[lastIdx].low : 0;
     const volume = lastIdx >= 0 ? candles[lastIdx].volume : 0;
-    const timestamp = lastIdx >= 0 ? candles[lastIdx].time : Date.now();
+    const timestamp = Date.now();
     const atr = (indicators && indicators.atr && lastIdx >= 0) 
       ? indicators.atr[lastIdx] 
       : (entry * 0.015); // Fallback: 1.5% of price

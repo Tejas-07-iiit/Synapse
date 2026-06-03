@@ -130,7 +130,7 @@ class StrategyEngine {
 
       if (supportsSymbol && supportsTimeframe) {
         // Enforce Regime check BEFORE execution
-        if (strategy.supportedRegimes && !strategy.supportedRegimes.includes(regime)) {
+        if (strategy.supportedRegimes && !RegimeEngine.matches(regime, strategy.supportedRegimes)) {
           continue;
         }
 
@@ -195,6 +195,7 @@ class StrategyEngine {
       console.error(`[Engine] Failed to log indicator snapshot to DB:`, err)
     );
 
+    console.log(`[FLOW_03] Processed tick, generated prioritized signals: ${prioritizedSignals.length} (raw: ${rawSignals.length})`);
     return { signals: prioritizedSignals, indicators };
   }
 

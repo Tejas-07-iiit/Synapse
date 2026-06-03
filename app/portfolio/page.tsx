@@ -180,7 +180,7 @@ export default function PortfolioPage() {
       await useWalletStore.getState().fetchWallet(user.id, silent);
       setError(null);
     } catch (err) {
-      console.error("[Portfolio] Error fetching data:", err);
+      console.warn("[Portfolio] Error fetching data:", err);
       if (!silent) setError("Failed to fetch portfolio data. Please try again.");
     } finally {
       if (!silent) setLoading(false);

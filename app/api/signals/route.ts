@@ -141,12 +141,7 @@ export async function GET(request: Request) {
     const userId = searchParams.get("userId") || undefined;
 
     const dbSignals = await prisma.tradeSignal.findMany({
-      where: userId ? {
-        OR: [
-          { userId },
-          { userId: null }
-        ]
-      } : undefined,
+      where: userId ? { userId } : undefined,
       orderBy: { timestamp: "desc" },
       take: limit,
     });

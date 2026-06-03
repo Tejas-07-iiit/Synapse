@@ -17,9 +17,10 @@ export async function GET(request: Request) {
     } catch (err: any) {
       if (err.message.includes("riskPerTradePct")) {
         console.warn("[API-Settings] Prisma desync detected, falling back to Raw SQL.");
-        const rawResults: any[] = await prisma.$queryRawUnsafe(`
-          SELECT * FROM "synapse"."UserSettings" WHERE "userId" = ${userId} LIMIT 1
-        `);
+        const rawResults: any[] = await prisma.$queryRawUnsafe(
+          `SELECT * FROM "UserSettings" WHERE "userId" = $1 LIMIT 1`,
+          userId
+        );
         settings = rawResults.length > 0 ? rawResults[0] : null;
       } else {
         throw err;

@@ -223,7 +223,7 @@ export default function TradeHistoryPage() {
       }
       setError(null);
     } catch (err) {
-      console.error("[TradeHistory] Error fetching data:", err);
+      console.warn("[TradeHistory] Error fetching data:", err);
       if (!silent) setError("Failed to fetch trade records. Please try again.");
     } finally {
       if (!silent) setLoading(false);

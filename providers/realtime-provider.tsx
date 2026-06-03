@@ -65,7 +65,7 @@ export const RealtimeProvider = ({ children }: { children: React.ReactNode }) =>
 
         console.log("[RealtimeProvider] Global streams active.");
       } catch (err) {
-        console.error("[RealtimeProvider] Failed to initialize global streams:", err);
+        console.warn("[RealtimeProvider] Failed to initialize global streams:", err);
       }
     };
 
@@ -84,7 +84,7 @@ export const RealtimeProvider = ({ children }: { children: React.ReactNode }) =>
       try {
         await marketEngine.init(selectedSymbol, timeframe);
       } catch (err) {
-        console.error("[RealtimeProvider] Failed starting market engine:", err);
+        console.warn("[RealtimeProvider] Failed starting market engine:", err);
       }
     };
 

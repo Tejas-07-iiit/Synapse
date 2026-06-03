@@ -39,6 +39,19 @@ async function runDaemon() {
     },
     openPosition: async (data: any) => {
       try {
+        // DB-level race condition check: ensure no open position already exists for this symbol and user
+        const existingOpen = await prisma.position.findFirst({
+          where: {
+            userId: data.userId,
+            symbol: data.symbol,
+            status: "OPEN",
+          },
+        });
+        if (existingOpen) {
+          console.warn(`[Daemon] Blocked duplicate position creation for ${data.symbol} (User: ${data.userId})`);
+          return null;
+        }
+
         return await prisma.position.create({
           data: {
             userId: data.userId,

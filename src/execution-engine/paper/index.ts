@@ -102,11 +102,6 @@ export class PaperTradingEngine {
     );
 
     for (const pos of activePositions) {
-      if (pos.expiresAt && Date.now() >= new Date(pos.expiresAt).getTime()) {
-        await this.closePosition(pos.id, currentPrice, "TRADE_TIMEOUT");
-        continue;
-      }
-
       pos.currentPrice = currentPrice;
 
       // Calculate floating PnL
@@ -442,14 +437,8 @@ export class PaperTradingEngine {
         }
       }
 
-      // Calculate expiresAt based on preferredTradingMode architecture
-      const tradingMode = settings.preferredTradingMode || "INTRADAY";
-      const openedAtTime = Date.now();
-      
-      // ARCHITECTURE: Scalping (45m timeout) | Intraday (8h timeout)
-      const expiresAt = tradingMode === "SCALPING" 
-        ? new Date(openedAtTime + 45 * 60 * 1000) 
-        : new Date(openedAtTime + 8 * 60 * 60 * 1000);
+      // Signal expiry disabled (only close when SL/TP hits or manually closed)
+      const expiresAt: any = null;
 
       try {
         console.log(`[DB_WRITE] Dispatching position open transaction to database for ${sym}`);
@@ -487,7 +476,7 @@ export class PaperTradingEngine {
             marketRegime,
             indicatorSnapshot,
             auditPayload: finalAuditPayload,
-            expiresAt: expiresAt.toISOString(),
+            expiresAt: expiresAt ? expiresAt.toISOString() : null,
             confidenceScore,
           });
         } else {
@@ -514,7 +503,7 @@ export class PaperTradingEngine {
                 marketRegime,
                 indicatorSnapshot,
                 auditPayload: finalAuditPayload,
-                expiresAt: expiresAt.toISOString(),
+                expiresAt: expiresAt ? expiresAt.toISOString() : null,
                 confidenceScore,
               },
             }),
@@ -552,7 +541,7 @@ export class PaperTradingEngine {
           marketRegime: dbPos.marketRegime || undefined,
           indicatorSnapshot: dbPos.indicatorSnapshot || undefined,
           auditPayload: dbPos.auditPayload || undefined,
-          expiresAt: expiresAt.getTime(),
+          expiresAt: expiresAt ? expiresAt.getTime() : undefined,
           confidenceScore,
         };
 
@@ -572,7 +561,7 @@ export class PaperTradingEngine {
         // Dynamic Position Sizing Debug Log
         console.log(`\n[DYNAMIC POSITION SIZING]\nUser: ${userId}\nMode: ${mode}\nStrategy: ${strategyName}\nConfidence: ${confidenceScore}\nRegime: ${position.marketRegime || "UNKNOWN"}\nWallet: $${balance.toFixed(2)}\nAllocation: ${pct.toFixed(2)}%\nPosition Size: $${orderValueUsdt.toFixed(2)}\n`);
 
-        console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit} | Expires: ${expiresAt.toISOString()}`);
+        console.log(`[POSITION_OPENED] ✅ Opened position: ${direction} ${sym} at $${price} | Qty: ${qty.toFixed(6)} | SL: ${stopLoss} | TP: ${takeProfit} | Expires: ${expiresAt ? expiresAt.toISOString() : "NEVER"}`);
         
         // Update store balance to keep in sync
         if (typeof window !== "undefined") {

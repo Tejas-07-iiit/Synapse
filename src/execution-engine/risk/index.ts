@@ -60,14 +60,6 @@ export class RiskEngine {
       };
     }
 
-    // 1. Limit active positions count
-    if (activePositionsCount >= settings.maxOpenTrades) {
-      return {
-        allowed: false,
-        reason: `Risk Limit Exceeded: Maximum open positions (${settings.maxOpenTrades}) reached.`,
-      };
-    }
-
     // 2. Limit trade size based on risk % and available balance (Margin check)
     const orderValueUsdt = order.price * order.quantity;
     const requiredMargin = orderValueUsdt / leverage;

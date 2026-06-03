@@ -3,6 +3,13 @@ export enum TradingMode {
   INTRADAY = "INTRADAY"
 }
 
+export enum ConsensusCategory {
+  SCALPING = "SCALPING",
+  INTRADAY = "INTRADAY",
+  SWING = "SWING",
+  DEFENSIVE = "DEFENSIVE"
+}
+
 export interface Candle {
   time: number; // UTC timestamp in milliseconds
   open: number;
@@ -103,6 +110,7 @@ export interface StrategySignal {
   strategyId: string;
   strategyName: string;
   strategyCategory?: string;
+  consensusCategory?: string;
   symbol: string;
   timeframe: string;
   signalType: "LONG" | "SHORT" | "HOLD"; // Required in Phase 4
@@ -185,6 +193,7 @@ export interface TradingStrategy {
   indicatorsRequired: string[];
   supportedRegimes: string[];
   category?: TradingMode;
+  consensusCategory?: ConsensusCategory;
   expectedHoldingTime?: string;
 
   // Core Phase 4 methods

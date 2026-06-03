@@ -195,23 +195,6 @@ export default function SettingsPage() {
                     </select>
                   </div>
 
-                  {/* Max Open Trades */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-muted-foreground uppercase">Max Open Trades</label>
-                    <input
-                      name="maxOpenTrades"
-                      type="number"
-                      step="1"
-                      min="1"
-                      max="10"
-                      value={formData.maxOpenTrades}
-                      onChange={handleChange}
-                      className="w-full p-2.5 bg-secondary/50 border border-border rounded-xl text-foreground font-semibold focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-
-
                   {/* Auto Trading Toggle */}
                   <div className="flex items-center justify-between p-2.5 bg-secondary/35 border border-border rounded-xl md:col-span-2">
                     <div>

@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -16,6 +16,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 export class ParabolicRSIStrategy implements TradingStrategy {
   public id = "parabolic-rsi";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SCALPING;
   public expectedHoldingTime = "5m-45m";
   public name = "Parabolic RSI Strategy";
   public description = "Applies Parabolic SAR logic to RSI values to detect momentum trend reversals within the oscillator.";

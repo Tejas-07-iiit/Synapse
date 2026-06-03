@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
@@ -59,6 +59,7 @@ function calculateWaveTrend(highs: number[], lows: number[], closes: number[], n
 export class LorentzianStrategy implements TradingStrategy {
   public id = "lorentzian";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "1h-8h";
   public name = "Lorentzian Classification";
   public description = "Statistical similarity classification strategy that matches current market state with historical nearest neighbors to predict trend direction.";

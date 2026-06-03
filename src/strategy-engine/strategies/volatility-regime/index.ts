@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { getATRPct } from "../../utils/volatility";
 
@@ -21,6 +21,7 @@ import { getATRPct } from "../../utils/volatility";
 export class VolatilityRegimeStrategy implements TradingStrategy {
   public id = "volatility-regime";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "1h-8h";
   public name = "Volatility Regime";
   public description = "Adaptive strategy classifying volatility regimes using rolling ATR rankings, entering trends only under favorable volatility environments.";

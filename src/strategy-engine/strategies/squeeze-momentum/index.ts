@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { getSqueezeState } from "../../utils/volatility";
 import { calculateEMA } from "../../indicators/ema";
@@ -19,6 +19,7 @@ import { calculateEMA } from "../../indicators/ema";
 export class SqueezeMomentumStrategy implements TradingStrategy {
   public id = "squeeze-momentum";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "1h-8h";
   public name = "Squeeze Momentum";
   public description = "Volatility breakout strategy entering trades on Bollinger/Keltner squeeze releases confirmed by momentum direction.";

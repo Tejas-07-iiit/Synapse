@@ -1,10 +1,11 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { ConfidenceEngine } from "../../core/confidence-engine";
 
 export class MACDMomentumStrategy implements TradingStrategy {
   public id = "macd-momentum";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SCALPING;
   public expectedHoldingTime = "5m-45m";
   public name = "MACD Momentum Strategy";
   public description = "Triggers on MACD Line / Signal Line crossovers and checks Histogram expansion to capitalize on trend acceleration.";

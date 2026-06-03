@@ -1,10 +1,11 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class DonchianBreakoutStrategy implements TradingStrategy {
   public id = "donchian-breakout";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SCALPING;
   public expectedHoldingTime = "5m-45m";
   public name = "Donchian Breakout Strategy";
   public description = "Capture strong momentum breakouts from established Donchian Ranges. Best in breakout/trending markets.";

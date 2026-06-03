@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -22,6 +22,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 export class WaveTrendStrategy implements TradingStrategy {
   public id = "wavetrend";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "5m-45m";
   public name = "WaveTrend Oscillator Strategy";
   public description = "LazyBear WaveTrend oscillator for momentum shifts and trend reversals with overbought/oversold zone detection.";

@@ -1,10 +1,11 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { ConfidenceEngine } from "../../core/confidence-engine";
 
 export class RSIReversalStrategy implements TradingStrategy {
   public id = "rsi-reversal";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SCALPING;
   public expectedHoldingTime = "5m-45m";
   public name = "RSI Reversal Strategy";
   public description = "Identifies oversold market bottoms (< 30) and overbought market tops (> 70) to capture swing trade entries.";

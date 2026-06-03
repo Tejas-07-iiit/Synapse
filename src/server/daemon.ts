@@ -6,6 +6,7 @@ import { marketWsService } from "../market-engine/websocket";
 import { useMarketStore } from "../stores/marketStore";
 import { PerformanceWeightingEngine } from "../strategy-engine/core/performance-weighting";
 import { ConfidenceEngine } from "../strategy-engine/core/confidence-engine";
+import { ConsensusEngine } from "../strategy-engine/core/consensus-engine";
 import { AuditLogger } from "../lib/audit/trading-audit";
 import { strategyRegistry } from "../strategy-engine/core/registry";
 
@@ -470,17 +471,6 @@ async function runDaemon() {
         const userId = settings.userId;
         const userMode = settings.preferredTradingMode; // "SCALPING" | "INTRADAY"
 
-        // Debug logging for user-level signal matching
-        if (signals.length > 0) {
-           console.log(`[USER_SIGNAL_AUDIT] User: ${userId} (${userMode}) | Total Global Signals: ${signals.length}`);
-           signals.forEach(s => {
-             const strat = strategyRegistry.getStrategy(s.strategyId);
-             if (strat?.category !== userMode) {
-               console.log(`  - [REJECTED_CATEGORY] Strategy: ${s.strategyName} (${strat?.category}) != User Mode (${userMode})`);
-             }
-           });
-        }
-
         // Sync active positions from DB to memory for this user to ensure manual closures on the frontend are reflected
         try {
           await PaperTradingEngine.loadActivePositions(userId);
@@ -488,160 +478,158 @@ async function runDaemon() {
           console.error(`[Daemon] Failed to sync active positions for user ${userId} in callback:`, err);
         }
 
-      // 1. Log category mismatch rejections for transparency
-      const unmatchedSignals = signals.filter(sig => {
-        if (sig.signal !== "LONG" && sig.signal !== "SHORT") return false;
-        const strat = strategyRegistry.getStrategy(sig.strategyId);
-        return strat?.category !== userMode;
-      });
+      // ─── CONSENSUS-BASED SIGNAL EVALUATION ───
+      // 1. Run consensus engine on ALL non-HOLD signals for this symbol
+      const consensusResult = ConsensusEngine.evaluate(signals, regime);
 
-      for (const sig of unmatchedSignals) {
+      // 2. Filter consensus result for this user's preferred trading mode
+      const userConsensus = ConsensusEngine.filterForUser(consensusResult, userMode);
+
+      // 3. Log consensus rejections to DB for transparency
+      for (const catResult of userConsensus.categoryResults) {
+        if (!catResult.approved) {
+          // Log each rejected category consensus to DB
+          for (const sig of [...(catResult.winningSignals || [])].slice(0, 3)) {
+            try {
+              await prisma.tradeSignal.create({
+                data: {
+                  symbol: sym,
+                  timeframe: tf,
+                  strategyId: sig.strategyId,
+                  direction: sig.signal,
+                  confidence: sig.confidence,
+                  entry: sig.entry,
+                  stopLoss: sig.stopLoss || 0,
+                  takeProfit: sig.takeProfit || 0,
+                  timestamp: new Date(sig.timestamp),
+                  reasoning: sig.reasoning,
+                  userId: userId,
+                  tradingMode: userMode,
+                  blocked: true,
+                  blockReason: `CONSENSUS REJECTED (${catResult.category}): ${catResult.rejectionReason}. Votes: LONG=${catResult.longCount} SHORT=${catResult.shortCount} HOLD=${catResult.holdCount}`,
+                  marketRegime: regime,
+                }
+              });
+            } catch (dbErr) {
+              console.error("[Daemon] Failed to log consensus rejection to DB:", dbErr);
+            }
+          }
+        }
+      }
+
+      // 4. Log fee rejection if applicable
+      if (userConsensus.feeRejected && userConsensus.feeRejectionReason) {
         try {
-          const strat = strategyRegistry.getStrategy(sig.strategyId);
-          const stratCategory = strat?.category || "Unknown";
           await prisma.tradeSignal.create({
             data: {
               symbol: sym,
               timeframe: tf,
-              strategyId: sig.strategyId,
-              direction: sig.signal,
-              confidence: sig.confidence,
-              entry: sig.entry,
-              stopLoss: sig.stopLoss || 0,
-              takeProfit: sig.takeProfit || 0,
+              strategyId: "consensus-engine",
+              direction: "HOLD",
+              confidence: 0,
+              entry: 0,
+              stopLoss: 0,
+              takeProfit: 0,
               timestamp: new Date(),
-              reasoning: sig.reasoning,
+              reasoning: [userConsensus.feeRejectionReason],
               userId: userId,
               tradingMode: userMode,
               blocked: true,
-              blockReason: `CATEGORY MISMATCH: Strategy category is ${stratCategory} but user preferred mode is ${userMode}.`,
+              blockReason: userConsensus.feeRejectionReason,
               marketRegime: regime,
             }
           });
         } catch (dbErr) {
-          console.error("[Daemon] Failed to log category rejection to DB:", dbErr);
+          console.error("[Daemon] Failed to log fee rejection to DB:", dbErr);
         }
       }
 
-      // Filter signals matching preferredTradingMode
-      const matchedSignals = signals.filter(sig => {
-        if (sig.signal !== "LONG" && sig.signal !== "SHORT") return false;
-        const strat = strategyRegistry.getStrategy(sig.strategyId);
-        return strat?.category === userMode;
-      });
-
-      if (matchedSignals.length === 0) {
-        if (signals.length > 0) console.log(`  - [SIGNAL_FLOW] No signals matched for user ${userId} (${userMode})`);
+      // 5. Check if consensus approved any signal
+      if (!userConsensus.bestSignal || !userConsensus.bestCategory) {
+        if (signals.length > 0) {
+          console.log(`  - [SIGNAL_FLOW] No consensus reached for user ${userId} (${userMode}) | Categories evaluated: ${userConsensus.categoryResults.length}`);
+        }
         continue;
       }
 
-      // 2. Rank signals
-      const rankedSignals = matchedSignals.map(sig => {
-        const strat = strategyRegistry.getStrategy(sig.strategyId);
-        const stats = PerformanceWeightingEngine.getStats(sig.strategyId);
-        const profitFactor = stats ? stats.profitFactor : 1.0;
-        const winRate = stats ? stats.winRate : 0.50;
+      const sig = userConsensus.bestSignal;
+      const consensusCategory = userConsensus.bestCategory;
 
-        const lastVal = (arr?: number[]) => {
-          if (!arr || arr.length === 0) return 0;
-          return arr[arr.length - 1];
-        };
+      console.log(`[FLOW_07] Consensus approved. Category: ${consensusCategory.category} | Direction: ${consensusCategory.winningDirection} | Consensus: ${consensusCategory.consensusPct.toFixed(1)}% | Selected: ${sig.strategyName}`);
 
-        const candlesCache = useMarketStore.getState().allCandles[`${sym}_${tf}`] || [];
-        const tickerCache = useMarketStore.getState().tickerData[sym] || null;
-        const stratContext = {
-          symbol: sym,
-          timeframe: tf,
-          candles: candlesCache,
-          indicators,
-          ticker: tickerCache
-        };
+      // 6. Compute ATR-based SL/TP and confidence for the winning signal
+      const lastVal = (arr?: number[]) => {
+        if (!arr || arr.length === 0) return 0;
+        return arr[arr.length - 1];
+      };
 
-        const lastCandle = candlesCache[candlesCache.length - 1];
-        const lastVol = lastCandle ? lastCandle.volume : 0;
-        const lastVolMA = lastVal(indicators.volumeMA) || 0;
-        const volumeRatio = lastVolMA > 0 ? Number((lastVol / lastVolMA).toFixed(2)) : 1.0;
+      const candlesCache = useMarketStore.getState().allCandles[`${sym}_${tf}`] || [];
+      const tickerCache = useMarketStore.getState().tickerData[sym] || null;
+      const stratContext = {
+        symbol: sym,
+        timeframe: tf,
+        candles: candlesCache,
+        indicators,
+        ticker: tickerCache
+      };
 
-        // System-managed ATR stop loss and take profit multipliers
-        const lastIdx = indicators.atr ? indicators.atr.length - 1 : -1;
-        const atrVal = (lastIdx >= 0 && indicators.atr[lastIdx]) ? indicators.atr[lastIdx] : (sig.entry * 0.015);
+      const lastCandle = candlesCache[candlesCache.length - 1];
+      const lastVol = lastCandle ? lastCandle.volume : 0;
+      const lastVolMA = lastVal(indicators.volumeMA) || 0;
+      const volumeRatio = lastVolMA > 0 ? Number((lastVol / lastVolMA).toFixed(2)) : 1.0;
 
-        const slMult = userMode === "SCALPING" ? 0.8 : 1.5;
-        const tpMult = userMode === "SCALPING" ? 1.2 : 3.0;
+      // System-managed ATR stop loss and take profit multipliers
+      const lastIdx = indicators.atr ? indicators.atr.length - 1 : -1;
+      const atrVal = (lastIdx >= 0 && indicators.atr[lastIdx]) ? indicators.atr[lastIdx] : (sig.entry * 0.015);
 
-        const atrSlDist = slMult * atrVal;
-        const atrTpDist = tpMult * atrVal;
+      const slMult = userMode === "SCALPING" ? 0.8 : 1.5;
+      const tpMult = userMode === "SCALPING" ? 1.2 : 3.0;
 
-        const direction = sig.signal;
-        const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
-        const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
+      const atrSlDist = slMult * atrVal;
+      const atrTpDist = tpMult * atrVal;
 
-        const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
-        const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
+      const direction = sig.signal;
+      const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
+      const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
 
-        const risk = Math.abs(sig.entry - finalSl);
-        const reward = Math.abs(finalTp - sig.entry);
-        const riskRewardRatio = risk > 0 ? reward / risk : 1.5;
+      const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
+      const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
 
-        // Confidence calculation
-        const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
-        const confidenceScore = detailedConf.finalScore;
-        console.log(`[FLOW_06] Confidence scoring executed for user: ${userId} | Strategy: ${sig.strategyId} | Score: ${confidenceScore}`);
+      const risk = Math.abs(sig.entry - finalSl);
+      const reward = Math.abs(finalTp - sig.entry);
+      const riskRewardRatio = risk > 0 ? reward / risk : 1.5;
 
-        // Regime compatibility
-        const category = sig.strategyCategory || "Central Engine";
-        const isTrendingStrat = category === "Trend Following" || category === "Sentiment" || category === "Defensive";
-        const isMeanReversionStrat = category === "Reversal" || category === "Mean-Reversion" || category === "MeanReversion" || category === "Grid";
-        const isBreakoutStrat = category === "Breakout" || category === "Volatility";
-        const isSweepStrat = category === "LiquiditySweep" || category === "SupplyDemand";
+      // Confidence scoring
+      const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
+      const confidenceScore = detailedConf.finalScore;
+      console.log(`[FLOW_06] Confidence scoring for consensus winner: User: ${userId} | Strategy: ${sig.strategyId} | Score: ${confidenceScore}`);
 
-        let regimeMatch = false;
-        if (regime === "TRENDING" && isTrendingStrat) regimeMatch = true;
-        else if ((regime === "RANGING" || regime === "LOW_VOLATILITY") && isMeanReversionStrat) regimeMatch = true;
-        else if (regime === "HIGH_VOLATILITY" && isBreakoutStrat) regimeMatch = true;
+      // Performance stats
+      const stats = PerformanceWeightingEngine.getStats(sig.strategyId);
+      const profitFactor = stats ? stats.profitFactor : 1.0;
+      const winRate = stats ? stats.winRate : 0.50;
 
-        return {
-          sig,
-          confidenceScore,
-          profitFactor,
-          winRate,
-          regimeMatch,
-          riskRewardRatio,
-          finalSl,
-          finalTp,
-          detailedConf,
-          volumeRatio,
-          lastVol,
-          candlesCache,
-          tickerCache,
-          stratContext,
-          atrVal
-        };
-      });
+      // Wrap the winning signal into a ranked object (compatible with existing risk validation flow)
+      const rankedSignals = [{
+        sig,
+        confidenceScore,
+        profitFactor,
+        winRate,
+        regimeMatch: true,
+        riskRewardRatio,
+        finalSl,
+        finalTp,
+        detailedConf,
+        volumeRatio,
+        lastVol,
+        candlesCache,
+        tickerCache,
+        stratContext,
+        atrVal,
+        consensusCategory,
+      }];
 
-      // Sort signals by:
-      // 1. Confidence Score
-      // 2. Profit Factor
-      // 3. Win Rate
-      // 4. Regime Match
-      // 5. Risk/Reward Ratio
-      rankedSignals.sort((a, b) => {
-        if (b.confidenceScore !== a.confidenceScore) {
-          return b.confidenceScore - a.confidenceScore;
-        }
-        if (b.profitFactor !== a.profitFactor) {
-          return b.profitFactor - a.profitFactor;
-        }
-        if (b.winRate !== a.winRate) {
-          return b.winRate - a.winRate;
-        }
-        if (a.regimeMatch !== b.regimeMatch) {
-          return a.regimeMatch ? -1 : 1; // True first
-        }
-        return b.riskRewardRatio - a.riskRewardRatio;
-      });
-
-      console.log(`[FLOW_07] Signals filtered and ranked. Matched signals count: ${rankedSignals.length}`);
+      console.log(`[FLOW_07] Consensus signal ranked. Count: ${rankedSignals.length}`);
 
       // Now process each ranked signal for this user
       for (const ranked of rankedSignals) {
@@ -912,41 +900,6 @@ async function runDaemon() {
           continue;
         }
 
-        // E. Check Max Open Trades Limit
-        const userActivePositionsCount = PaperTradingEngine.getOpenPositions().filter(p => p.userId === userId).length;
-        if (userActivePositionsCount >= settings.maxOpenTrades) {
-          const reason = `RISK MANAGEMENT BLOCK: Max open positions limit reached (${settings.maxOpenTrades}).`;
-          console.log(`  - [REJECTED_MAX_OPEN] ${reason}`);
-          console.log(`[SIGNAL_REJECTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Reason: Max open trades reached`);
-          AuditLogger.logRiskRejected({ userId, symbol: sym, reason });
-          try {
-            await prisma.tradeSignal.create({
-              data: {
-                symbol: sym,
-                timeframe: tf,
-                strategyId: sig.strategyId,
-                direction: sig.signal,
-                confidence: sig.confidence,
-                entry: sig.entry,
-                stopLoss: finalSl,
-                takeProfit: finalTp,
-                timestamp: new Date(sig.timestamp),
-                reasoning: sig.reasoning,
-                userId: userId,
-                tradingMode: userMode,
-                blocked: true,
-                blockReason: reason,
-                confidenceScore: confidenceScore,
-                marketRegime: regime,
-                atr: atrVal,
-                positionSizeUsdt: estimatedSizeUsdt,
-              }
-            });
-          } catch (dbErr) {
-            console.error("[Daemon] Failed to log max open trades rejection to DB:", dbErr);
-          }
-          continue;
-        }
 
         // F. Check Insufficient Margin
         const requiredMargin = estimatedSizeUsdt;

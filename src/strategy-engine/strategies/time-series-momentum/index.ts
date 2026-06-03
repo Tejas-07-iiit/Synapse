@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -20,6 +20,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 export class TimeSeriesMomentumStrategy implements TradingStrategy {
   public id = "time-series-momentum";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "1h-8h";
   public name = "Time Series Momentum Strategy";
   public description = "Captures trend persistence using 12-period momentum and ADX trend strength filtering.";

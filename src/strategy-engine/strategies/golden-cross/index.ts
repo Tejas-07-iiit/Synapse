@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -18,6 +18,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 export class GoldenCrossStrategy implements TradingStrategy {
   public id = "golden-cross";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SWING;
   public expectedHoldingTime = "1h-8h";
   public name = "Golden Cross Strategy";
   public description = "Institutional trend-following using SMA50/SMA200 crossovers for major trend reversal identification.";

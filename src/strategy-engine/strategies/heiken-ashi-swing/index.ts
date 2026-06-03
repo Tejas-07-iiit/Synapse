@@ -1,4 +1,4 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 
 /**
@@ -22,6 +22,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 export class HeikenAshiSwingStrategy implements TradingStrategy {
   public id = "heiken-ashi-swing";
   public category: TradingMode = TradingMode.INTRADAY;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SWING;
   public expectedHoldingTime = "1h-8h";
   public name = "Heiken Ashi Swing Strategy";
   public description = "Trend-following using Heiken Ashi candle transformations with ATR expansion for swing trade capture.";

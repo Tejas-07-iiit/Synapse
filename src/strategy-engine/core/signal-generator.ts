@@ -184,8 +184,50 @@ export class SignalGenerator {
       "zeiierman-volatility": "Volatility",
     };
 
+    // Consensus category classification for category-based consensus engine
+    const CONSENSUS_CATEGORIES: Record<string, string> = {
+      // Scalping (15 strategies)
+      "ema-crossover": "SCALPING",
+      "rsi-reversal": "SCALPING",
+      "macd-momentum": "SCALPING",
+      "bollinger-breakout": "SCALPING",
+      "mean-reversion": "SCALPING",
+      "momentum": "SCALPING",
+      "grid": "SCALPING",
+      "donchian-breakout": "SCALPING",
+      "rally-base-drop": "SCALPING",
+      "sr-sweep": "SCALPING",
+      "bollinger-reversion": "SCALPING",
+      "short-term-reversal": "SCALPING",
+      "parabolic-rsi": "SCALPING",
+      "range-breakout-high": "SCALPING",
+      "residual-momentum": "SCALPING",
+      // Intraday (11 strategies)
+      "wavetrend": "INTRADAY",
+      "dow-mfi-rsi": "INTRADAY",
+      "lorentzian": "INTRADAY",
+      "ema-cross-adx": "INTRADAY",
+      "hyper-supertrend": "INTRADAY",
+      "ma-crossover-var": "INTRADAY",
+      "sma-trend-filter": "INTRADAY",
+      "t3-nexus": "INTRADAY",
+      "squeeze-momentum": "INTRADAY",
+      "time-series-momentum": "INTRADAY",
+      "volatility-regime": "INTRADAY",
+      // Swing (5 strategies)
+      "golden-cross": "SWING",
+      "heiken-ashi-swing": "SWING",
+      "ichimoku-cloud": "SWING",
+      "hash-ribbons": "SWING",
+      "news-fear-greed": "SWING",
+      // Defensive (2 strategies)
+      "defensive": "DEFENSIVE",
+      "zeiierman-volatility": "DEFENSIVE",
+    };
+
     const strategyName = STRATEGY_NAMES[strategyId] || "AI Confluence Strategy";
     const strategyCategory = STRATEGY_CATEGORIES[strategyId] || "Central Engine";
+    const consensusCategory = CONSENSUS_CATEGORIES[strategyId] || "INTRADAY";
 
     // Enforce Minimum Risk-to-Reward Ratio of 1.5
     if (signal !== "HOLD" && stopLoss > 0 && takeProfit > 0) {
@@ -208,6 +250,7 @@ export class SignalGenerator {
       strategyId,
       strategyName,
       strategyCategory,
+      consensusCategory,
       signal,
       signalType: signal,
       confidence,

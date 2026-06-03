@@ -1,10 +1,11 @@
-import { TradingMode,  TradingStrategy, StrategyContext, StrategySignal, SupplyDemandZone } from "../../types";
+import { TradingMode, ConsensusCategory, TradingStrategy, StrategyContext, StrategySignal, SupplyDemandZone } from "../../types";
 import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class RallyBaseDropStrategy implements TradingStrategy {
   public id = "rally-base-drop";
   public category: TradingMode = TradingMode.SCALPING;
+  public consensusCategory: ConsensusCategory = ConsensusCategory.SCALPING;
   public expectedHoldingTime = "5m-45m";
   public name = "Rally Base Drop Strategy";
   public description = "Trade institutional supply/demand zone reactions (Rally-Base-Drop and Drop-Base-Rally patterns).";

@@ -141,14 +141,14 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] hover:bg-[#1e293b]/70 transition duration-150 h-9"
+        className="w-full flex items-center justify-between px-3 py-2 bg-background dark:bg-[#0f172a] border border-input dark:border-[#1e293b] text-foreground dark:text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-primary hover:bg-accent dark:hover:bg-[#1e293b]/70 transition duration-150 h-9"
       >
         <span className="truncate">{selectedOption.label}</span>
-        <span className="ml-1 text-[9px] text-[#e2e8f0]/60">▼</span>
+        <span className="ml-1 text-[9px] text-muted-foreground dark:text-[#e2e8f0]/60">▼</span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-[100%] left-0 z-40 mt-1.5 w-full min-w-[150px] bg-[#0f172a] border border-[#1e293b] rounded-[10px] shadow-xl overflow-hidden py-1 max-h-60 overflow-y-auto">
+        <div className="absolute top-[100%] left-0 z-40 mt-1.5 w-full min-w-[150px] bg-background dark:bg-[#0f172a] border border-border dark:border-[#1e293b] rounded-[10px] shadow-xl overflow-hidden py-1 max-h-60 overflow-y-auto">
           {options.map((opt) => {
             const isSelected = opt.value === value;
             return (
@@ -159,13 +159,14 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
                   onChange(opt.value);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-xs font-semibold transition duration-150 ${
+                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition duration-150 ${
                   isSelected 
-                    ? "bg-[#2563eb] text-white" 
-                    : "text-[#e2e8f0] hover:bg-[#1e293b]"
+                    ? "bg-primary/10 text-primary dark:bg-[#2563eb]/20 dark:text-[#60a5fa] hover:bg-primary hover:text-primary-foreground dark:hover:bg-[#2563eb] dark:hover:text-white" 
+                    : "text-foreground dark:text-[#e2e8f0] hover:bg-primary hover:text-primary-foreground dark:hover:bg-[#2563eb] dark:hover:text-white"
                 }`}
               >
-                {opt.label}
+                <span>{opt.label}</span>
+                {isSelected && <span className="text-[10px]">✓</span>}
               </button>
             );
           })}
@@ -597,7 +598,7 @@ export default function TradeHistoryPage() {
                     placeholder="Search symbol or ID..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-[#0f172a] border border-[#1e293b] text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-[#2563eb] hover:bg-[#1e293b]/70 transition duration-150 h-9"
+                    className="w-full pl-9 pr-4 py-2 bg-background dark:bg-[#0f172a] border border-input dark:border-[#1e293b] text-foreground dark:text-[#e2e8f0] text-xs font-semibold rounded-[10px] focus:outline-none focus:border-primary hover:bg-accent dark:hover:bg-[#1e293b]/70 transition duration-150 h-9"
                   />
                 </div>
               </div>

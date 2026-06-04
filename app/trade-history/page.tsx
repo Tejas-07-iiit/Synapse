@@ -553,7 +553,7 @@ export default function TradeHistoryPage() {
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground">
-                Includes floating positions evaluation.
+                Includes fees & floating positions evaluation.
               </p>
             </div>
 

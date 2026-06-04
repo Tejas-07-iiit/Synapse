@@ -756,7 +756,7 @@ export default function PortfolioPage() {
                 <span className={`text-2xl font-black ${realizedPnL >= 0 ? "text-emerald-500" : "text-destructive"}`}>
                   {realizedPnL >= 0 ? "+" : ""}${realizedPnL.toFixed(2)}
                 </span>
-                <span className="text-[10px] text-muted-foreground block mt-1">Closed Trades Cumulative</span>
+                <span className="text-[10px] text-muted-foreground block mt-1">Closed Trades Cumulative (After Fees)</span>
               </div>
             </div>
 

@@ -1,0 +1,454 @@
+
+> synapse@0.1.0 replay
+> npx tsx src/replay/cli.ts --symbols BTCUSDT --days 0.1 --mode SCALPING --debug
+
+================================================================================
+[ReplayEngine] Initializing Synapse Replay Simulation
+================================================================================
+- Symbols: BTCUSDT
+- Timeframes: 1m, 3m, 5m
+- Duration: 0.1 days
+- Balance: $10000
+- Mode: SCALPING
+- Risk per Trade: 1%
+- Max Open Trades: 3
+- Leverage: 1x
+- Fees: Maker: 0.10% | Taker: 0.10%
+--------------------------------------------------------------------------------
+[Registry] Registered strategy: EMA Crossover Strategy [ID: ema-crossover]
+[Registry] Registered strategy: RSI Reversal Strategy [ID: rsi-reversal]
+[Registry] Registered strategy: MACD Momentum Strategy [ID: macd-momentum]
+[Registry] Registered strategy: Bollinger Breakout Strategy [ID: bollinger-breakout]
+[Registry] Registered strategy: Mean Reversion Strategy [ID: mean-reversion]
+[Registry] Registered strategy: Momentum Strategy [ID: momentum]
+[Registry] Registered strategy: Defensive Strategy [ID: defensive]
+[Registry] Registered strategy: Grid Strategy [ID: grid]
+[Registry] Registered strategy: Lorentzian Classification [ID: lorentzian]
+[Registry] Registered strategy: Donchian Breakout Strategy [ID: donchian-breakout]
+[Registry] Registered strategy: Rally Base Drop Strategy [ID: rally-base-drop]
+[Registry] Registered strategy: Support Resistance Sweep Strategy [ID: sr-sweep]
+[Registry] Registered strategy: Bollinger Reversion Strategy [ID: bollinger-reversion]
+[Registry] Registered strategy: Short Term Reversal Strategy [ID: short-term-reversal]
+[Registry] Registered strategy: Dow Factor MFI RSI Strategy [ID: dow-mfi-rsi]
+[Registry] Registered strategy: Parabolic RSI Strategy [ID: parabolic-rsi]
+[Registry] Registered strategy: Range Breakout High Strategy [ID: range-breakout-high]
+[Registry] Registered strategy: Residual Momentum Strategy [ID: residual-momentum]
+[Registry] Registered strategy: Time Series Momentum Strategy [ID: time-series-momentum]
+[Registry] Registered strategy: WaveTrend Oscillator Strategy [ID: wavetrend]
+[Registry] Registered strategy: Hash Ribbons Strategy [ID: hash-ribbons]
+[Registry] Registered strategy: News Fear & Greed Strategy [ID: news-fear-greed]
+[Registry] Registered strategy: EMA Cross ADX Strategy [ID: ema-cross-adx]
+[Registry] Registered strategy: Golden Cross Strategy [ID: golden-cross]
+[Registry] Registered strategy: Heiken Ashi Swing Strategy [ID: heiken-ashi-swing]
+[Registry] Registered strategy: Hyper Supertrend Strategy [ID: hyper-supertrend]
+[Registry] Registered strategy: Ichimoku Cloud Strategy [ID: ichimoku-cloud]
+[Registry] Registered strategy: MA Crossover Variable [ID: ma-crossover-var]
+[Registry] Registered strategy: SMA Trend Filter [ID: sma-trend-filter]
+[Registry] Registered strategy: T3 Nexus [ID: t3-nexus]
+[Registry] Registered strategy: Squeeze Momentum [ID: squeeze-momentum]
+[Registry] Registered strategy: Volatility Regime [ID: volatility-regime]
+[Registry] Registered strategy: Zeiierman Volatility [ID: zeiierman-volatility]
+[Strategies] Plug-and-play strategies initialized successfully.
+[CandleLoader] Loading BTCUSDT 1m from cache: /home/tejas-ambaliya/Desktop/Synapse1/src/replay/cache/candles_BTCUSDT_1m_0.1d.json
+[CandleLoader] Splitting BTCUSDT 1m: Warmup = 1011 candles, Replay = 133 candles
+[CandleLoader] Loading BTCUSDT 3m from cache: /home/tejas-ambaliya/Desktop/Synapse1/src/replay/cache/candles_BTCUSDT_3m_0.1d.json
+[CandleLoader] Splitting BTCUSDT 3m: Warmup = 1004 candles, Replay = 44 candles
+[CandleLoader] Loading BTCUSDT 5m from cache: /home/tejas-ambaliya/Desktop/Synapse1/src/replay/cache/candles_BTCUSDT_5m_0.1d.json
+[CandleLoader] Splitting BTCUSDT 5m: Warmup = 1002 candles, Replay = 27 candles
+[ReplayEngine] Executing simulation timeline...
+[Replayer] Warmup started: Pre-calculating indicators...
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[Replayer] Warmup complete.
+[Replayer] Replaying 204 chronological candle close events...
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[SIGNAL_REJECTED] Regime mismatch: LiquiditySweep strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 95.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($162.5250) ≤ 2× total fees ($133.8236). Entry: $66830.52, TP: $66993.045, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($162.5250) ≤ 2× total fees ($133.8236). Entry: $66830.52, TP: $66993.045, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 70.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($171.4200) ≤ 2× total fees ($133.6958). Entry: $66762.18, TP: $66933.6, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($171.4200) ≤ 2× total fees ($133.6958). Entry: $66762.18, TP: $66933.6, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 7)
+[SIGNAL_REJECTED] Confidence 35% below threshold 50%
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 70.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($52.2700) ≤ 2× total fees ($133.5621). Entry: $66754.91, TP: $66807.18, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($52.2700) ≤ 2× total fees ($133.5621). Entry: $66754.91, TP: $66807.18, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 75.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($61.8015) ≤ 2× total fees ($133.5286). Entry: $66733.42, TP: $66795.2215, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($61.8015) ≤ 2× total fees ($133.5286). Entry: $66733.42, TP: $66795.2215, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 0 | SHORT: 1 | HOLD: 0 | Consensus: 100.0% SHORT | Avg Confidence: 70.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($98.9439) ≤ 2× total fees ($133.2609). Entry: $66679.92, TP: $66580.9761, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($98.9439) ≤ 2× total fees ($133.2609). Entry: $66679.92, TP: $66580.9761, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 5)
+[SIGNAL_REJECTED] Regime mismatch: Reversal strategy not allowed in BREAKOUT regime.
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[SIGNAL_REJECTED] Regime mismatch: Mean-Reversion strategy not allowed in BREAKOUT regime.
+[CONSENSUS] Category: SCALPING | LONG: 2 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 95.0 | ✅ APPROVED
+[CONSENSUS_APPROVED] Category: SCALPING | Direction: LONG | Consensus: 100.0% | Avg Confidence: 95.0 | Selected Strategy: Bollinger Breakout Strategy (bollinger-breakout)
+
+[DEBUG_MODE] EVALUATION:
+- Current Candle: BTCUSDT 1m Close: $67023.02 Time: 2026-06-03T09:49:59.999Z
+- Current Regime: HIGH_VOLATILITY
+- Top Strategy: Bollinger Breakout Strategy
+- Confidence Score: 100%
+- Consensus Score: 100.0%
+- Trade Decision: OPEN LONG at $67023.02 SL: 66981.35957512003 TP: 67085.51063731997
+- Sizing Allocation: 30.00% ($3000.00)
+
+[DEBUG] Calling PaperTradingEngine.openPosition...
+[DEBUG] PaperTradingEngine.openPosition function source: async openPosition(userId,symbol,direction,price,sizeUsdt=null,stopLoss=null,takeProfit=null,leverage=1,explicitBalance,explicitSettings,signalContext){console.log(`[DEBUG-PT-FIRST-LINE] openPosition called for ${symbol} direction ${direction} price ${price}`);const sym=symbol.toUpperCase();if(this.executionLocks.has(sym)){console.log(`[DEBUG-PT] early return: executionLocks has ${sym}`);return null}this.executionLocks.add(sym);try{const strategyId=signalContext?.strategyId||"manual";const strat
+[DEBUG-PT-FIRST-LINE] openPosition called for BTCUSDT direction LONG price 67023.02
+[FLOW_03] Processed tick, generated prioritized signals: 2 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 90.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($128.8517) ≤ 2× total fees ($134.5492). Entry: $67210.18, TP: $67339.0317, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($128.8517) ≤ 2× total fees ($134.5492). Entry: $67210.18, TP: $67339.0317, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Reversal strategy not allowed in BREAKOUT regime.
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Reversal strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 70.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($215.5179) ≤ 2× total fees ($134.3659). Entry: $67075.17, TP: $67290.6879, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($215.5179) ≤ 2× total fees ($134.3659). Entry: $67075.17, TP: $67290.6879, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 5)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 85.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($125.4787) ≤ 2× total fees ($134.5335). Entry: $67204, TP: $67329.4787, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($125.4787) ≤ 2× total fees ($134.5335). Entry: $67204, TP: $67329.4787, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 5)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 100.0 | ✅ APPROVED
+[CONSENSUS_APPROVED] Category: SCALPING | Direction: LONG | Consensus: 100.0% | Avg Confidence: 100.0 | Selected Strategy: Momentum Strategy (momentum)
+
+[DEBUG_MODE] EVALUATION:
+- Current Candle: BTCUSDT 1m Close: $67318.04 Time: 2026-06-03T10:06:59.999Z
+- Current Regime: TRENDING
+- Top Strategy: Momentum Strategy
+- Confidence Score: 93%
+- Consensus Score: 100.0%
+- Trade Decision: OPEN LONG at $67318.04 SL: 67263.70050047248 TP: 67399.54924929127
+- Sizing Allocation: 36.00% ($3600.00)
+
+[DEBUG] Calling PaperTradingEngine.openPosition...
+[DEBUG] PaperTradingEngine.openPosition function source: async openPosition(userId,symbol,direction,price,sizeUsdt=null,stopLoss=null,takeProfit=null,leverage=1,explicitBalance,explicitSettings,signalContext){console.log(`[DEBUG-PT-FIRST-LINE] openPosition called for ${symbol} direction ${direction} price ${price}`);const sym=symbol.toUpperCase();if(this.executionLocks.has(sym)){console.log(`[DEBUG-PT] early return: executionLocks has ${sym}`);return null}this.executionLocks.add(sym);try{const strategyId=signalContext?.strategyId||"manual";const strat
+[DEBUG-PT-FIRST-LINE] openPosition called for BTCUSDT direction LONG price 67318.04
+[DEBUG-PT] early return: executionLocks has BTCUSDT
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 5)
+[DEBUG] PaperTradingEngine.openPosition result: FAILED/NULL
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 5)
+[SIGNAL_REJECTED] Regime mismatch: LiquiditySweep strategy not allowed in RANGING regime.
+[CONSENSUS] Category: SCALPING | LONG: 0 | SHORT: 2 | HOLD: 0 | Consensus: 100.0% SHORT | Avg Confidence: 76.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($228.1130) ≤ 2× total fees ($134.5959). Entry: $67412.01, TP: $67183.897, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($228.1130) ≤ 2× total fees ($134.5959). Entry: $67412.01, TP: $67183.897, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 2 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Mean-Reversion strategy not allowed in BREAKOUT regime.
+[CONSENSUS] Category: SCALPING | LONG: 2 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 80.0 | ✅ APPROVED
+[CONSENSUS_APPROVED] Category: SCALPING | Direction: LONG | Consensus: 100.0% | Avg Confidence: 80.0 | Selected Strategy: Bollinger Breakout Strategy (bollinger-breakout)
+
+[DEBUG_MODE] EVALUATION:
+- Current Candle: BTCUSDT 3m Close: $67412.01 Time: 2026-06-03T10:08:59.999Z
+- Current Regime: HIGH_VOLATILITY
+- Top Strategy: Bollinger Breakout Strategy
+- Confidence Score: 100%
+- Consensus Score: 100.0%
+- Trade Decision: OPEN LONG at $67412.01 SL: 67316.01954709589 TP: 67555.99567935617
+- Sizing Allocation: 30.00% ($3000.00)
+
+[DEBUG] Calling PaperTradingEngine.openPosition...
+[DEBUG] PaperTradingEngine.openPosition function source: async openPosition(userId,symbol,direction,price,sizeUsdt=null,stopLoss=null,takeProfit=null,leverage=1,explicitBalance,explicitSettings,signalContext){console.log(`[DEBUG-PT-FIRST-LINE] openPosition called for ${symbol} direction ${direction} price ${price}`);const sym=symbol.toUpperCase();if(this.executionLocks.has(sym)){console.log(`[DEBUG-PT] early return: executionLocks has ${sym}`);return null}this.executionLocks.add(sym);try{const strategyId=signalContext?.strategyId||"manual";const strat
+[DEBUG-PT-FIRST-LINE] openPosition called for BTCUSDT direction LONG price 67412.01
+[DEBUG-PT] early return: executionLocks has BTCUSDT
+[FLOW_03] Processed tick, generated prioritized signals: 2 (raw: 12)
+[DEBUG] PaperTradingEngine.openPosition result: FAILED/NULL
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[CONSENSUS] Category: SCALPING | LONG: 1 | SHORT: 0 | HOLD: 0 | Consensus: 100.0% LONG | Avg Confidence: 78.0 | ✅ APPROVED
+[CONSENSUS_APPROVED] Category: SCALPING | Direction: LONG | Consensus: 100.0% | Avg Confidence: 78.0 | Selected Strategy: EMA Crossover Strategy (ema-crossover)
+
+[DEBUG_MODE] EVALUATION:
+- Current Candle: BTCUSDT 5m Close: $67440 Time: 2026-06-03T10:09:59.999Z
+- Current Regime: HIGH_VOLATILITY
+- Top Strategy: EMA Crossover Strategy
+- Confidence Score: 78%
+- Consensus Score: 100.0%
+- Trade Decision: OPEN LONG at $67440 SL: 67320.86586066474 TP: 67618.7012090029
+- Sizing Allocation: 23.50% ($2350.00)
+
+[DEBUG] Calling PaperTradingEngine.openPosition...
+[DEBUG] PaperTradingEngine.openPosition function source: async openPosition(userId,symbol,direction,price,sizeUsdt=null,stopLoss=null,takeProfit=null,leverage=1,explicitBalance,explicitSettings,signalContext){console.log(`[DEBUG-PT-FIRST-LINE] openPosition called for ${symbol} direction ${direction} price ${price}`);const sym=symbol.toUpperCase();if(this.executionLocks.has(sym)){console.log(`[DEBUG-PT] early return: executionLocks has ${sym}`);return null}this.executionLocks.add(sym);try{const strategyId=signalContext?.strategyId||"manual";const strat
+[DEBUG-PT-FIRST-LINE] openPosition called for BTCUSDT direction LONG price 67440
+[DEBUG-PT] early return: executionLocks has BTCUSDT
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 12)
+[DEBUG] PaperTradingEngine.openPosition result: FAILED/NULL
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Reversal strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 5)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in RANGING regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 5)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[SIGNAL_REJECTED] Regime mismatch: Momentum strategy not allowed in BREAKOUT regime.
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 5)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[CONSENSUS] Category: SCALPING | LONG: 0 | SHORT: 1 | HOLD: 0 | Consensus: 100.0% SHORT | Avg Confidence: 85.0 | ✅ APPROVED
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($211.5097) ≤ 2× total fees ($134.2568). Entry: $67234.15, TP: $67022.6403, Fee rate: 0.10%
+[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: FEE_INEFFICIENT_SCALP: Expected gross profit ($211.5097) ≤ 2× total fees ($134.2568). Entry: $67234.15, TP: $67022.6403, Fee rate: 0.10%
+[FLOW_03] Processed tick, generated prioritized signals: 1 (raw: 5)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 7)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[FLOW_03] Processed tick, generated prioritized signals: 0 (raw: 12)
+[Replayer] Replay sequence completed.
+[ReplayEngine] Simulation finished in 3.83 seconds.
+[ReplayEngine] Evaluating trade metrics...
+[ReplayEngine] Creating reports & exporting snapshots...
+================================================================================
+                              REPLAY SUMMARY
+================================================================================
+Starting Balance:  $10000.00
+Ending Balance:    $10000.00
+Net Profit:        $0.00
+ROI:               0.00%
+Fees Paid:         $0.00
+Profit Factor:     1.00
+Max Drawdown:      -0.00%
+Sharpe Ratio:      0.00
+Total Trades:      0
+Wins:              0
+Losses:            0
+Win Rate:          0.0%
+Average Winner:    $0.00
+Average Loser:     $0.00
+Average Duration:  0m
+Largest Win:       $0.00
+Largest Loss:      $0.00
+
+================================================================================
+                            REPLAY HEALTH REPORT
+================================================================================
+Signals Generated:          17
+Signals Executed:           0
+------------------------------------------------
+Rejected By Confidence:     0
+Rejected By Regime:         508
+Rejected By Cooldown:       0
+Rejected By Quarantine:     0
+Blocked By Active Position: 0
+Rejected By Consensus:      0
+Rejected By Fees:           10
+Rejected By Risk Engine:    0
+
+================================================================================
+                            STRATEGY LEADERBOARD
+================================================================================
+Rank Strategy                      Trades  Win Rate  Net Profit  Contribution  
+
+================================================================================
+                             SYMBOL LEADERBOARD
+================================================================================
+Symbol         Trades  Win Rate    Net Profit     ROI       
+
+================================================================================
+                            CATEGORY PERFORMANCE
+================================================================================
+Category            Trades    Win Rate    Net Profit     
+
+================================================================================
+                                 TOP WINNERS
+================================================================================
+
+================================================================================
+                                 TOP LOSERS
+================================================================================
+================================================================================
+
+
+[ReportGenerator] Reports generated successfully in: /home/tejas-ambaliya/Desktop/Synapse1/src/replay/reports
+[ReportGenerator] Snapshot saved to: /home/tejas-ambaliya/Desktop/Synapse1/src/replay/reports/replays/2026-06-03_16-27-27_0.1d_BTC
+

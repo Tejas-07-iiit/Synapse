@@ -9,6 +9,7 @@ export interface PaperTradingSettings {
   autoTrading: boolean;
   maxOpenTrades: number;
   preferredTradingMode?: "SCALPING" | "INTRADAY";
+  riskPerTradePct?: number;
 }
 
 export interface DbClientHandler {
@@ -17,6 +18,7 @@ export interface DbClientHandler {
   updatePosition: (id: string, currentPrice: number, pnl: number) => Promise<any>;
   closePosition: (data: any) => Promise<any>;
   fetchWallet: (userId: string) => Promise<any>;
+  calculateDailyDrawdown?: (userId: string, currentBalance: number, startOfToday: number) => Promise<number>;
 }
 
 export class PaperTradingEngine {
@@ -248,10 +250,13 @@ export class PaperTradingEngine {
     explicitSettings?: PaperTradingSettings,
     signalContext?: any
   ): Promise<VirtualPosition | null> {
+    console.log(`[DEBUG-PT-FIRST-LINE] openPosition called for ${symbol} direction ${direction} price ${price}`);
     const sym = symbol.toUpperCase();
 
     // 1. ACQUIRE MUTEX LOCK
+    // 1. ACQUIRE MUTEX LOCK
     if (this.executionLocks.has(sym)) {
+      console.log(`[DEBUG-PT] early return: executionLocks has ${sym}`);
       return null;
     }
     this.executionLocks.add(sym);
@@ -288,6 +293,7 @@ export class PaperTradingEngine {
       // 1.5 CHECK COOLDOWN
       const cooldownExpiry = this.symbolCooldowns.get(sym) || 0;
       if (Date.now() < cooldownExpiry) {
+        console.log(`[DEBUG-PT] early return: cooldown active for ${sym}. current: ${Date.now()}, expiry: ${cooldownExpiry}`);
         return null;
       }
 
@@ -297,6 +303,7 @@ export class PaperTradingEngine {
       );
 
       if (alreadyOpen) {
+        console.log(`[DEBUG-PT] early return: position already open in memory for ${sym}`);
         return null;
       }
 
@@ -319,6 +326,7 @@ export class PaperTradingEngine {
         }
         if (dbOpen) {
           alreadyOpen = true;
+          console.log(`[DEBUG-PT] early return: position already open in DB for ${sym}`);
           return null;
         }
       } catch (e) {
@@ -340,33 +348,41 @@ export class PaperTradingEngine {
           const startOfToday = new Date();
           startOfToday.setUTCHours(0, 0, 0, 0);
 
-          const closedTradesToday = await prisma.trade.findMany({
-            where: {
-              userId,
-              closedAt: {
-                gte: startOfToday,
+          if (this.dbHandler.calculateDailyDrawdown) {
+            let balanceVal = explicitBalance !== undefined ? explicitBalance : 0;
+            if (explicitBalance === undefined) {
+              balanceVal = useWalletStore.getState().balance;
+            }
+            dailyDrawdownPercent = await this.dbHandler.calculateDailyDrawdown(userId, balanceVal, startOfToday.getTime());
+          } else {
+            const closedTradesToday = await prisma.trade.findMany({
+              where: {
+                userId,
+                closedAt: {
+                  gte: startOfToday,
+                },
               },
-            },
-            select: {
-              netPnl: true,
-            },
-          });
+              select: {
+                netPnl: true,
+              },
+            });
 
-          const closedPnlToday = closedTradesToday.reduce((sum, t) => sum + t.netPnl, 0);
+            const closedPnlToday = closedTradesToday.reduce((sum, t) => sum + t.netPnl, 0);
 
-          const openPositions = Array.from(this.positions.values()).filter(
-            (p) => p.userId === userId && p.status === "OPEN"
-          );
-          const floatingPnl = openPositions.reduce((sum, p) => sum + p.pnl, 0);
+            const openPositions = Array.from(this.positions.values()).filter(
+              (p) => p.userId === userId && p.status === "OPEN"
+            );
+            const floatingPnl = openPositions.reduce((sum, p) => sum + p.pnl, 0);
 
-          const totalDailyPnl = closedPnlToday + floatingPnl;
-          
-          const wallet = await prisma.wallet.findUnique({ where: { userId } });
-          const currentBalance = wallet ? wallet.balance : (explicitBalance !== undefined ? explicitBalance : 0);
-          const startOfDayBalance = currentBalance - closedPnlToday;
+            const totalDailyPnl = closedPnlToday + floatingPnl;
+            
+            const wallet = await prisma.wallet.findUnique({ where: { userId } });
+            const currentBalance = wallet ? wallet.balance : (explicitBalance !== undefined ? explicitBalance : 0);
+            const startOfDayBalance = currentBalance - closedPnlToday;
 
-          if (startOfDayBalance > 0 && totalDailyPnl < 0) {
-            dailyDrawdownPercent = (Math.abs(totalDailyPnl) / startOfDayBalance) * 100;
+            if (startOfDayBalance > 0 && totalDailyPnl < 0) {
+              dailyDrawdownPercent = (Math.abs(totalDailyPnl) / startOfDayBalance) * 100;
+            }
           }
         }
       } catch (e) {
@@ -414,6 +430,36 @@ export class PaperTradingEngine {
         }
 
         pct = Math.min(50, Math.max(5, pct));
+
+        // Scale size dynamically based on market condition (regime & volatility relative average)
+        let regimeMultiplier = 1.0;
+        if (marketRegime === "TRENDING") {
+          regimeMultiplier = 1.25; // Trend-following: increase size
+        } else if (marketRegime === "HIGH_VOLATILITY") {
+          regimeMultiplier = 0.75; // Volatility/noise: decrease size
+        } else if (marketRegime === "LOW_VOLATILITY") {
+          regimeMultiplier = 0.90; // Slightly lower due to compressed movement
+        } else if (marketRegime === "RANGING") {
+          regimeMultiplier = 1.0;  // Standard sizing
+        }
+
+        let volatilityMultiplier = 1.0;
+        const atrArray = indicatorSnapshot.atr || [];
+        if (atrArray.length > 0) {
+          const currentAtr = atrArray[atrArray.length - 1];
+          // Take average of last up to 20 ATR values
+          const recentAtrs = atrArray.slice(-20);
+          const avgAtr = recentAtrs.reduce((sum: number, v: number) => sum + v, 0) / recentAtrs.length;
+          if (currentAtr > 0 && avgAtr > 0) {
+            volatilityMultiplier = avgAtr / currentAtr;
+            volatilityMultiplier = Math.min(1.5, Math.max(0.5, volatilityMultiplier));
+          }
+        }
+
+        const marketSizingMultiplier = regimeMultiplier * volatilityMultiplier;
+        pct = pct * marketSizingMultiplier;
+        pct = Math.min(50, Math.max(1, pct)); // Enforce boundaries
+
         orderValueUsdt = balance * (pct / 100) * leverage;
         console.log(`[DYNAMIC_SIZING] Confidence: ${confidence} | Regime: ${marketRegime} | Drawdown: ${dailyDrawdownPercent.toFixed(2)}% | Calculated Pct: ${pct.toFixed(2)}% | Order size: $${orderValueUsdt.toFixed(2)}`);
       } else {

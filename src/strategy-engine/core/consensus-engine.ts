@@ -309,6 +309,9 @@ export class ConsensusEngine {
     }
 
     let bestSignal: StrategySignal | null = null;
+    let feeRejected = result.feeRejected;
+    let feeRejectionReason = result.feeRejectionReason;
+
     if (bestCategory && bestCategory.winningSignals.length > 0) {
       const sorted = [...bestCategory.winningSignals].sort((a, b) => {
         const scoreA = (a as any).finalScore ?? a.confidence;
@@ -316,6 +319,17 @@ export class ConsensusEngine {
         return scoreB - scoreA;
       });
       bestSignal = sorted[0];
+
+      if (bestCategory.category === ConsensusCategory.SCALPING && bestSignal) {
+        const feeCheck = this.checkFeeEfficiency(bestSignal);
+        if (!feeCheck.passed) {
+          feeRejected = true;
+          feeRejectionReason = feeCheck.reason;
+          console.log(`[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: ${feeCheck.reason}`);
+          bestSignal = null;
+          bestCategory = null;
+        }
+      }
     }
 
     return {
@@ -323,8 +337,8 @@ export class ConsensusEngine {
       approvedCategories: filteredApproved,
       bestCategory,
       bestSignal,
-      feeRejected: result.feeRejected,
-      feeRejectionReason: result.feeRejectionReason,
+      feeRejected,
+      feeRejectionReason,
     };
   }
 }

@@ -7,7 +7,8 @@
     "dev:turbo": "NODE_OPTIONS='--max-old-space-size=1024' next dev --turbopack",
     "build": "NODE_OPTIONS='--max-old-space-size=768' next build",
     "start": "NODE_OPTIONS='--max-old-space-size=512' next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "replay": "npx tsx src/replay/cli.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

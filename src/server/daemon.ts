@@ -605,8 +605,12 @@ async function runDaemon() {
       const atrSl = direction === "LONG" ? sig.entry - atrSlDist : sig.entry + atrSlDist;
       const atrTp = direction === "LONG" ? sig.entry + atrTpDist : sig.entry - atrTpDist;
 
-      const finalSl = atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05);
-      const finalTp = atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90);
+      // Use strategy-calculated SL/TP if available, fallback to system ATR SL/TP
+      const strategySl = (sig.stopLoss && sig.stopLoss > 0) ? sig.stopLoss : null;
+      const strategyTp = (sig.takeProfit && sig.takeProfit > 0) ? sig.takeProfit : null;
+
+      const finalSl = strategySl !== null ? strategySl : (atrSl > 0 ? atrSl : (direction === "LONG" ? sig.entry * 0.95 : sig.entry * 1.05));
+      const finalTp = strategyTp !== null ? strategyTp : (atrTp > 0 ? atrTp : (direction === "LONG" ? sig.entry * 1.10 : sig.entry * 0.90));
 
       const risk = Math.abs(sig.entry - finalSl);
       const reward = Math.abs(finalTp - sig.entry);
@@ -705,6 +709,36 @@ async function runDaemon() {
         }
 
         pct = Math.min(50, Math.max(5, pct));
+
+        // Scale size dynamically based on market condition (regime & volatility relative average)
+        let regimeMultiplier = 1.0;
+        if (regime === "TRENDING") {
+          regimeMultiplier = 1.25; // Trend-following: increase size
+        } else if (regime === "HIGH_VOLATILITY") {
+          regimeMultiplier = 0.75; // Volatility/noise: decrease size
+        } else if (regime === "LOW_VOLATILITY") {
+          regimeMultiplier = 0.90; // Slightly lower due to compressed movement
+        } else if (regime === "RANGING") {
+          regimeMultiplier = 1.0;  // Standard sizing
+        }
+
+        let volatilityMultiplier = 1.0;
+        const atrArray = indicators.atr || [];
+        if (atrArray.length > 0) {
+          const currentAtr = atrArray[atrArray.length - 1];
+          // Take average of last up to 20 ATR values
+          const recentAtrs = atrArray.slice(-20);
+          const avgAtr = recentAtrs.reduce((sum: number, v: number) => sum + v, 0) / recentAtrs.length;
+          if (currentAtr > 0 && avgAtr > 0) {
+            volatilityMultiplier = avgAtr / currentAtr;
+            volatilityMultiplier = Math.min(1.5, Math.max(0.5, volatilityMultiplier));
+          }
+        }
+
+        const marketSizingMultiplier = regimeMultiplier * volatilityMultiplier;
+        pct = pct * marketSizingMultiplier;
+        pct = Math.min(50, Math.max(1, pct)); // Enforce boundaries
+
         const estimatedSizeUsdt = wallet.balance * (pct / 100);
 
         console.log(`[FLOW_09] Risk checks initialized. Estimated size: $${estimatedSizeUsdt.toFixed(2)} (${pct}% of balance $${wallet.balance.toFixed(2)})`);
@@ -1050,7 +1084,10 @@ async function runDaemon() {
         const enrichedSig = {
           ...sig,
           confidence: confidenceScore,
-          auditPayload: entryAuditPayload
+          auditPayload: entryAuditPayload,
+          marketContext: { regime },
+          indicators,
+          timeframe: tf,
         };
 
         try {
@@ -1069,6 +1106,7 @@ async function runDaemon() {
               autoTrading: settings.autoTrading,
               maxOpenTrades: settings.maxOpenTrades,
               preferredTradingMode: userMode,
+              riskPerTradePct: settings.riskPerTradePct,
             },
             enrichedSig
           );

@@ -127,4 +127,12 @@ export class PerformanceWeightingEngine {
   public static getStats(strategyId: string): StrategyStats | null {
     return this.strategyStatsMap.get(strategyId) || null;
   }
+
+  public static setMockStats(strategyId: string, stats: StrategyStats): void {
+    this.strategyStatsMap.set(strategyId, stats);
+  }
+
+  public static clearMockStats(): void {
+    this.strategyStatsMap.clear();
+  }
 }

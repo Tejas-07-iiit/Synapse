@@ -96,8 +96,10 @@ export default function SettingsPage() {
     e.preventDefault();
     if (user?.id) {
       await settings.updateSettings(user.id, formData);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      if (!useSettingsStore.getState().error) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2000);
+      }
     }
   };
 
@@ -217,7 +219,13 @@ export default function SettingsPage() {
               </div>
 
               {/* Action Bar */}
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-3 items-center">
+                {settings.error && (
+                  <span className="text-xs font-bold text-destructive flex items-center gap-1.5 bg-destructive/10 px-3 py-1.5 rounded-lg border border-destructive/20">
+                    <AlertCircle size={14} />
+                    {settings.error}
+                  </span>
+                )}
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"

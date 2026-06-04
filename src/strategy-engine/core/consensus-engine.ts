@@ -43,9 +43,9 @@ const MIN_PROFIT_FEE_MULTIPLE = 2; // Gross profit must exceed 2× total fees
 
 // ─── User Mode → Allowed Categories Mapping ───
 export const USER_MODE_CATEGORY_MAP: Record<string, ConsensusCategory[]> = {
-  "SCALPING":  [ConsensusCategory.SCALPING, ConsensusCategory.DEFENSIVE],
-  "INTRADAY":  [ConsensusCategory.SCALPING, ConsensusCategory.INTRADAY, ConsensusCategory.DEFENSIVE],
-  // Future: "SWING" → [SCALPING, INTRADAY, SWING, DEFENSIVE]
+  "SCALPING":  [ConsensusCategory.SCALPING],
+  "INTRADAY":  [ConsensusCategory.INTRADAY, ConsensusCategory.DEFENSIVE],
+  // Future: "SWING" → [ConsensusCategory.SWING, ConsensusCategory.DEFENSIVE]
 };
 
 export class ConsensusEngine {

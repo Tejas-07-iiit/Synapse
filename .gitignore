@@ -44,3 +44,7 @@ logs/
 
 # Replay Simulator
 src/replay/
+
+# MCX Folder
+MCX/
+MCX

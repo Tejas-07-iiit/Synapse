@@ -73,16 +73,35 @@ export async function POST(request: Request) {
         data: updateData,
       });
     } catch (err: any) {
-      if (err.message.includes("riskPerTradePct")) {
-        console.warn("[API-Settings] Prisma desync: riskPerTradePct missing on update. Stripping and retrying.");
-        const { riskPerTradePct, ...safeData } = updateData as any;
-        updatedSettings = await prisma.userSettings.update({
-          where: { userId },
-          data: safeData,
-        });
-        if (updatedSettings) updatedSettings.riskPerTradePct = 2.0;
+      console.warn("[API-Settings] Prisma update failed, attempting raw SQL fallback:", err.message);
+      
+      const setClauses: string[] = [];
+      const values: any[] = [];
+      let i = 1;
+
+      for (const [key, value] of Object.entries(updateData)) {
+        if (value !== undefined) {
+          setClauses.push(`"${key}" = $${i}`);
+          values.push(value);
+          i++;
+        }
+      }
+
+      if (setClauses.length > 0) {
+        setClauses.push(`"updatedAt" = NOW()`);
+        values.push(userId);
+        const query = `UPDATE "UserSettings" SET ${setClauses.join(', ')} WHERE "userId" = $${i} RETURNING *`;
+        
+        const rawResults: any[] = await prisma.$queryRawUnsafe(query, ...values);
+        
+        if (rawResults && rawResults.length > 0) {
+          updatedSettings = rawResults[0];
+          console.log("[API-Settings] Raw SQL fallback succeeded.");
+        } else {
+          throw new Error("Raw SQL fallback resulted in 0 updated rows.");
+        }
       } else {
-        throw err;
+         throw new Error("No valid fields provided for update.");
       }
     }
 

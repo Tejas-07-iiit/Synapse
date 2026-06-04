@@ -491,9 +491,32 @@ async function runDaemon() {
           console.error(`[Daemon] Failed to sync active positions for user ${userId} in callback:`, err);
         }
 
+        // --- PRE-CONSENSUS STRICT FILTERING ---
+        let allowedTimeframes: string[] = [];
+        let allowedCategories: string[] = [];
+        if (userMode === "SCALPING") {
+           allowedTimeframes = ["1m", "3m", "5m"];
+           allowedCategories = ["SCALPING"];
+        } else if (userMode === "INTRADAY") {
+           allowedTimeframes = ["15m", "30m"];
+           allowedCategories = ["INTRADAY", "DEFENSIVE"];
+        }
+
+        const eligibleSignals = signals.filter(sig => {
+           const category = (sig.consensusCategory || sig.strategyCategory || "").toUpperCase();
+           const timeframeAllowed = allowedTimeframes.includes(sig.timeframe.toLowerCase());
+           const categoryAllowed = allowedCategories.includes(category);
+           return timeframeAllowed && categoryAllowed;
+        });
+
+        if (eligibleSignals.length === 0 && signals.length > 0) {
+            console.log(`\n[NO_ELIGIBLE_SIGNALS]\nMode: ${userMode}\nRejected:\n${signals.length}\nReason:\nNo valid ${userMode.toLowerCase()} signals available.\n`);
+            continue; // Move to the next user, do NOT evaluate consensus
+        }
+
       // ─── CONSENSUS-BASED SIGNAL EVALUATION ───
       // 1. Run consensus engine on ALL non-HOLD signals for this symbol
-      const consensusResult = ConsensusEngine.evaluate(signals, regime);
+      const consensusResult = ConsensusEngine.evaluate(eligibleSignals, regime);
 
       // 2. Filter consensus result for this user's preferred trading mode
       const userConsensus = ConsensusEngine.filterForUser(consensusResult, userMode);
@@ -1078,7 +1101,7 @@ async function runDaemon() {
             netPnl: 0
           },
           otherStrategiesLost,
-          executiveSummary: `An autonomous ${sig.signal} position was opened on ${sym} at $${sig.entry}. Winning strategy ${sig.strategyName || sig.strategyId} achieved confidence score of ${confidenceScore}% in a ${regime} market structure under ${userMode} mode.`
+          executiveSummary: `An autonomous ${sig.signal} position was opened on ${sym} at $${sig.entry}. Winning strategy ${sig.strategyName || sig.strategyId} achieved confidence score of ${confidenceScore}% in a ${regime} market structure under ${userMode} mode on ${tf} timeframe.`
         };
 
         const enrichedSig = {
@@ -1112,6 +1135,7 @@ async function runDaemon() {
           );
 
           if (position) {
+            console.log(`\n[EXECUTION_APPROVED]\nMode:\n${userMode}\nStrategy:\n${sig.strategyName || sig.strategyId}\nCategory:\n${sig.strategyCategory || "UNKNOWN"}\nTimeframe:\n${tf}\nConfidence:\n${confidenceScore}%\n`);
             console.log(`[FLOW_11] Position opened successfully: ${position.id}`);
             console.log(`[SIGNAL_EXECUTED] User: ${userId} | Symbol: ${sym} | Strategy: ${sig.strategyId} | Direction: ${direction}`);
             console.log(`[MULTI-TENANT DEBUG] TRADE GENERATED -> userId: ${userId}, strategyId: ${sig.strategyId}, positionId: ${position.id}, symbol: ${sym}, side: ${direction}, entry: ${sig.entry}, sizeUsdt: ${estimatedSizeUsdt}`);

@@ -48,3 +48,6 @@ src/replay/
 # MCX Folder
 MCX/
 MCX
+docs/
+docs
+Synapse_Backtest_Meta.md

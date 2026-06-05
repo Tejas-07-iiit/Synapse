@@ -122,6 +122,9 @@ class StrategyEngine {
     const activeStrategies = strategyRegistry.getStrategies();
 
     for (const strategy of activeStrategies) {
+      if (strategy.enabled === false) {
+        continue;
+      }
       const supportsSymbol = !strategy.symbols || strategy.symbols.map(s => s.toUpperCase()).includes(sym);
       const supportsTimeframe = 
         (strategy.timeframe && strategy.timeframe.toLowerCase() === tf) ||

@@ -186,10 +186,6 @@ export async function POST(request: Request) {
             throw new Error("POSITION_NOT_FOUND");
           }
 
-          if (existingPos.status === "CLOSED") {
-            return { alreadyClosed: true };
-          }
-
           const finalUserId = userId || existingPos?.userId || "default-user-id";
           const finalSymbol = symbol || existingPos?.symbol || "BTCUSDT";
           const finalDirection = direction || existingPos?.direction || "LONG";
@@ -201,9 +197,12 @@ export async function POST(request: Request) {
           const finalClosedAt = closedAt ? new Date(closedAt) : new Date();
           const finalExitReason = data.exitReason || null;
 
-          // 2. Update position to CLOSED
-          await tx.position.update({
-            where: { id },
+          // 2. Update position to CLOSED conditionally (prevents race condition)
+          const updateResult = await tx.position.updateMany({
+            where: {
+              id,
+              status: "OPEN",
+            },
             data: {
               status: "CLOSED",
               currentPrice: exitPrice,
@@ -212,6 +211,10 @@ export async function POST(request: Request) {
               exitReason: finalExitReason || reason,
             },
           });
+
+          if (updateResult.count === 0) {
+            return { alreadyClosed: true };
+          }
 
           // Map reason to status
           let tradeStatus = "CLOSED";

@@ -131,14 +131,12 @@ async function runDaemon() {
             return;
           }
 
-          if (existingPos.status === "CLOSED") {
-            console.log(`[Daemon] Position ${id} (${symbol}) is already CLOSED in DB. Skipping duplicate DB updates.`);
-            return;
-          }
-
-          // Update position to CLOSED
-          await tx.position.update({
-            where: { id },
+          // Update position to CLOSED conditionally (prevents race condition)
+          const updateResult = await tx.position.updateMany({
+            where: {
+              id,
+              status: "OPEN",
+            },
             data: {
               status: "CLOSED",
               currentPrice: exitPrice,
@@ -147,6 +145,11 @@ async function runDaemon() {
               exitReason: exitReason || reason,
             },
           });
+
+          if (updateResult.count === 0) {
+            console.log(`[Daemon] Position ${id} (${symbol}) is already CLOSED in DB. Skipping duplicate DB updates.`);
+            return;
+          }
 
           // Map reason to status
           let tradeStatus = "CLOSED";

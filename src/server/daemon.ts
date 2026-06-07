@@ -647,6 +647,21 @@ async function runDaemon() {
       const confidenceScore = detailedConf.finalScore;
       console.log(`[FLOW_06] Confidence scoring for consensus winner: User: ${userId} | Strategy: ${sig.strategyId} | Score: ${confidenceScore}`);
 
+      // DOW confidence breakdown logging
+      if (sig.strategyId && sig.strategyId.includes("dow")) {
+        const logTag = confidenceScore < 50 ? "[DOW_CONFIDENCE_REJECTED]" : "[DOW_CONFIDENCE_PASSED]";
+        console.log(
+          `${logTag} ${symbol} ${timeframe} | ` +
+          `Regime Score: ${detailedConf.regimeScore} | ` +
+          `Trend Score: ${detailedConf.trendScore} | ` +
+          `Momentum Score: ${detailedConf.momentumScore} | ` +
+          `Volume Score: ${detailedConf.volumeScore} | ` +
+          `Confirm Score: ${detailedConf.confirmScore} | ` +
+          `Perf Boost: ${detailedConf.perfBoost} | ` +
+          `Final Score: ${detailedConf.finalScore}`
+        );
+      }
+
       // Performance stats
       const stats = PerformanceWeightingEngine.getStats(sig.strategyId);
       const profitFactor = stats ? stats.profitFactor : 1.0;

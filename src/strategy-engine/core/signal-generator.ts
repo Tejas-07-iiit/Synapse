@@ -17,6 +17,7 @@ const STRATEGY_NAMES: Record<string, string> = {
   "bollinger-reversion": "Bollinger Reversion Strategy",
   "short-term-reversal": "Short Term Reversal Strategy",
   "dow-mfi-rsi": "Dow Factor MFI RSI Strategy",
+  "dow-mfi-rsi-trend-reversion": "Dow Factor MFI RSI Strategy",
   "parabolic-rsi": "Parabolic RSI Strategy",
   "range-breakout-high": "Range Breakout High Strategy",
   "residual-momentum": "Residual Momentum Strategy",
@@ -164,6 +165,7 @@ export class SignalGenerator {
       "bollinger-reversion": "MeanReversion",
       "short-term-reversal": "Reversal",
       "dow-mfi-rsi": "Momentum",
+      "dow-mfi-rsi-trend-reversion": "Momentum",
       "parabolic-rsi": "Momentum",
       "range-breakout-high": "Breakout",
       "residual-momentum": "Momentum",
@@ -205,6 +207,7 @@ export class SignalGenerator {
       // Intraday (11 strategies)
       "wavetrend": "INTRADAY",
       "dow-mfi-rsi": "INTRADAY",
+      "dow-mfi-rsi-trend-reversion": "INTRADAY",
       "lorentzian": "INTRADAY",
       "ema-cross-adx": "INTRADAY",
       "hyper-supertrend": "INTRADAY",

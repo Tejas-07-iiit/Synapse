@@ -65,25 +65,58 @@ export class ConfidenceEngine {
     let regimeScore = 0;
     const regime = RegimeEngine.classify(context);
     
-    // Check compatibility based on strategy ID or indicators used
-    const isTrendingStrat = strategyId && (
-      strategyId.includes("cross") || 
-      strategyId.includes("trend") || 
-      strategyId.includes("supertrend") || 
-      strategyId.includes("cloud") ||
-      strategyId.includes("defensive") ||
-      strategyId.includes("momentum")
-    );
-    const isMeanReversionStrat = strategyId && (
-      strategyId.includes("reversion") || 
-      strategyId.includes("reversal") || 
-      strategyId.includes("grid")
-    );
-    const isBreakoutStrat = strategyId && strategyId.includes("breakout");
+    // Determine strategy type from supportedRegimes in registry (preferred), then fallback to ID keywords
+    let isTrendingStrat = false;
+    let isMeanReversionStrat = false;
+    let isBreakoutStrat = false;
+
+    if (strategy && strategy.supportedRegimes) {
+      const sr = strategy.supportedRegimes.map(s => s.toUpperCase());
+      const supportsTrending = sr.includes("TRENDING") || sr.includes("WEAK_TRENDING");
+      const supportsRanging = sr.includes("RANGING");
+      const supportsBreakout = sr.includes("BREAKOUT") || sr.includes("HIGH_VOLATILITY");
+
+      // A strategy that supports TRENDING is trend-following unless it ONLY supports ranging
+      if (supportsTrending && !supportsBreakout) {
+        isTrendingStrat = true;
+      } else if (supportsRanging && !supportsTrending && !supportsBreakout) {
+        isMeanReversionStrat = true;
+      } else if (supportsBreakout) {
+        isBreakoutStrat = true;
+      } else {
+        // Mixed support — treat as trending if it supports trending
+        isTrendingStrat = supportsTrending;
+        isMeanReversionStrat = !supportsTrending && supportsRanging;
+      }
+    } else if (strategyId) {
+      // Fallback: ID keyword matching (order matters — check trending first)
+      isBreakoutStrat = strategyId.includes("breakout");
+      if (!isBreakoutStrat) {
+        isTrendingStrat = (
+          strategyId.includes("cross") || 
+          strategyId.includes("trend") || 
+          strategyId.includes("supertrend") || 
+          strategyId.includes("cloud") ||
+          strategyId.includes("defensive") ||
+          strategyId.includes("momentum") ||
+          strategyId.includes("dow")
+        );
+        // Only classify as mean reversion if NOT already a trending strategy
+        isMeanReversionStrat = !isTrendingStrat && (
+          strategyId.includes("reversion") || 
+          strategyId.includes("reversal") || 
+          strategyId.includes("grid")
+        );
+      }
+    }
 
     if (regime === "TRENDING") {
       if (isTrendingStrat) regimeScore = 20;
       else if (isMeanReversionStrat) regimeScore = -10;
+      else regimeScore = 5;
+    } else if (regime === "WEAK_TRENDING") {
+      if (isTrendingStrat) regimeScore = 15;
+      else if (isMeanReversionStrat) regimeScore = -5;
       else regimeScore = 5;
     } else if (regime === "RANGING") {
       if (isMeanReversionStrat) regimeScore = 20;

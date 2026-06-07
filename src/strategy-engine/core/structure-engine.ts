@@ -248,9 +248,12 @@ export class StructureEngine {
       const isLowerHigh = lastHigh.price < prevHigh.price;
       const isLowerLow = lastLow.price < prevLow.price;
 
-      if (isHigherHigh && isHigherLow) {
+      const lastClose = closes[len - 1];
+      const ema20Val = indicators.ema20?.[len - 1] || lastClose;
+
+      if (isHigherHigh && (isHigherLow || lastClose > ema20Val)) {
         dowStructure = "BULLISH";
-      } else if (isLowerHigh && isLowerLow) {
+      } else if (isLowerLow && (isLowerHigh || lastClose < ema20Val)) {
         dowStructure = "BEARISH";
       }
     }

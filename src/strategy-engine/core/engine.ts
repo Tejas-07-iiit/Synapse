@@ -22,11 +22,46 @@ export interface SignalsDbHandler {
   logIndicatorSnapshot: (data: any) => Promise<any>;
 }
 
+export interface FunnelMetrics {
+  rawEvaluations: number;
+  structurePassed: number;
+  structureRejected: number;
+  regimePassed: number;
+  regimeRejected: number;
+  confidencePassed: number;
+  confidenceRejected: number;
+  executed: number;
+}
+
 class StrategyEngine {
   private callbacks: Set<EngineRunCallback> = new Set();
   private signalLocks: Set<string> = new Set();
   private lastEmittedSignals: Map<string, "LONG" | "SHORT"> = new Map();
   private dbHandler: SignalsDbHandler | null = null;
+
+  public funnelMetrics: FunnelMetrics = {
+    rawEvaluations: 0,
+    structurePassed: 0,
+    structureRejected: 0,
+    regimePassed: 0,
+    regimeRejected: 0,
+    confidencePassed: 0,
+    confidenceRejected: 0,
+    executed: 0,
+  };
+
+  public resetFunnelMetrics() {
+    this.funnelMetrics = {
+      rawEvaluations: 0,
+      structurePassed: 0,
+      structureRejected: 0,
+      regimePassed: 0,
+      regimeRejected: 0,
+      confidencePassed: 0,
+      confidenceRejected: 0,
+      executed: 0,
+    };
+  }
 
   public registerDbHandler(handler: SignalsDbHandler) {
     this.dbHandler = handler;
@@ -132,10 +167,21 @@ class StrategyEngine {
         (!strategy.timeframe && !strategy.timeframes);
 
       if (supportsSymbol && supportsTimeframe) {
+        this.funnelMetrics.rawEvaluations++;
+
+        const isStructureAligned = structure.dowStructure === "BULLISH" || structure.dowStructure === "BEARISH";
+        if (isStructureAligned) {
+          this.funnelMetrics.structurePassed++;
+        } else {
+          this.funnelMetrics.structureRejected++;
+        }
+
         // Enforce Regime check BEFORE execution
         if (strategy.supportedRegimes && !RegimeEngine.matches(regime, strategy.supportedRegimes)) {
+          this.funnelMetrics.regimeRejected++;
           continue;
         }
+        this.funnelMetrics.regimePassed++;
 
         const lastCandleTime = strategyCandles[strategyCandles.length - 1]?.time || 0;
         const lockKey = `${sym}_${tf}_${strategy.id}_${lastCandleTime}`;

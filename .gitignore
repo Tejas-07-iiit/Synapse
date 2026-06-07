@@ -42,9 +42,11 @@ yarn-error.log*
 next-env.d.ts
 logs/
 
+
 # Replay Simulator
 src/replay/
 
 # MCX Folder
 MCX/
 MCX
+docs/

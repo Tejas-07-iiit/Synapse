@@ -3,7 +3,7 @@ import { SignalGenerator } from "../../core/signal-generator";
 import { RegimeEngine } from "../../core/regime-engine";
 
 export class DowFactorMFIRSIStrategy implements TradingStrategy {
-  public id = "dow-mfi-rsi";
+  public id = "dow-mfi-rsi-trend-reversion";
   public category: TradingMode = TradingMode.INTRADAY;
   public consensusCategory: ConsensusCategory = ConsensusCategory.INTRADAY;
   public expectedHoldingTime = "1h-8h";
@@ -15,7 +15,7 @@ export class DowFactorMFIRSIStrategy implements TradingStrategy {
   public symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   public enabled = true;
   public indicatorsRequired = ["rsi", "atr", "volumeMA", "mfi"];
-  public supportedRegimes = ["Breakout","High Volatility","Bullish Trend","Bearish Trend"];
+  public supportedRegimes = ["TRENDING", "WEAK_TRENDING", "LIQUIDITY_SWEEP", "RANGING"];
 
   public analyze(context: StrategyContext): { direction: "LONG" | "SHORT" | "HOLD"; reasoning: string[]; confidence: number } {
     const { candles, indicators, structure } = context;
@@ -40,9 +40,9 @@ export class DowFactorMFIRSIStrategy implements TradingStrategy {
     // 3. MFI > 50 and rising
     // 4. volume > volumeMA
     const isBullishStructure = dowStructure === "BULLISH";
-    const rsiBullish = rsi > 50 && rsi > prevRsi;
-    const mfiBullish = mfi > 50 && mfi > prevMfi;
-    const volumeBullish = volume > volumeMA;
+    const rsiBullish = rsi > 48 && rsi > prevRsi;
+    const mfiBullish = mfi > 48 && mfi > prevMfi;
+    const volumeBullish = volume > volumeMA * 0.90;
 
     // SHORT Conditions:
     // 1. dowStructure is BEARISH
@@ -50,24 +50,32 @@ export class DowFactorMFIRSIStrategy implements TradingStrategy {
     // 3. MFI < 50 and falling
     // 4. volume > volumeMA
     const isBearishStructure = dowStructure === "BEARISH";
-    const rsiBearish = rsi < 50 && rsi < prevRsi;
-    const mfiBearish = mfi < 50 && mfi < prevMfi;
-    const volumeBearish = volume > volumeMA;
+    const rsiBearish = rsi < 52 && rsi < prevRsi;
+    const mfiBearish = mfi < 52 && mfi < prevMfi;
+    const volumeBearish = volume > volumeMA * 0.90;
 
-    if (isBullishStructure && rsiBullish && mfiBullish && volumeBullish) {
+    if (isBullishStructure && volumeBullish && (rsiBullish || mfiBullish)) {
       direction = "LONG";
       reasoning.push("Dow Factor MFI RSI LONG Triggered.");
       reasoning.push(`Dow structure is BULLISH.`);
-      reasoning.push(`RSI is above 50 and rising at ${rsi.toFixed(1)} (prev: ${prevRsi.toFixed(1)}).`);
-      reasoning.push(`Money Flow Index is above 50 and rising at ${mfi.toFixed(1)} (prev: ${prevMfi.toFixed(1)}).`);
       reasoning.push(`Volume is above MA: ${volume.toFixed(0)} > ${volumeMA.toFixed(0)}.`);
-    } else if (isBearishStructure && rsiBearish && mfiBearish && volumeBearish) {
+      if (rsiBullish) {
+        reasoning.push(`RSI is above 50 and rising at ${rsi.toFixed(1)} (prev: ${prevRsi.toFixed(1)}).`);
+      }
+      if (mfiBullish) {
+        reasoning.push(`Money Flow Index is above 50 and rising at ${mfi.toFixed(1)} (prev: ${prevMfi.toFixed(1)}).`);
+      }
+    } else if (isBearishStructure && volumeBearish && (rsiBearish || mfiBearish)) {
       direction = "SHORT";
       reasoning.push("Dow Factor MFI RSI SHORT Triggered.");
       reasoning.push(`Dow structure is BEARISH.`);
-      reasoning.push(`RSI is below 50 and falling at ${rsi.toFixed(1)} (prev: ${prevRsi.toFixed(1)}).`);
-      reasoning.push(`Money Flow Index is below 50 and falling at ${mfi.toFixed(1)} (prev: ${prevMfi.toFixed(1)}).`);
       reasoning.push(`Volume is above MA: ${volume.toFixed(0)} > ${volumeMA.toFixed(0)}.`);
+      if (rsiBearish) {
+        reasoning.push(`RSI is below 50 and falling at ${rsi.toFixed(1)} (prev: ${prevRsi.toFixed(1)}).`);
+      }
+      if (mfiBearish) {
+        reasoning.push(`Money Flow Index is below 50 and falling at ${mfi.toFixed(1)} (prev: ${prevMfi.toFixed(1)}).`);
+      }
     } else {
       reasoning.push(`No Dow structure continuation signal. Dow structure: ${dowStructure}`);
     }

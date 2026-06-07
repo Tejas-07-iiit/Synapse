@@ -2,6 +2,7 @@ import { StrategyContext } from "../types";
 
 export type MarketRegime =
   | "TRENDING"
+  | "WEAK_TRENDING"
   | "RANGING"
   | "HIGH_VOLATILITY"
   | "LOW_VOLATILITY"
@@ -86,6 +87,14 @@ export class RegimeEngine {
       }
     }
 
+    // Weak Trending (Confirmed by ADX between 15 and 25 or gentle slope)
+    if (adx > 15 && ema20Last && sma50) {
+      if ((price > ema20Last && ema20Last > sma50 && emaSlope > 0.0001) || 
+          (price < ema20Last && ema20Last < sma50 && emaSlope < -0.0001)) {
+        return "WEAK_TRENDING";
+      }
+    }
+
     // D. Default Sideways Ranging Channel
     return "RANGING";
   }
@@ -93,6 +102,7 @@ export class RegimeEngine {
   public static getRegimeCategory(context: StrategyContext): "TRENDING" | "RANGING" | "BREAKOUT" | "LIQUIDITY_SWEEP" | "ACCUMULATION" | "DISTRIBUTION" | "HIGH_VOLATILITY" | "LOW_VOLATILITY" {
     const regime = this.classify(context);
     if (regime === "TRENDING") return "TRENDING";
+    if (regime === "WEAK_TRENDING") return "TRENDING";
     if (regime === "HIGH_VOLATILITY") return "BREAKOUT";
     if (regime === "LOW_VOLATILITY") return "RANGING";
     return "RANGING";
@@ -114,7 +124,8 @@ export class RegimeEngine {
 
       // 2. Broad regime mappings
       if (c === "TRENDING" && (norm.includes("TREND") || norm.includes("TRENDING"))) return true;
-      if (c === "RANGING" && (norm.includes("RANGE") || norm.includes("RANGING") || norm.includes("ACCUMULATION") || norm.includes("DISTRIBUTION"))) return true;
+      if (c === "WEAK_TRENDING" && (norm.includes("TREND") || norm.includes("WEAK"))) return true;
+      if (c === "RANGING" && (norm.includes("RANGE") || norm.includes("RANGING") || norm.includes("ACCUMULATION") || norm.includes("DISTRIBUTION") || norm.includes("SWEEP") || norm.includes("LIQUIDITY SWEEP"))) return true;
       if (c === "HIGH_VOLATILITY" && (norm.includes("VOLATIL") || norm.includes("BREAKOUT"))) return true;
       if (c === "LOW_VOLATILITY" && (norm.includes("VOLATIL") || norm.includes("SQUEEZE") || norm.includes("RANGING") || norm.includes("RANGE"))) return true;
 

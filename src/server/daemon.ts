@@ -131,14 +131,12 @@ async function runDaemon() {
             return;
           }
 
-          if (existingPos.status === "CLOSED") {
-            console.log(`[Daemon] Position ${id} (${symbol}) is already CLOSED in DB. Skipping duplicate DB updates.`);
-            return;
-          }
-
-          // Update position to CLOSED
-          await tx.position.update({
-            where: { id },
+          // Update position to CLOSED conditionally (prevents race condition)
+          const updateResult = await tx.position.updateMany({
+            where: {
+              id,
+              status: "OPEN",
+            },
             data: {
               status: "CLOSED",
               currentPrice: exitPrice,
@@ -147,6 +145,11 @@ async function runDaemon() {
               exitReason: exitReason || reason,
             },
           });
+
+          if (updateResult.count === 0) {
+            console.log(`[Daemon] Position ${id} (${symbol}) is already CLOSED in DB. Skipping duplicate DB updates.`);
+            return;
+          }
 
           // Map reason to status
           let tradeStatus = "CLOSED";
@@ -643,6 +646,21 @@ async function runDaemon() {
       const detailedConf = ConfidenceEngine.calculateDetailed(sig.signal as any, stratContext, sig.strategyId);
       const confidenceScore = detailedConf.finalScore;
       console.log(`[FLOW_06] Confidence scoring for consensus winner: User: ${userId} | Strategy: ${sig.strategyId} | Score: ${confidenceScore}`);
+
+      // DOW confidence breakdown logging
+      if (sig.strategyId && sig.strategyId.includes("dow")) {
+        const logTag = confidenceScore < 50 ? "[DOW_CONFIDENCE_REJECTED]" : "[DOW_CONFIDENCE_PASSED]";
+        console.log(
+          `${logTag} ${symbol} ${timeframe} | ` +
+          `Regime Score: ${detailedConf.regimeScore} | ` +
+          `Trend Score: ${detailedConf.trendScore} | ` +
+          `Momentum Score: ${detailedConf.momentumScore} | ` +
+          `Volume Score: ${detailedConf.volumeScore} | ` +
+          `Confirm Score: ${detailedConf.confirmScore} | ` +
+          `Perf Boost: ${detailedConf.perfBoost} | ` +
+          `Final Score: ${detailedConf.finalScore}`
+        );
+      }
 
       // Performance stats
       const stats = PerformanceWeightingEngine.getStats(sig.strategyId);

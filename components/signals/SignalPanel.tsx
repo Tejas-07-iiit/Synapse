@@ -45,7 +45,7 @@ export default function SignalPanel({ className }: SignalPanelProps) {
     if (strategyId === "sr-sweep") return "SR Sweep Strategy";
     if (strategyId === "bollinger-reversion") return "Bollinger Reversion Strategy";
     if (strategyId === "short-term-reversal") return "Short Term Reversal Strategy";
-    if (strategyId === "dow-mfi-rsi") return "Dow Factor MFI RSI Strategy";
+    if (strategyId === "dow-mfi-rsi" || strategyId === "dow-mfi-rsi-trend-reversion") return "Dow Factor MFI RSI Strategy";
     return strategyId.toUpperCase();
   };
 
@@ -231,7 +231,7 @@ export default function SignalPanel({ className }: SignalPanelProps) {
                   )}
 
                   {/* Dow Factor MFI RSI */}
-                  {sig.strategyId === "dow-mfi-rsi" && sig.marketContext?.dowStructure && (
+                  {(sig.strategyId === "dow-mfi-rsi" || sig.strategyId === "dow-mfi-rsi-trend-reversion") && sig.marketContext?.dowStructure && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/25 rounded">
                       Dow: {sig.marketContext.dowStructure} (MFI {Number(sig.marketContext.mfi || 50).toFixed(0)})
                     </span>

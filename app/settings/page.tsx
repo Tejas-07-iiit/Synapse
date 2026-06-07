@@ -25,7 +25,8 @@ import {
   Key,
   LogOut,
   Check,
-  RotateCcw
+  RotateCcw,
+  AlertCircle
 } from "lucide-react";
 
 export default function SettingsPage() {

@@ -16,6 +16,16 @@ export async function POST() {
       expires: new Date(0),
     });
 
+    // Also clear MCX token
+    response.cookies.set("mcx_token", "", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
     return response;
   } catch (error) {
     console.error("Logout error:", error);

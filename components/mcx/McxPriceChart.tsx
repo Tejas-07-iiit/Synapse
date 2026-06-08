@@ -37,7 +37,17 @@ interface McxPriceChartProps {
     ema200?: boolean;
     bb?: boolean;
   };
-  onCrosshairMove?: (hoveredItem: any | null) => void;
+  onCrosshairMove?: (hoveredItem: {
+    time: Time;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    ema20: number | null;
+    ema50: number | null;
+    ema200: number | null;
+  } | null) => void;
 }
 
 export default function McxPriceChart({
@@ -112,8 +122,25 @@ export default function McxPriceChart({
           labelBackgroundColor: "#f97316",
         },
       },
-      autoSize: true,
+      // Remove autoSize: true, we will handle resizing manually via ResizeObserver
     });
+
+    const handleResize = () => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+
+    resizeObserver.observe(containerRef.current);
+    // Initial size set
+    handleResize();
 
     // Candlesticks
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -184,11 +211,13 @@ export default function McxPriceChart({
         return;
       }
 
-      const cData = param.seriesData.get(candleSeries) as any;
-      const vData = param.seriesData.get(volumeSeries) as any;
-      const e20 = param.seriesData.get(ema20Series) as any;
-      const e50 = param.seriesData.get(ema50Series) as any;
-      const e200 = param.seriesData.get(ema200Series) as any;
+      const cData = param.seriesData.get(candleSeries) as
+        | { open: number; high: number; low: number; close: number }
+        | undefined;
+      const vData = param.seriesData.get(volumeSeries) as { value: number } | undefined;
+      const e20 = param.seriesData.get(ema20Series) as { value: number } | undefined;
+      const e50 = param.seriesData.get(ema50Series) as { value: number } | undefined;
+      const e200 = param.seriesData.get(ema200Series) as { value: number } | undefined;
 
       onCrosshairMove({
         time: param.time,
@@ -214,7 +243,7 @@ export default function McxPriceChart({
     bbLowerSeriesRef.current = bbLowerSeries;
 
     return () => {
-      chart.applyOptions({ autoSize: false });
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -227,6 +256,7 @@ export default function McxPriceChart({
       bbLowerSeriesRef.current = null;
       dataHydratedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 2. Sync Theme
@@ -268,35 +298,48 @@ export default function McxPriceChart({
 
   // 4. Load Data
   useEffect(() => {
-    if (!chartRef.current || data.length === 0) return;
+    if (!chartRef.current) return;
 
-    const toTime = (t: number) => Math.floor(t / 1000) as UTCTimestamp;
+    // The data.time is already in seconds from the API
+    const toTime = (t: number) => t as UTCTimestamp;
+    const clearAllSeries = () => {
+      candleSeriesRef.current?.setData([]);
+      volumeSeriesRef.current?.setData([]);
+      ema20SeriesRef.current?.setData([]);
+      ema50SeriesRef.current?.setData([]);
+      ema200SeriesRef.current?.setData([]);
+      bbUpperSeriesRef.current?.setData([]);
+      bbMiddleSeriesRef.current?.setData([]);
+      bbLowerSeriesRef.current?.setData([]);
+    };
+
+    if (data.length === 0) {
+      clearAllSeries();
+      dataHydratedRef.current = false;
+      firstTimeRef.current = 0;
+      lastTimeRef.current = 0;
+      return;
+    }
+    
+    // Sort and remove duplicates by time to prevent Lightweight Charts assertions
     const sorted = [...data].sort((a, b) => a.time - b.time);
+    const uniqueData: ChartDataItem[] = [];
+    const seenTimes = new Set<number>();
+    
+    for (const item of sorted) {
+      if (!seenTimes.has(item.time)) {
+        uniqueData.push(item);
+        seenTimes.add(item.time);
+      }
+    }
 
-    const currentFirstTime = sorted[0].time;
+    if (uniqueData.length === 0) return;
+
+    const currentFirstTime = uniqueData[0].time;
     const isNewDataset = !dataHydratedRef.current || currentFirstTime !== firstTimeRef.current;
 
-    // Set full data to keep standard candle history, volume, and indicator lines aligned
-    candleSeriesRef.current?.setData(
-      sorted.map((item) => ({
-        time: toTime(item.time),
-        open: item.open,
-        high: item.high,
-        low: item.low,
-        close: item.close,
-      }))
-    );
-
-    volumeSeriesRef.current?.setData(
-      sorted.map((item) => ({
-        time: toTime(item.time),
-        value: item.volume,
-        color: item.close >= item.open ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
-      }))
-    );
-
     const mapLineData = (extractor: (item: ChartDataItem) => number | null) => {
-      return sorted
+      return uniqueData
         .map((item) => {
           const val = extractor(item);
           if (val === null || isNaN(val)) return null;
@@ -308,20 +351,78 @@ export default function McxPriceChart({
         .filter(Boolean) as { time: UTCTimestamp; value: number }[];
     };
 
-    ema20SeriesRef.current?.setData(mapLineData((i) => i.ema20));
-    ema50SeriesRef.current?.setData(mapLineData((i) => i.ema50));
-    ema200SeriesRef.current?.setData(mapLineData((i) => i.ema200));
-    bbUpperSeriesRef.current?.setData(mapLineData((i) => i.bbUpper));
-    bbMiddleSeriesRef.current?.setData(mapLineData((i) => i.bbMiddle));
-    bbLowerSeriesRef.current?.setData(mapLineData((i) => i.bbLower));
-
     if (isNewDataset) {
+      clearAllSeries();
+
+      candleSeriesRef.current?.setData(
+        uniqueData.map((item) => ({
+          time: toTime(item.time),
+          open: item.open,
+          high: item.high,
+          low: item.low,
+          close: item.close,
+        }))
+      );
+
+      volumeSeriesRef.current?.setData(
+        uniqueData.map((item) => ({
+          time: toTime(item.time),
+          value: item.volume,
+          color: item.close >= item.open ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
+        }))
+      );
+
+      ema20SeriesRef.current?.setData(mapLineData((i) => i.ema20));
+      ema50SeriesRef.current?.setData(mapLineData((i) => i.ema50));
+      ema200SeriesRef.current?.setData(mapLineData((i) => i.ema200));
+      bbUpperSeriesRef.current?.setData(mapLineData((i) => i.bbUpper));
+      bbMiddleSeriesRef.current?.setData(mapLineData((i) => i.bbMiddle));
+      bbLowerSeriesRef.current?.setData(mapLineData((i) => i.bbLower));
+
       dataHydratedRef.current = true;
       firstTimeRef.current = currentFirstTime;
+      lastTimeRef.current = uniqueData[uniqueData.length - 1].time;
       // Fit content only when changing commodity/dataset
       setTimeout(() => {
-        chartRef.current?.timeScale().fitContent();
-      }, 100);
+        if (chartRef.current) {
+          // Force scale recalculation 
+          chartRef.current.priceScale("right").applyOptions({ autoScale: true });
+          chartRef.current.timeScale().fitContent();
+        }
+      }, 50);
+      return;
+    }
+
+    const last = uniqueData[uniqueData.length - 1];
+    if (last.time < lastTimeRef.current) return;
+
+    candleSeriesRef.current?.update({
+      time: toTime(last.time),
+      open: last.open,
+      high: last.high,
+      low: last.low,
+      close: last.close,
+    });
+
+    volumeSeriesRef.current?.update({
+      time: toTime(last.time),
+      value: last.volume,
+      color: last.close >= last.open ? "rgba(34, 197, 94, 0.25)" : "rgba(239, 68, 68, 0.25)",
+    });
+
+    const updateLine = (series: ISeriesApi<"Line"> | null, value: number | null) => {
+      if (!series || value === null || Number.isNaN(value)) return;
+      series.update({ time: toTime(last.time), value });
+    };
+    updateLine(ema20SeriesRef.current, last.ema20);
+    updateLine(ema50SeriesRef.current, last.ema50);
+    updateLine(ema200SeriesRef.current, last.ema200);
+    updateLine(bbUpperSeriesRef.current, last.bbUpper);
+    updateLine(bbMiddleSeriesRef.current, last.bbMiddle);
+    updateLine(bbLowerSeriesRef.current, last.bbLower);
+
+    if (last.time > lastTimeRef.current) {
+      lastTimeRef.current = last.time;
     }
   }, [data]);
 

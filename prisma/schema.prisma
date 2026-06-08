@@ -267,3 +267,178 @@ enum TradingMode {
   SCALPING
   INTRADAY
 }
+
+// MCX V2 Postgres models. Independent from crypto trading tables.
+model McxInstrument {
+  id             String   @id @default(uuid())
+  symbol         String
+  token          String
+  exchange       String
+  expiry         DateTime
+  contractName   String
+  instrumentType String
+  lotSize        Float
+  tickSize       Float
+  raw            Json
+  active         Boolean  @default(true)
+  syncedAt       DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([symbol, exchange, expiry, contractName])
+  @@unique([token, exchange])
+  @@index([symbol, active, expiry])
+}
+
+model McxTick {
+  id           String   @id @default(uuid())
+  symbol       String
+  token        String
+  exchange     String
+  expiry       DateTime
+  contractName String
+  price        Float
+  volume       Float
+  timestamp    DateTime
+  raw          Json?
+  createdAt    DateTime @default(now())
+
+  @@index([symbol, timestamp])
+  @@index([token, timestamp])
+}
+
+model McxCandle {
+  id           String   @id @default(uuid())
+  symbol       String
+  token        String
+  exchange     String
+  expiry       DateTime
+  contractName String
+  interval     String
+  open         Float
+  high         Float
+  low          Float
+  close        Float
+  volume       Float
+  timestamp    DateTime
+  isClosed     Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([symbol, interval, timestamp])
+  @@index([symbol, interval, isClosed, timestamp])
+}
+
+model McxWallet {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  equity              Float
+  availableBalance    Float
+  blockedMargin       Float    @default(0)
+  realizedPnL         Float    @default(0)
+  unrealizedPnL       Float    @default(0)
+  tradingHalted       Boolean  @default(false)
+  haltReason          String?
+  dayStartEquity      Float
+  highWatermarkEquity Float
+  riskConfigVersion   String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model McxPosition {
+  id            String    @id @default(uuid())
+  openKey       String?   @unique
+  userId        String
+  symbol        String
+  token         String
+  exchange      String
+  expiry        DateTime
+  contractName  String
+  side          String
+  status        String
+  entryPrice    Float
+  exitPrice     Float?
+  currentPrice  Float
+  stopLoss      Float
+  takeProfit    Float
+  trailingStop  Float?
+  quantity      Float
+  lots          Float
+  pointValue    Float
+  marginUsed    Float
+  riskAmount    Float
+  pnl           Float     @default(0)
+  unrealizedPnL Float     @default(0)
+  strategyId    String
+  strategyName  String
+  confidence    Float
+  openedAt      DateTime  @default(now())
+  closedAt      DateTime?
+  exitReason    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([symbol, status])
+}
+
+model McxTrade {
+  id             String   @id @default(uuid())
+  tradeId        String   @unique
+  userId         String
+  positionId     String?
+  symbol         String
+  token          String
+  exchange       String
+  expiry         DateTime
+  contractName   String
+  side           String
+  type           String
+  lots           Float
+  quantity       Float
+  price          Float
+  entryPrice     Float?
+  exitPrice      Float?
+  stopLoss       Float?
+  takeProfit     Float?
+  strategy       String
+  aiConfidence   Float
+  profit         Float    @default(0)
+  status         String
+  reason         String?
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+
+  @@index([userId, symbol, createdAt])
+}
+
+model McxEventLog {
+  id        String   @id @default(uuid())
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+model McxExecutionLock {
+  key       String   @id
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model McxStrategyState {
+  id         String   @id @default(uuid())
+  userId     String
+  strategyId String
+  symbol     String
+  state      Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, strategyId, symbol])
+}

@@ -95,10 +95,20 @@ export const useMcxAuthStore = create<McxAuthState>((set) => ({
   fetchMe: async () => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch("/api/mcx/auth/profile");
+      const res = await fetch("/api/auth/me");
       const result = await res.json();
-      if (res.ok && result.success) {
-        set({ user: result.user, isAuthenticated: true, isLoading: false });
+      if (res.ok && result.authenticated) {
+        // Map main user to McxUser format if needed, or just use the same data
+        const mcxUser: McxUser = {
+          id: result.user.id,
+          firstName: result.user.username,
+          lastName: "User",
+          email: result.user.email,
+          role: "user",
+          botEnabled: false, // Default or fetch from mcx settings
+          subscriptionPlan: "pro"
+        };
+        set({ user: mcxUser, isAuthenticated: true, isLoading: false });
       } else {
         set({ user: null, isAuthenticated: false, isLoading: false });
       }

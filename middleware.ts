@@ -10,21 +10,16 @@ export async function middleware(request: NextRequest) {
   const isCryptoAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
   const isMcxAuthPage = pathname.startsWith("/mcx/login") || pathname.startsWith("/mcx/register");
 
-  // Protect all internal application pages
-  const isCryptoProtectedPage = 
+  // Protected internal application pages (Crypto and MCX)
+  const isProtectedPage = 
     pathname.startsWith("/dashboard") || 
     pathname.startsWith("/trade-history") || 
     pathname.startsWith("/portfolio") || 
     pathname.startsWith("/market-intelligence") || 
-    pathname.startsWith("/settings");
+    pathname.startsWith("/settings") ||
+    (pathname.startsWith("/mcx") && !pathname.startsWith("/mcx/login") && !pathname.startsWith("/mcx/register"));
 
-  const isMcxProtectedPage = 
-    pathname.startsWith("/mcx") && 
-    !pathname.startsWith("/mcx/login") && 
-    !pathname.startsWith("/mcx/register");
-
-  // 1. Crypto Routes Protection
-  if (isCryptoProtectedPage) {
+  if (isProtectedPage) {
     const token = request.cookies.get("token")?.value;
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -35,79 +30,23 @@ export async function middleware(request: NextRequest) {
       await jwtVerify(token, secret);
       return NextResponse.next();
     } catch (err) {
-      console.error("Middleware Crypto JWT verification failed:", err);
+      console.error("Middleware JWT verification failed:", err);
       const response = NextResponse.redirect(new URL("/login", request.url));
       response.cookies.delete("token");
       return response;
     }
   }
 
-  if (isCryptoAuthPage) {
+  if (isCryptoAuthPage || isMcxAuthPage) {
     const token = request.cookies.get("token")?.value;
     if (token) {
       try {
         const secret = new TextEncoder().encode(JWT_SECRET);
         await jwtVerify(token, secret);
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+        return NextResponse.redirect(new URL(pathname.startsWith("/mcx") ? "/mcx" : "/dashboard", request.url));
       } catch (err) {
         return NextResponse.next();
       }
-    }
-  }
-
-  // 2. MCX Routes Protection
-  if (isMcxProtectedPage) {
-    const mcxToken = request.cookies.get("mcx_token")?.value;
-    const token = request.cookies.get("token")?.value;
-
-    if (!mcxToken) {
-      if (token) {
-        // Silent SSO redirection to auto-login sync route
-        return NextResponse.redirect(
-          new URL(`/api/mcx-autologin?redirect=${encodeURIComponent(pathname)}`, request.url)
-        );
-      }
-      // Redirect to main login page if not logged in at all
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    try {
-      const secret = new TextEncoder().encode(JWT_SECRET);
-      await jwtVerify(mcxToken, secret);
-      return NextResponse.next();
-    } catch (err) {
-      console.error("Middleware MCX JWT verification failed:", err);
-      // Try to re-authenticate with Crypto token if valid
-      if (token) {
-        return NextResponse.redirect(
-          new URL(`/api/mcx-autologin?redirect=${encodeURIComponent(pathname)}`, request.url)
-        );
-      }
-      const response = NextResponse.redirect(new URL("/login", request.url));
-      response.cookies.delete("mcx_token");
-      return response;
-    }
-  }
-
-  if (isMcxAuthPage) {
-    const mcxToken = request.cookies.get("mcx_token")?.value;
-    const token = request.cookies.get("token")?.value;
-
-    if (mcxToken) {
-      try {
-        const secret = new TextEncoder().encode(JWT_SECRET);
-        await jwtVerify(mcxToken, secret);
-        return NextResponse.redirect(new URL("/mcx", request.url));
-      } catch (err) {
-        // Fall through
-      }
-    }
-
-    // If visiting mcx/login but already logged into crypto, auto-login
-    if (token) {
-      return NextResponse.redirect(
-        new URL(`/api/mcx-autologin?redirect=/mcx`, request.url)
-      );
     }
   }
 

@@ -268,7 +268,21 @@ export class PaperTradingEngine {
       const entryReason = signalContext?.reasoning ? signalContext.reasoning.join(". ") : "Manual execution by user.";
       const confidenceAtEntry = signalContext?.confidence !== undefined ? signalContext.confidence / 100 : 1.0;
       const marketRegime = signalContext?.marketContext?.regime || "UNKNOWN";
-      const indicatorSnapshot = signalContext?.indicators || {};
+      
+      // Optimize indicator snapshot: only store the latest value from arrays to prevent database bloat
+      const rawIndicators = signalContext?.indicators || {};
+      const indicatorSnapshot: Record<string, any> = {};
+      
+      for (const [key, value] of Object.entries(rawIndicators)) {
+        if (Array.isArray(value) && value.length > 0) {
+          indicatorSnapshot[key] = value[value.length - 1];
+        } else if (typeof value === "number" || typeof value === "string" || typeof value === "boolean") {
+          indicatorSnapshot[key] = value;
+        }
+        // Complex objects (like 'structure') are omitted or could be handled separately if needed.
+        // For audit purposes, basic numbers/strings are usually sufficient here.
+      }
+      
       const auditPayload = signalContext?.auditPayload || null;
 
       // 1.4 TIMEFRAME VALIDATION GUARD

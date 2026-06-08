@@ -1234,6 +1234,12 @@ async function runDaemon() {
 
   console.log("[Daemon] Market streams & ticker execution actively running 24/7.");
 
+  let lastPruneTime = Date.now();
+  
+  // 6. RUN STARTUP PRUNING (Async, non-blocking)
+  console.log("[Daemon] Initiating startup retention prune...");
+  runRetentionPruning().catch(e => console.error("[Daemon] Startup prune failed:", e));
+
   setInterval(async () => {
     try {
       const activeUsersCount = await prisma.userSettings.count({ where: { autoTrading: true } });
@@ -1244,8 +1250,16 @@ async function runDaemon() {
         openPositions: PaperTradingEngine.getOpenPositions().length,
         trackedSymbols: useMarketStore.getState().supportedSymbols,
       });
+
+      // Run daily diagnostic retention pruning internally
+      const now = Date.now();
+      if (now - lastPruneTime > 24 * 60 * 60 * 1000) {
+        lastPruneTime = now;
+        console.log("[Daemon] Running daily storage retention prune...");
+        runRetentionPruning().catch(e => console.error("[Daemon] Daily prune failed:", e));
+      }
     } catch (err) {
-      AuditLogger.logDatabaseError({ action: "Heartbeat", message: "Failed to fetch active users count", errorDetails: err });
+      AuditLogger.logDatabaseError({ action: "Heartbeat", message: "Failed to execute heartbeat or prune", errorDetails: err });
     }
   }, 60000);
 }

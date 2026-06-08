@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
 import { marketEngine } from "../market-engine/market-engine";
 import { PaperTradingEngine } from "../execution-engine/paper";
 import { strategyEngine } from "../strategy-engine/core/engine";
@@ -9,6 +9,8 @@ import { ConfidenceEngine } from "../strategy-engine/core/confidence-engine";
 import { ConsensusEngine } from "../strategy-engine/core/consensus-engine";
 import { AuditLogger } from "../lib/audit/trading-audit";
 import { strategyRegistry } from "../strategy-engine/core/registry";
+import { runRetentionPruning } from "../lib/storage/pruning";
+import prisma from "../../lib/prisma";
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("[Daemon] Unhandled Promise Rejection at:", promise, "reason:", reason);
@@ -17,8 +19,6 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("uncaughtException", (error) => {
   console.error("[Daemon] Uncaught Exception thrown:", error);
 });
-
-const prisma = new PrismaClient();
 
 async function runDaemon() {
   console.log("==================================================");
@@ -501,7 +501,7 @@ async function runDaemon() {
            allowedTimeframes = ["1m", "3m", "5m"];
            allowedCategories = ["SCALPING"];
         } else if (userMode === "INTRADAY") {
-           allowedTimeframes = ["15m", "30m"];
+           allowedTimeframes = ["15m", "30m", "1h", "4h"];
            allowedCategories = ["INTRADAY", "DEFENSIVE"];
         }
 

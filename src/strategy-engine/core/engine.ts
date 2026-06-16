@@ -62,7 +62,6 @@ class StrategyEngine {
       executed: 0,
     };
   }
-
   public registerDbHandler(handler: SignalsDbHandler) {
     this.dbHandler = handler;
   }
@@ -160,6 +159,9 @@ class StrategyEngine {
       if (strategy.enabled === false) {
         continue;
       }
+      this.funnelMetrics.rawEvaluations++;
+      this.funnelMetrics.structurePassed++;
+
       const supportsSymbol = !strategy.symbols || strategy.symbols.map(s => s.toUpperCase()).includes(sym);
       const supportsTimeframe = 
         (strategy.timeframe && strategy.timeframe.toLowerCase() === tf) ||

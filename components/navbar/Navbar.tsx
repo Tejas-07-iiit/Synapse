@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useDashboardStore } from "@/store/dashboard/useDashboardStore";
 import CoinSwitcher from "@/components/dashboard/CoinSwitcher";
@@ -56,9 +57,20 @@ export default function Navbar() {
 
       {/* Profile, Theme Toggle & Logout */}
       <div className="flex items-center gap-3 lg:gap-4 ml-auto">
+        {/* Toggle Option Tabs */}
+        <div className="flex items-center bg-secondary/50 p-1 rounded-xl border border-border text-[10px] uppercase font-black tracking-wider mr-2">
+          <span className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground shadow-sm font-black">
+            Crypto
+          </span>
+          <Link href="/mcx" className="px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all">
+            MCX
+          </Link>
+        </div>
+
         <ThemeToggle />
         
         <div className="h-8 w-px bg-border mx-1 hidden lg:block"></div>
+
 
         <div className="flex items-center gap-2.5 bg-secondary/50 border border-border px-3 py-2 rounded-xl text-xs font-bold shadow-inner">
           <div className="w-5 h-5 rounded-lg bg-primary/20 flex items-center justify-center border border-primary/20">

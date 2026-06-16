@@ -1,17 +1,20 @@
-{
+  {
   "name": "synapse",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_OPTIONS='--max-old-space-size=768' next dev",
-    "dev:turbo": "NODE_OPTIONS='--max-old-space-size=1024' next dev --turbopack",
-    "build": "NODE_OPTIONS='--max-old-space-size=768' next build",
-    "start": "NODE_OPTIONS='--max-old-space-size=512' next start",
+    "dev": "concurrently -n \"crypto,mcx,next\" -c \"cyan,magenta,green\" \"tsx src/server/daemon.ts\" \"tsx src/mcx/daemon.ts\" \"NODE_OPTIONS='--max-old-space-size=4096' next dev\"",
+    "dev:turbo": "concurrently -n \"crypto,mcx,next\" -c \"cyan,magenta,green\" \"tsx src/server/daemon.ts\" \"tsx src/mcx/daemon.ts\" \"NODE_OPTIONS='--max-old-space-size=4096' next dev --turbopack\"",
+    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
+    "start": "NODE_OPTIONS='--max-old-space-size=2048' next start",
     "lint": "eslint",
-    "replay": "npx tsx src/replay/cli.ts"
+    "replay": "npx tsx src/replay/cli.ts",
+    "test:mcx": "tsx src/mcx/tests/run-tests.ts",
+    "mcx:daemon": "tsx src/mcx/daemon.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@types/node-cron": "^3.0.11",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^12.40.0",
     "jose": "^6.2.3",
@@ -20,8 +23,11 @@
     "lucide-react": "^1.16.0",
     "next": "15.5.18",
     "next-themes": "^0.4.6",
+    "node-cron": "^4.2.1",
+    "otplib": "^13.4.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "smartapi-javascript": "^1.0.27",
     "tailwindcss-animate": "^1.0.7",
     "ws": "^8.21.0",
     "zustand": "^5.0.13"
@@ -35,6 +41,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.18",
     "prisma": "^6.19.3",

@@ -472,7 +472,7 @@ export class PaperTradingEngine {
 
         const marketSizingMultiplier = regimeMultiplier * volatilityMultiplier;
         pct = pct * marketSizingMultiplier;
-        pct = Math.min(50, Math.max(1, pct)); // Enforce boundaries
+        pct = Math.min(15, Math.max(2, pct)); // Enforce boundaries (capped at 15% for capital preservation)
 
         orderValueUsdt = balance * (pct / 100) * leverage;
         console.log(`[DYNAMIC_SIZING] Confidence: ${confidence} | Regime: ${marketRegime} | Drawdown: ${dailyDrawdownPercent.toFixed(2)}% | Calculated Pct: ${pct.toFixed(2)}% | Order size: $${orderValueUsdt.toFixed(2)}`);
@@ -541,17 +541,17 @@ export class PaperTradingEngine {
         return null;
       }
 
-      // Risk Reward Enforcement (RR >= 1.5)
+      // Risk Reward Enforcement (RR >= 1.0)
       if (stopLoss !== null && takeProfit !== null) {
         const risk = Math.abs(price - stopLoss);
         const reward = Math.abs(takeProfit - price);
         if (risk > 0) {
           const rr = reward / risk;
-          if (rr < 1.5) {
-            const minReward = risk * 1.5;
+          if (rr < 1.0) {
+            const minReward = risk * 1.0;
             const oldTp = takeProfit;
             takeProfit = direction === "LONG" ? price + minReward : price - minReward;
-            console.log(`[RR Guard] Adjusted TP from ${oldTp.toFixed(4)} to ${takeProfit.toFixed(4)} to enforce 1.5 RR.`);
+            console.log(`[RR Guard] Adjusted TP from ${oldTp.toFixed(4)} to ${takeProfit.toFixed(4)} to enforce 1.0 RR.`);
           }
         }
       }

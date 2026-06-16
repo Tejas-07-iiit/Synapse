@@ -35,7 +35,7 @@ export class WalletService {
       db.mcxPosition.findMany({ where: { userId, status: "OPEN" } }),
     ]);
     const unrealizedPnL = positions.reduce((sum, position) => sum + position.unrealizedPnL, 0);
-    const equity = wallet.availableBalance + wallet.blockedMargin + wallet.realizedPnL + unrealizedPnL;
+    const equity = wallet.availableBalance + wallet.blockedMargin + unrealizedPnL;
     const updated = await db.mcxWallet.update({
       where: { userId },
       data: {

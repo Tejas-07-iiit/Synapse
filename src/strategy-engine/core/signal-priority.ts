@@ -26,18 +26,7 @@ export class SignalPriorityEngine {
       const isGrid = category === "Grid";
       const isVolatility = category === "Volatility";
 
-      let compatible = false;
-      if (regime === "TRENDING") {
-        compatible = true; // Always allow in trending
-      } else if (regime === "RANGING" || regime === "LOW_VOLATILITY" || regime === "ACCUMULATION" || regime === "DISTRIBUTION") {
-        compatible = isMeanReversionStrat || category === "Lorentzian" || isTrendingStrat || isGrid;
-      } else if (regime === "HIGH_VOLATILITY" || regime === "BREAKOUT") {
-        compatible = isBreakoutStrat || category === "Lorentzian" || isTrendingStrat || isVolatility;
-      } else if (regime === "LIQUIDITY_SWEEP") {
-        compatible = true; // High importance event
-      } else {
-        compatible = true; // Fallback
-      }
+      let compatible = true; // Delegated to strategy-level supportedRegimes checks in engine.ts
 
       if (!compatible) {
         sig.signal = "HOLD";

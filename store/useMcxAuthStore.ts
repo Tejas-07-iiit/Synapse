@@ -6,7 +6,7 @@ interface McxUser {
   lastName: string;
   email: string;
   role: string;
-  botEnabled: boolean;
+  engineEnabled: boolean;
   subscriptionPlan: string;
 }
 
@@ -21,7 +21,7 @@ interface McxAuthState {
   login: (data: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
-  setBotEnabled: (enabled: boolean) => void;
+  setEngineEnabled: (enabled: boolean) => void;
 }
 
 export const useMcxAuthStore = create<McxAuthState>((set) => ({
@@ -32,8 +32,8 @@ export const useMcxAuthStore = create<McxAuthState>((set) => ({
 
   setError: (error) => set({ error }),
 
-  setBotEnabled: (enabled) => set((state) => ({
-    user: state.user ? { ...state.user, botEnabled: enabled } : null
+  setEngineEnabled: (enabled) => set((state) => ({
+    user: state.user ? { ...state.user, engineEnabled: enabled } : null
   })),
 
   register: async (data) => {
@@ -105,7 +105,7 @@ export const useMcxAuthStore = create<McxAuthState>((set) => ({
           lastName: "User",
           email: result.user.email,
           role: "user",
-          botEnabled: false, // Default or fetch from mcx settings
+          engineEnabled: false, // Default or fetch from mcx settings
           subscriptionPlan: "pro"
         };
         set({ user: mcxUser, isAuthenticated: true, isLoading: false });

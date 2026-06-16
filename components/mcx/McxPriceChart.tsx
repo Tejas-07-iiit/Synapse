@@ -7,10 +7,12 @@ import {
   HistogramSeries,
   LineSeries,
   CrosshairMode,
+  LineStyle,
   type IChartApi,
   type ISeriesApi,
   type Time,
   type UTCTimestamp,
+  type IPriceLine,
 } from "lightweight-charts";
 import { useTheme } from "next-themes";
 
@@ -29,8 +31,17 @@ interface ChartDataItem {
   bbLower: number | null;
 }
 
+export interface ChartPriceLine {
+  id: string;
+  price: number;
+  color: string;
+  lineStyle?: LineStyle;
+  title: string;
+}
+
 interface McxPriceChartProps {
   data: ChartDataItem[];
+  priceLines?: ChartPriceLine[];
   showIndicators?: {
     ema20?: boolean;
     ema50?: boolean;
@@ -52,6 +63,7 @@ interface McxPriceChartProps {
 
 export default function McxPriceChart({
   data,
+  priceLines = [],
   showIndicators = { ema20: true, ema50: true, ema200: false, bb: true },
   onCrosshairMove
 }: McxPriceChartProps) {
@@ -62,6 +74,7 @@ export default function McxPriceChart({
   const firstTimeRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const dataHydratedRef = useRef<boolean>(false);
+  const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
 
   // Series refs
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -242,7 +255,10 @@ export default function McxPriceChart({
     bbMiddleSeriesRef.current = bbMiddleSeries;
     bbLowerSeriesRef.current = bbLowerSeries;
 
+    const currentPriceLines = priceLinesRef.current;
+
     return () => {
+      currentPriceLines.clear();
       resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -300,8 +316,21 @@ export default function McxPriceChart({
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // The data.time is already in seconds from the API
-    const toTime = (t: number) => t as UTCTimestamp;
+    // The data.time is already in seconds from the API.
+    // Shift timestamps to local timezone so Lightweight Charts renders them in local time.
+    const toTime = (t: number) => {
+      const d = new Date(t * 1000);
+      const localUtc = Date.UTC(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate(),
+        d.getHours(),
+        d.getMinutes(),
+        d.getSeconds(),
+        d.getMilliseconds()
+      ) / 1000;
+      return localUtc as UTCTimestamp;
+    };
     const clearAllSeries = () => {
       candleSeriesRef.current?.setData([]);
       volumeSeriesRef.current?.setData([]);
@@ -425,6 +454,41 @@ export default function McxPriceChart({
       lastTimeRef.current = last.time;
     }
   }, [data]);
+
+  // 5. Overlays (Price Lines)
+  useEffect(() => {
+    if (!candleSeriesRef.current) return;
+    const series = candleSeriesRef.current;
+    const live = priceLinesRef.current;
+    const nextIds = new Set(priceLines.map(l => l.id));
+
+    // Remove old lines
+    for (const [id, handle] of live) {
+      if (!nextIds.has(id)) {
+        series.removePriceLine(handle);
+        live.delete(id);
+      }
+    }
+
+    // Add/Update lines
+    for (const line of priceLines) {
+      const opts = {
+        price: line.price,
+        color: line.color,
+        lineStyle: line.lineStyle ?? LineStyle.Dashed,
+        lineWidth: 1 as 1 | 2 | 3 | 4,
+        axisLabelVisible: true,
+        title: line.title,
+      };
+      
+      const existing = live.get(line.id);
+      if (existing) {
+        existing.applyOptions(opts);
+      } else {
+        live.set(line.id, series.createPriceLine(opts));
+      }
+    }
+  }, [priceLines]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

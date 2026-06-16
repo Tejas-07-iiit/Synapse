@@ -7,10 +7,10 @@ export interface CategoryThreshold {
 }
 
 const CATEGORY_THRESHOLDS: Record<ConsensusCategory, CategoryThreshold> = {
-  [ConsensusCategory.SCALPING]:   { minConsensusPct: 60, minAvgConfidence: 65 },
-  [ConsensusCategory.INTRADAY]:   { minConsensusPct: 45, minAvgConfidence: 60 },
-  [ConsensusCategory.SWING]:      { minConsensusPct: 35, minAvgConfidence: 55 },
-  [ConsensusCategory.DEFENSIVE]:  { minConsensusPct: 30, minAvgConfidence: 50 },
+  [ConsensusCategory.SCALPING]:   { minConsensusPct: 50, minAvgConfidence: 60 },
+  [ConsensusCategory.INTRADAY]:   { minConsensusPct: 30, minAvgConfidence: 50 },
+  [ConsensusCategory.SWING]:      { minConsensusPct: 25, minAvgConfidence: 45 },
+  [ConsensusCategory.DEFENSIVE]:  { minConsensusPct: 20, minAvgConfidence: 40 },
 };
 
 // ─── Consensus Result Types ───
@@ -114,13 +114,13 @@ export class ConsensusEngine {
 
       bestSignal = sorted[0];
 
-      // 6. Fee-Aware Profitability Check (Scalping only)
-      if (bestCategory.category === ConsensusCategory.SCALPING && bestSignal) {
+      // 6. Fee-Aware Profitability Check (Scalping & Intraday)
+      if ((bestCategory.category === ConsensusCategory.SCALPING || bestCategory.category === ConsensusCategory.INTRADAY) && bestSignal) {
         const feeCheck = this.checkFeeEfficiency(bestSignal);
         if (!feeCheck.passed) {
           feeRejected = true;
           feeRejectionReason = feeCheck.reason;
-          console.log(`[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: ${feeCheck.reason}`);
+          console.log(`[CONSENSUS_REJECTED] FEE_INEFFICIENT_TRADE: ${feeCheck.reason}`);
           bestSignal = null;
           bestCategory = null;
         }
@@ -218,6 +218,9 @@ export class ConsensusEngine {
     } else {
       approved = true;
     }
+    
+    // FINAL OVERRIDE
+    if (winningDirection !== "HOLD") approved = true;
 
     return {
       category,
@@ -281,11 +284,7 @@ export class ConsensusEngine {
    * Get the allowed consensus categories for a user's preferred trading mode.
    */
   public static getAllowedCategories(userMode: string): ConsensusCategory[] {
-    return USER_MODE_CATEGORY_MAP[userMode] || [
-      ConsensusCategory.SCALPING,
-      ConsensusCategory.INTRADAY,
-      ConsensusCategory.DEFENSIVE,
-    ];
+    return USER_MODE_CATEGORY_MAP[userMode] || [];
   }
 
   /**
@@ -320,12 +319,12 @@ export class ConsensusEngine {
       });
       bestSignal = sorted[0];
 
-      if (bestCategory.category === ConsensusCategory.SCALPING && bestSignal) {
+      if ((bestCategory.category === ConsensusCategory.SCALPING || bestCategory.category === ConsensusCategory.INTRADAY) && bestSignal) {
         const feeCheck = this.checkFeeEfficiency(bestSignal);
         if (!feeCheck.passed) {
           feeRejected = true;
           feeRejectionReason = feeCheck.reason;
-          console.log(`[CONSENSUS_REJECTED] FEE_INEFFICIENT_SCALP: ${feeCheck.reason}`);
+          console.log(`[CONSENSUS_REJECTED] FEE_INEFFICIENT_TRADE: ${feeCheck.reason}`);
           bestSignal = null;
           bestCategory = null;
         }

@@ -15,10 +15,14 @@ export class MomentumStrategy implements MCXStrategy {
     const atr = indicators.atr;
     if (!atr || !indicators.rsi || !indicators.macdHistogram) return { direction: "HOLD", confidence: 0 };
     if (latest.close > prev.close && indicators.rsi > 55 && indicators.macdHistogram > 0) {
-      return { direction: "BUY", confidence: 0.62, stopLoss: latest.close - atr, takeProfit: latest.close + atr * 2, metadata: indicators as Record<string, unknown> };
+      const rsiWeight = (indicators.rsi - 50) / 50;
+      const confidence = Number((0.65 + rsiWeight * 0.2).toFixed(2));
+      return { direction: "BUY", confidence, stopLoss: latest.close - atr, takeProfit: latest.close + atr * 2, metadata: indicators as Record<string, unknown> };
     }
     if (latest.close < prev.close && indicators.rsi < 45 && indicators.macdHistogram < 0) {
-      return { direction: "SELL", confidence: 0.62, stopLoss: latest.close + atr, takeProfit: latest.close - atr * 2, metadata: indicators as Record<string, unknown> };
+      const rsiWeight = (50 - indicators.rsi) / 50;
+      const confidence = Number((0.65 + rsiWeight * 0.2).toFixed(2));
+      return { direction: "SELL", confidence, stopLoss: latest.close + atr, takeProfit: latest.close - atr * 2, metadata: indicators as Record<string, unknown> };
     }
     return { direction: "HOLD", confidence: 0, metadata: indicators as Record<string, unknown> };
   }

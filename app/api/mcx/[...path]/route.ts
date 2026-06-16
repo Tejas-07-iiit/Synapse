@@ -25,7 +25,7 @@ async function getAuthenticatedUser() {
 
 async function handleInternal(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   try {
-    await bootstrapMCX();
+    await bootstrapMCX({ mode: "web" });
     const user = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     const userId = String(user.id);
@@ -86,6 +86,31 @@ async function handleInternal(_req: NextRequest, { params }: { params: Promise<{
       });
     }
 
+    if (section === "signals") {
+      const logs = await prisma.mcxEventLog.findMany({
+        where: { type: "SIGNAL_GENERATED" },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      const signals = logs.map(log => {
+        const payload = log.payload as any;
+        return {
+          id: log.id,
+          symbol: payload.symbol,
+          direction: payload.direction,
+          confidence: payload.confidence,
+          strategyId: payload.strategyId,
+          strategyName: payload.strategyName,
+          timeframe: payload.timeframe,
+          entryPrice: payload.entryPrice,
+          stopLoss: payload.stopLoss,
+          takeProfit: payload.takeProfit,
+          timestamp: log.createdAt.toISOString(),
+        };
+      });
+      return NextResponse.json({ success: true, signals });
+    }
+
     if (section === "wallet") {
       const data = await PortfolioService.portfolio(userId);
       return NextResponse.json({ success: true, wallet: data.wallet });
@@ -106,11 +131,14 @@ async function handleInternal(_req: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: true, data });
     }
 
-    if (section === "bot" && subSection === "state") {
+    if ((section === "engine" || section === "bot") && subSection === "state") {
       const portfolio = await PortfolioService.portfolio(userId);
       return NextResponse.json({
         success: true,
+        engineEnabled: !portfolio.wallet.tradingHalted,
         botEnabled: !portfolio.wallet.tradingHalted,
+        availableBalance: portfolio.wallet.availableBalance,
+        realTotalProfit: portfolio.wallet.realizedPnL,
         states: mcxConfig.marketData.symbols.map((symbol) => {
           const position = portfolio.openPositions.find((item) => item.symbol === symbol);
           return {
@@ -121,7 +149,7 @@ async function handleInternal(_req: NextRequest, { params }: { params: Promise<{
             realTotalProfit: portfolio.wallet.realizedPnL,
             currentStrategy: position ? "Active" : "None",
             marketType: "MCX FUTCOM",
-            botMode: portfolio.wallet.tradingHalted ? "Risk Locked" : "Automatic",
+            engineMode: portfolio.wallet.tradingHalted ? "Risk Locked" : "Automatic",
             lastAction: position ? position.direction : "HOLD",
             nextAnalysisTime: null,
             warningMessage: portfolio.wallet.haltReason || undefined,
@@ -130,8 +158,8 @@ async function handleInternal(_req: NextRequest, { params }: { params: Promise<{
       });
     }
 
-    if (section === "bot" && (subSection === "enable" || subSection === "disable")) {
-      return NextResponse.json({ success: false, error: "Bot state is controlled by risk and strategy configuration, not a stub toggle." }, { status: 409 });
+    if ((section === "engine" || section === "bot") && (subSection === "enable" || subSection === "disable")) {
+      const isHalted = subSection === "disable"; await prisma.mcxWallet.updateMany({ where: { userId }, data: { tradingHalted: isHalted, haltReason: isHalted ? "USER_DISABLED" : null } }); return NextResponse.json({ success: true, engineEnabled: !isHalted, botEnabled: !isHalted });
     }
 
     if (section === "mcx" && subSection === "indicators") {

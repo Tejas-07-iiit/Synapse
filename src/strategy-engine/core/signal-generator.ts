@@ -186,9 +186,8 @@ export class SignalGenerator {
 
     // Consensus category classification for category-based consensus engine
     const CONSENSUS_CATEGORIES: Record<string, string> = {
-      // Scalping (15 strategies)
+      // Scalping (11 strategies)
       "ema-crossover": "SCALPING",
-      "rsi-reversal": "SCALPING",
       "macd-momentum": "SCALPING",
       "bollinger-breakout": "SCALPING",
       "mean-reversion": "SCALPING",
@@ -196,13 +195,14 @@ export class SignalGenerator {
       "grid": "SCALPING",
       "donchian-breakout": "SCALPING",
       "rally-base-drop": "SCALPING",
-      "sr-sweep": "SCALPING",
-      "bollinger-reversion": "SCALPING",
       "short-term-reversal": "SCALPING",
       "parabolic-rsi": "SCALPING",
       "range-breakout-high": "SCALPING",
       "residual-momentum": "SCALPING",
-      // Intraday (11 strategies)
+      // Intraday (14 strategies)
+      "rsi-reversal": "INTRADAY",
+      "bollinger-reversion": "INTRADAY",
+      "sr-sweep": "INTRADAY",
       "wavetrend": "INTRADAY",
       "dow-mfi-rsi": "INTRADAY",
       "lorentzian": "INTRADAY",

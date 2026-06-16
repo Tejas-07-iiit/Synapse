@@ -20,14 +20,15 @@ function parseExpiry(value: unknown): Date | null {
 }
 
 function normalizeBaseSymbol(record: AngelInstrument): string {
-  const name = String(record.name || record.symbol || record.tradingsymbol || "").toUpperCase();
-  const configured = mcxConfig.marketData.symbols.find((symbol) => name.startsWith(symbol));
-  return configured || name.replace(/[^A-Z]/g, "");
+  const name = String(record.name || "").toUpperCase().trim();
+  // Exact match only to avoid GOLDM matching GOLD
+  if (mcxConfig.marketData.symbols.includes(name)) return name;
+  return name.replace(/[^A-Z]/g, "");
 }
 
 function isFuturesInstrument(instrumentType: string, contractName: string): boolean {
   const isFutureType = /^FUT/i.test(instrumentType) && !/^OPT/i.test(instrumentType);
-  const isFutureContract = /FUT$/i.test(contractName) && !/(CE|PE)$/i.test(contractName);
+  const isFutureContract = /FUT$/i.test(contractName);
   return isFutureType && isFutureContract;
 }
 
@@ -51,7 +52,7 @@ function preferredContractPattern(symbol: string): RegExp {
 function fallbackReferencePrice(symbol: string): number {
   const map: Record<string, number> = {
     GOLD: 155_710,
-    SILVER: 106_200,
+    SILVER: 246_200,
     CRUDEOIL: 6_400,
     NATURALGAS: 250,
     COPPER: 890,
@@ -63,6 +64,7 @@ export class MarketDataService {
   private static initialized = false;
   private static tickStore = new Map<string, NormalizedMCXTick>();
   private static contractCache = new Map<string, McxInstrument>();
+  private static tokenToContractMap = new Map<string, McxInstrument>();
 
   static initialize() {
     if (this.initialized) return;
@@ -192,17 +194,29 @@ export class MarketDataService {
     const cached = this.contractCache.get(normalized);
     if (cached && cached.expiry >= at) return cached;
 
+    // Filter by Futures directly in DB to avoid getting overwhelmed by options in the top 200
     const contracts = await prisma.mcxInstrument.findMany({
-      where: { symbol: normalized, exchange: mcxConfig.marketData.exchange, active: true, expiry: { gte: at } },
+      where: { 
+        symbol: normalized, 
+        exchange: mcxConfig.marketData.exchange, 
+        active: true, 
+        expiry: { gte: at },
+        instrumentType: { startsWith: "FUT" },
+        contractName: { endsWith: "FUT" }
+      },
       orderBy: [{ expiry: "asc" }, { createdAt: "desc" }],
-      take: 200,
+      take: 50,
     });
+    
+    // Secondary strict filter
     const futuresOnly = contracts.filter((item) =>
       isFuturesInstrument(String(item.instrumentType || ""), String(item.contractName || ""))
     );
+    
     const preferredPattern = preferredContractPattern(normalized);
     const preferred = futuresOnly.find((item) => preferredPattern.test(item.contractName));
     const contract = preferred || futuresOnly[0] || null;
+    
     if (!contract) {
       MCXEventBus.publish(MCXEventType.CONTRACT_MISMATCH, { symbol: normalized, reason: "NO_ACTIVE_CONTRACT" });
       throw new Error(`No active MCX contract found for ${normalized}`);
@@ -210,28 +224,42 @@ export class MarketDataService {
 
     // Update Cache
     this.contractCache.set(normalized, contract);
+    this.tokenToContractMap.set(contract.token, contract);
+    
     return contract;
   }
 
   static async normalizeTick(input: { symbol?: string; token?: string; price: number; volume?: number; timestamp?: number | Date; raw?: unknown }): Promise<NormalizedMCXTick> {
     if (!Number.isFinite(input.price) || input.price <= 0) throw new Error("Invalid MCX tick price");
     
+    const cleanToken = input.token ? String(input.token).replace(/^["']|["']$/g, "").trim() : undefined;
     let contract: McxInstrument | null = null;
     
-    // Resolve contract via centralized logic
-    if (input.token) {
-      // Try to find in cache by token first? No, resolveContract handles by symbol. 
-      // If we have token, we can lookup in DB or we should have a token-based cache too.
-      contract = await prisma.mcxInstrument.findFirst({ 
-        where: { token: String(input.token), exchange: mcxConfig.marketData.exchange, active: true } 
-      });
+    // 1. Try Memory Token Map (fastest)
+    if (cleanToken) {
+      contract = this.tokenToContractMap.get(cleanToken) || null;
     }
     
+    // 2. Try DB Lookup by Token (if not in memory)
+    if (!contract && cleanToken) {
+      contract = await prisma.mcxInstrument.findFirst({ 
+        where: { 
+          token: cleanToken, 
+          exchange: mcxConfig.marketData.exchange, 
+          active: true,
+          instrumentType: { startsWith: "FUT" }, // Strict future check
+          contractName: { endsWith: "FUT" }
+        } 
+      });
+      if (contract) this.tokenToContractMap.set(contract.token, contract);
+    }
+    
+    // 3. Try Resolve by Symbol
     if (!contract && input.symbol) {
       contract = await this.resolveContract(input.symbol);
     }
     
-    if (!contract) throw new Error("MCX tick cannot be mapped to a contract");
+    if (!contract) throw new Error(`MCX tick token ${input.token} cannot be mapped to a valid future contract`);
     
     const timestamp = input.timestamp instanceof Date ? input.timestamp : new Date(input.timestamp || Date.now());
     return {

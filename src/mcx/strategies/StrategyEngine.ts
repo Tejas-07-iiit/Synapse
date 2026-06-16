@@ -7,6 +7,7 @@ import { StrategyRegistry } from "./StrategyRegistry";
 
 export class StrategyEngine {
   private static initialized = false;
+  private static lastEmittedSignals = new Map<string, string>(); // key: strategy_symbol_interval, value: last_timestamp
 
   static initialize() {
     if (this.initialized) return;
@@ -18,11 +19,23 @@ export class StrategyEngine {
   private static async onCandleClosed(candle: Record<string, unknown>) {
     const symbol = String(candle.symbol);
     const interval = String(candle.interval);
+    const timestamp = String(candle.timestamp);
+
     for (const strategy of StrategyRegistry.all().filter((item) => item.timeframe === interval)) {
+      const dupKey = `${strategy.id}_${symbol}_${interval}`;
+      if (this.lastEmittedSignals.get(dupKey) === timestamp) continue;
+      this.lastEmittedSignals.set(dupKey, timestamp);
+
       const candles = await prisma.mcxCandle.findMany({
         where: { symbol, interval: strategy.timeframe, isClosed: true },
         orderBy: { timestamp: "desc" },
         take: mcxConfig.runtime.strategyLookbackCandles,
+      });
+      mcxLogger.info("StrategyEngine: Processing candle", { 
+        symbol, 
+        timeframe: strategy.timeframe, 
+        candlesCount: candles.length, 
+        lookbackLimit: mcxConfig.runtime.strategyLookbackCandles 
       });
       const context = {
         userId: mcxConfig.runtime.defaultUserId,

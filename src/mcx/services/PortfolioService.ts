@@ -17,8 +17,10 @@ export class PortfolioService {
     return {
       wallet,
       livePrice: tick?.price ?? MarketDataService.referencePrice(normalized),
+      contractName: contract?.contractName ?? null,
+      token: contract?.token ?? null,
       positions,
-      botEnabled: !wallet.tradingHalted,
+      engineEnabled: !wallet.tradingHalted,
     };
   }
 
@@ -48,6 +50,8 @@ export class PortfolioService {
         marginUsed: position.marginUsed,
         unrealizedPnL: position.unrealizedPnL,
         status: position.status,
+        stopLoss: position.stopLoss,
+        takeProfit: position.takeProfit,
       })),
       closedStats: {
         totalTrades: closedTrades.length,
@@ -66,6 +70,9 @@ export class PortfolioService {
   static async chart(symbol: string, interval = "15m") {
     const sym = symbol.toUpperCase();
     const contract = await MarketDataService.resolveContract(sym).catch(() => null);
+    
+    // STRICT: Only fetch candles for the currently active contract
+    // If no contract is resolved, we force an empty list to avoid leaking old data
     const preferredCandles = await prisma.mcxCandle.findMany({
       where: {
         symbol: sym,
@@ -80,7 +87,11 @@ export class PortfolioService {
     const candles = preferredCandles.length
       ? preferredCandles
       : await prisma.mcxCandle.findMany({
-          where: { symbol: sym, interval, isClosed: true },
+          where: {
+            symbol: sym,
+            interval,
+            isClosed: true,
+          },
           orderBy: { timestamp: "desc" },
           take: 300,
         });
@@ -89,9 +100,24 @@ export class PortfolioService {
 
     // Check for active candle
     if (contract) {
-      const active = CandleBuilder.getActiveCandle(sym, contract.token, interval as MCXInterval);
+      let active = CandleBuilder.getActiveCandle(sym, contract.token, interval as MCXInterval);
+      
+      if (!active) {
+        // Fallback: Check DB for latest unclosed candle (daemon might have persisted it)
+        const unclosed = await prisma.mcxCandle.findFirst({
+          where: {
+            symbol: sym,
+            token: contract.token,
+            interval,
+            isClosed: false,
+          },
+          orderBy: { timestamp: "desc" },
+        });
+        if (unclosed) active = unclosed as any;
+      }
+
       if (active) {
-        // STEP 6: Ensure active candle close strictly matches single source of truth
+        // Ensure active candle matches single source of truth
         const latestPrice = await MarketDataService.latestPrice(sym);
         if (latestPrice) {
           active.close = latestPrice;

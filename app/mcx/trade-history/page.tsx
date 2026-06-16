@@ -190,7 +190,7 @@ export default function McxTradeHistoryPage() {
             <div>
               <p className="font-bold text-foreground">No Trades Found</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Start the automated bot to begin executing market positions.
+                Start the automated engine to begin executing market positions.
               </p>
             </div>
           </div>

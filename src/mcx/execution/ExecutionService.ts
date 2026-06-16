@@ -4,6 +4,7 @@ import { MCXEventBus, MCXEventType } from "../events/EventBus";
 import { IndicatorEngine } from "../indicators/IndicatorEngine";
 import { MarketDataService } from "../market-data/MarketDataService";
 import { RiskEngine } from "../risk/RiskEngine";
+import { mcxConfig } from "../config/mcx.config";
 import type { MCXExitReason, MCXSignal } from "../types";
 import { mcxLogger } from "../utils/logger";
 import { WalletService } from "../wallet/WalletService";
@@ -26,6 +27,34 @@ export class ExecutionService {
 
   static async executeEntry(signal: MCXSignal) {
     if (signal.direction === "HOLD") return null;
+    const symbol = signal.symbol.toUpperCase();
+
+    if (signal.userId === mcxConfig.runtime.defaultUserId) {
+      const users = await prisma.user.findMany();
+      mcxLogger.info(`Fanning out signal ${signal.strategyName} on ${symbol} to ${users.length} users`);
+      const results = [];
+      for (const user of users) {
+        const wallet = await WalletService.getWallet(user.id);
+        if (!wallet.tradingHalted) {
+          const userSignal = { ...signal, userId: user.id };
+          const posId = await this.executeForUser(userSignal);
+          if (posId) results.push({ userId: user.id, positionId: posId });
+        }
+      }
+      // Also execute for SYSTEM_MCX_USER if they have a wallet and it's not halted
+      const systemWallet = await WalletService.getWallet(mcxConfig.runtime.defaultUserId);
+      if (!systemWallet.tradingHalted) {
+        const systemSignal = { ...signal, userId: mcxConfig.runtime.defaultUserId };
+        const posId = await this.executeForUser(systemSignal);
+        if (posId) results.push({ userId: mcxConfig.runtime.defaultUserId, positionId: posId });
+      }
+      return results.length > 0 ? results[0].positionId : null;
+    } else {
+      return this.executeForUser(signal);
+    }
+  }
+
+  private static async executeForUser(signal: MCXSignal): Promise<string | null> {
     const symbol = signal.symbol.toUpperCase();
     const lockKey = `${signal.userId}:${symbol}`;
     if (!(await LockManager.acquire(lockKey))) return null;

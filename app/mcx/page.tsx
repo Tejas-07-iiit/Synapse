@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useMcxStore } from "@/store/useMcxStore";
 import { useMcxAuthStore } from "@/store/useMcxAuthStore";
 import { 
@@ -22,7 +22,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { StatCard } from "@/components/shared/StatCard";
 
-interface BotStateItem {
+import McxSignalPanel from "@/components/mcx/McxSignalPanel";
+
+interface EngineStateItem {
   commodity: string;
   availableBalance: number;
   holdings: number;
@@ -32,7 +34,7 @@ interface BotStateItem {
   realTotalProfit: number;
   currentStrategy: string;
   marketType: string;
-  botMode: string;
+  engineMode: string;
   lastAction: string;
   nextAnalysisTime: string | null;
   warningMessage?: string;
@@ -45,15 +47,19 @@ export default function McxDashboardPage() {
     livePrice, 
     updateLivePrice, 
     priceTrend, 
-    botEnabled, 
-    setBotEnabled 
+    engineEnabled, 
+    setEngineEnabled,
+    activeContractName,
+    setActiveContractName
   } = useMcxStore();
 
-  const [activeState, setActiveState] = useState<BotStateItem | null>(null);
+  const [activeState, setActiveState] = useState<EngineStateItem | null>(null);
+  const [globalBalance, setGlobalBalance] = useState<number>(0);
+  const [globalProfit, setGlobalProfit] = useState<number>(0);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loadingChart, setLoadingChart] = useState(true);
-  const [loadingBotAction, setLoadingBotAction] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
+  const [loadingEngineAction, setLoadingEngineAction] = useState(false);
+  const [activePositions, setActivePositions] = useState<any[]>([]);
 
   const [hoverData, setHoverData] = useState<any>(null); // For HUD panel
 
@@ -88,8 +94,9 @@ export default function McxDashboardPage() {
       try {
         const res = await fetch(`/api/mcx/mcx/live-price/${selectedCommodity}`);
         const data = await res.json();
-        if (active && data && data.price) {
-          updateLivePrice(Number(data.price));
+        if (active && data) {
+          if (data.price) updateLivePrice(Number(data.price));
+          if (data.contractName) setActiveContractName(data.contractName);
         }
       } catch (err) {
         console.warn("Failed to fetch live price:", err);
@@ -130,75 +137,118 @@ export default function McxDashboardPage() {
     };
   }, [selectedCommodity]);
 
-  const fetchBotStates = async () => {
+  const fetchEngineStates = async () => {
     try {
-      const res = await fetch("/api/mcx/bot/state");
+      const res = await fetch("/api/mcx/engine/state");
       const data = await res.json();
       if (data && data.success) {
-        setBotEnabled(data.botEnabled);
+        setEngineEnabled(data.engineEnabled);
+        setGlobalBalance(data.availableBalance ?? 0);
+        setGlobalProfit(data.realTotalProfit ?? 0);
         const specificState = data.states?.find((s: any) => s.commodity === selectedCommodity);
         if (specificState) {
           setActiveState(specificState);
         }
       }
     } catch (err) {
-      console.warn("Failed to fetch bot states:", err);
+      console.warn("Failed to fetch engine states:", err);
     }
   };
 
   useEffect(() => {
-    fetchBotStates();
-    const interval = setInterval(fetchBotStates, 4000);
+    fetchEngineStates();
+    const interval = setInterval(fetchEngineStates, 4000);
     return () => clearInterval(interval);
-  }, [selectedCommodity, setBotEnabled]);
+  }, [selectedCommodity, setEngineEnabled]);
 
+  // Fetch active open positions for the user
   useEffect(() => {
-    if (activeState?.nextAnalysisTime) {
-      const target = new Date(activeState.nextAnalysisTime).getTime();
-      const interval = setInterval(() => {
-        const remaining = Math.max(0, Math.floor((target - Date.now()) / 1000));
-        setTimeLeft(remaining);
-      }, 1000);
-      return () => clearInterval(interval);
-    } else {
-      const interval = setInterval(() => {
-        setTimeLeft((prev) => (prev > 0 ? prev - 1 : 300));
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [activeState?.nextAnalysisTime]);
+    let active = true;
+    const fetchPositions = async () => {
+      try {
+        const res = await fetch("/api/mcx/positions");
+        const data = await res.json();
+        if (active && data && data.success) {
+          setActivePositions(data.data || []);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch MCX positions:", err);
+      }
+    };
 
-  const handleToggleBot = async () => {
-    setLoadingBotAction(true);
-    const endpoint = botEnabled ? "/api/mcx/bot/disable" : "/api/mcx/bot/enable";
+    fetchPositions();
+    const interval = setInterval(fetchPositions, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Compute priceLines based on current active commodity and active positions
+  const priceLines = useMemo(() => {
+    const commodity = selectedCommodity.toUpperCase();
+    const pos = activePositions.find((p) => p.symbol.toUpperCase() === commodity);
+    if (!pos) return [];
+
+    const entryPrice = pos.entryPrice;
+    const direction = pos.direction; // BUY or SELL
+    const tpPrice = pos.takeProfit;
+    const slPrice = pos.stopLoss;
+
+    const p = [];
+    p.push({
+      id: `${pos.id}-entry`,
+      price: entryPrice,
+      color: "#0ea5e9",
+      title: `${direction} ${pos.lots} Lots`,
+    });
+
+    if (tpPrice) {
+      p.push({
+        id: `${pos.id}-tp`,
+        price: tpPrice,
+        color: "#22c55e",
+        title: "TP",
+      });
+    }
+
+    if (slPrice) {
+      p.push({
+        id: `${pos.id}-sl`,
+        price: slPrice,
+        color: "#ef4444",
+        title: "SL",
+      });
+    }
+
+    return p;
+  }, [selectedCommodity, activePositions]);
+
+  const handleToggleEngine = async () => {
+    setLoadingEngineAction(true);
+    const endpoint = engineEnabled ? "/api/mcx/engine/disable" : "/api/mcx/engine/enable";
     try {
       const res = await fetch(endpoint, { method: "POST" });
       const data = await res.json();
       if (data && data.success) {
-        setBotEnabled(!botEnabled);
-        fetchBotStates();
+        setEngineEnabled(!engineEnabled);
+        fetchEngineStates();
       }
     } catch (e) {
       console.error(e);
     } finally {
-      setLoadingBotAction(false);
+      setLoadingEngineAction(false);
     }
   };
 
-  const formatTime = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-
-  const availableBalance = activeState?.availableBalance ?? 0;
-  const portfolioValue = activeState ? (activeState.availableBalance + activeState.realTotalProfit) : 0;
-  const dailyGain = activeState && activeState.availableBalance > 0 ? (activeState.realTotalProfit / activeState.availableBalance) * 100 : 0;
+  const availableBalance = globalBalance;
+  const portfolioValue = globalBalance + globalProfit;
+  const dailyGain = globalBalance > 0 ? (globalProfit / globalBalance) * 100 : 0;
 
   return (
     <>
       {/* Top Row Cards (Unified with Crypto MarketCards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Wallet Balance"
           value={formatRupee(availableBalance)}
@@ -228,7 +278,7 @@ export default function McxDashboardPage() {
               </span>
             </div>
             <div className="flex gap-4 text-[10px] text-muted-foreground font-medium uppercase tracking-tight">
-              <span>Status: <b className="text-foreground font-bold">{botEnabled ? "BOT ACTIVE" : "BOT STOPPED"}</b></span>
+              <span>Status: <b className="text-foreground font-bold">{engineEnabled ? "ENGINE ACTIVE" : "ENGINE STOPPED"}</b></span>
               <span>Strategy: <b className="text-foreground font-bold">{activeState?.currentStrategy || "NONE"}</b></span>
               <span>Holding: <b className="text-foreground font-bold">{activeState?.holdings || 0} LOTS</b></span>
             </div>
@@ -237,13 +287,6 @@ export default function McxDashboardPage() {
             <Activity size={18} />
           </div>
         </div>
-
-        <StatCard
-          title="Next Analysis"
-          value={formatTime(timeLeft)}
-          subValue="5-min interval"
-          icon={Clock}
-        />
       </div>
 
       {/* Full Width Chart (Unified with Crypto TradingViewChart) */}
@@ -272,7 +315,7 @@ export default function McxDashboardPage() {
                     <Clock size={12} /> 15m
                   </span>
                   <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Activity size={12} /> MCX Futures
+                    <Activity size={12} /> {activeContractName || "MCX Futures"}
                   </span>
                 </div>
               </div>
@@ -353,6 +396,7 @@ export default function McxDashboardPage() {
               <McxPriceChart 
                 key={selectedCommodity}
                 data={chartData} 
+                priceLines={priceLines}
                 showIndicators={{
                   ema20: showEMA20,
                   ema50: showEMA50,
@@ -381,75 +425,59 @@ export default function McxDashboardPage() {
 
       {/* Bottom Widgets Grid (Unified with Crypto 2-Column Layout) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-5">
-        {/* Column 1: Bot Operations (matching Crypto's Market Watchlist) */}
+        {/* Column 1: Signal Panel (Replaces Engine Operations) */}
         <div className="flex flex-col">
-          <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4 flex flex-col h-full hover:shadow-md transition-all">
-            <h3 className="text-sm font-black uppercase tracking-wider text-foreground">
-              Bot Engine Operations
-            </h3>
-            <div className="p-4 bg-muted/20 border border-border rounded-xl flex items-center justify-between mt-auto">
-              <div className="flex flex-col leading-none">
-                <span className="text-[10px] font-black uppercase text-muted-foreground">
-                  Automated Trading
-                </span>
-                <span className={`text-[11px] font-black uppercase mt-1 ${botEnabled ? "text-green-500" : "text-red-500"}`}>
-                  {botEnabled ? "ACTIVE" : "INACTIVE"}
-                </span>
-              </div>
-              <button
-                onClick={handleToggleBot}
-                disabled={loadingBotAction}
-                className={`flex items-center gap-2 px-4 py-2 text-[10px] uppercase font-black tracking-widest rounded-xl transition-all shadow-md active:scale-95 ${
-                  botEnabled
-                    ? "bg-red-500 text-white shadow-red-500/10 border border-red-600"
-                    : "bg-primary text-primary-foreground shadow-primary/20 border border-primary/20 hover:opacity-90"
-                }`}
-              >
-                {loadingBotAction ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : botEnabled ? (
-                  <>
-                    <Square size={12} fill="white" /> STOP BOT
-                  </>
-                ) : (
-                  <>
-                    <Play size={12} fill="white" /> START BOT
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+          <McxSignalPanel className="bg-card border border-border rounded-xl overflow-hidden flex flex-col h-[524px] shadow-sm hover:shadow-md transition-all" />
         </div>
 
-        {/* Column 2: Terminal Statistics (matching Crypto's Signal Log) */}
+        {/* Column 2: Terminal Statistics */}
         <div className="flex flex-col">
           <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col p-5 shadow-sm hover:shadow-md transition-all h-full">
             <h3 className="text-sm font-black uppercase tracking-wider text-foreground mb-4">
               Terminal Statistics
             </h3>
-            <div className="space-y-3 mt-auto">
+            <div className="space-y-4">
               <StatCard
                 title="Available Wallet"
-                value={activeState ? formatRupee(activeState.availableBalance) : formatRupee(0)}
+                value={formatRupee(availableBalance)}
                 icon={Wallet}
               />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/20 border border-border rounded-xl p-3 flex flex-col">
-                  <span className="text-[9px] font-black text-muted-foreground uppercase">Holdings</span>
-                  <span className="text-sm font-bold text-foreground">{activeState?.holdings || 0} Lots</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-muted/20 border border-border rounded-xl p-4 flex flex-col">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Holdings</span>
+                  <span className="text-lg font-bold text-foreground mt-1">{activeState?.holdings || 0} Lots</span>
                 </div>
-                <div className="bg-muted/20 border border-border rounded-xl p-3 flex flex-col">
-                  <span className="text-[9px] font-black text-muted-foreground uppercase">Avg Entry</span>
-                  <span className="text-sm font-bold text-foreground">{activeState ? formatRupee(activeState.averageBuyPrice) : "₹0"}</span>
+                <div className="bg-muted/20 border border-border rounded-xl p-4 flex flex-col">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Avg Entry</span>
+                  <span className="text-lg font-bold text-foreground mt-1">{activeState ? formatRupee(activeState.averageBuyPrice) : "₹0"}</span>
                 </div>
               </div>
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between shadow-inner mt-2">
-                <span className="text-[10px] font-black uppercase text-primary tracking-widest">Realized Profit</span>
-                <span className={`font-mono text-base font-black ${
-                  (activeState?.realTotalProfit || 0) >= 0 ? "text-green-500" : "text-red-500"
-                }`}>
-                  {activeState ? formatRupee(activeState.realTotalProfit) : formatRupee(0)}
-                </span>
+              
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 flex items-center justify-between shadow-inner mt-4">
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-black uppercase text-primary tracking-widest">Realized Profit</span>
+                  <span className={`font-mono text-2xl font-black mt-1 ${globalProfit >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    {formatRupee(globalProfit)}
+                  </span>
+                </div>
+                <div className={`p-3 rounded-full ${globalProfit >= 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+
+              <div className="bg-muted/10 border border-border rounded-xl p-4 flex flex-col space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase">Engine Status</span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${engineEnabled ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                    {engineEnabled ? "ACTIVE" : "INACTIVE"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase">Trading Mode</span>
+                  <span className="text-[10px] font-black text-foreground uppercase tracking-widest">
+                    {activeState?.engineMode || "AUTOMATIC"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

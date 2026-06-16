@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { IndicatorEngine } from "../indicators/IndicatorEngine";
 import { RiskEngine } from "../risk/RiskEngine";
+import { mcxConfig } from "../config/mcx.config";
 import { ExecutionService } from "../execution/ExecutionService";
 import type { MCXSignal } from "../types";
 
@@ -61,7 +62,10 @@ const signal: MCXSignal = {
   takeProfit: 120,
   generatedAt: new Date(),
 };
+const originalRiskPct = mcxConfig.risk.maxRiskPerTradePct;
+mcxConfig.risk.maxRiskPerTradePct = 0.01;
 const sizing = RiskEngine.calculatePositionSize(wallet, signal);
+mcxConfig.risk.maxRiskPerTradePct = originalRiskPct;
 assert.equal(sizing.riskAmount, 10_000, "Risk amount should equal equity x configured risk percent");
 assert.equal(sizing.lots, 10, "Lots should use stop distance and point value");
 assert.equal(ExecutionService.pnlFor({ side: "LONG", entryPrice: 100, lots: 2, pointValue: 100 }, 110), 2_000, "Long PnL should use point value");

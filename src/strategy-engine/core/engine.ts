@@ -28,6 +28,17 @@ class StrategyEngine {
   private lastEmittedSignals: Map<string, "LONG" | "SHORT"> = new Map();
   private dbHandler: SignalsDbHandler | null = null;
 
+  public funnelMetrics = {
+    rawEvaluations: 0,
+    structurePassed: 0,
+    structureRejected: 0,
+    regimePassed: 0,
+    regimeRejected: 0,
+    confidencePassed: 0,
+    confidenceRejected: 0,
+    executed: 0,
+  };
+
   public registerDbHandler(handler: SignalsDbHandler) {
     this.dbHandler = handler;
   }
@@ -125,6 +136,9 @@ class StrategyEngine {
       if (strategy.enabled === false) {
         continue;
       }
+      this.funnelMetrics.rawEvaluations++;
+      this.funnelMetrics.structurePassed++;
+
       const supportsSymbol = !strategy.symbols || strategy.symbols.map(s => s.toUpperCase()).includes(sym);
       const supportsTimeframe = 
         (strategy.timeframe && strategy.timeframe.toLowerCase() === tf) ||
@@ -134,8 +148,10 @@ class StrategyEngine {
       if (supportsSymbol && supportsTimeframe) {
         // Enforce Regime check BEFORE execution
         if (strategy.supportedRegimes && !RegimeEngine.matches(regime, strategy.supportedRegimes)) {
+          this.funnelMetrics.regimeRejected++;
           continue;
         }
+        this.funnelMetrics.regimePassed++;
 
         const lastCandleTime = strategyCandles[strategyCandles.length - 1]?.time || 0;
         const lockKey = `${sym}_${tf}_${strategy.id}_${lastCandleTime}`;

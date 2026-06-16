@@ -25,18 +25,36 @@ export class RiskEngine {
   }
 
   static async validateEntry(userId: string, wallet: McxWallet, signal: MCXSignal, sizing: PositionSizingResult, db: Tx | PrismaClient = prisma) {
-    if (wallet.tradingHalted) throw new Error(`MCX trading halted: ${wallet.haltReason || "risk lock"}`);
-    if (signal.confidence < mcxConfig.risk.minConfidence) throw new Error("Signal confidence below configured threshold");
+    if (wallet.tradingHalted) {
+      mcxLogger.warn("ENTRY_REJECTED: TRADING_HALTED", { userId, reason: wallet.haltReason });
+      throw new Error(`MCX trading halted: ${wallet.haltReason || "risk lock"}`);
+    }
+    if (signal.confidence < mcxConfig.risk.minConfidence) {
+      mcxLogger.warn("ENTRY_REJECTED: LOW_CONFIDENCE", { userId, confidence: signal.confidence, min: mcxConfig.risk.minConfidence });
+      throw new Error("Signal confidence below configured threshold");
+    }
     const [openCount, sameSymbol, exposure] = await Promise.all([
       db.mcxPosition.count({ where: { userId, status: "OPEN" } }),
       db.mcxPosition.findFirst({ where: { userId, symbol: signal.symbol, status: "OPEN" } }),
       db.mcxPosition.aggregate({ where: { userId, status: "OPEN" }, _sum: { marginUsed: true } }),
     ]);
-    if (sameSymbol) throw new Error("Duplicate open position for user and symbol is blocked");
-    if (openCount >= mcxConfig.risk.maxSimultaneousPositions) throw new Error("Max simultaneous MCX positions reached");
+    if (sameSymbol) {
+      mcxLogger.warn("ENTRY_REJECTED: DUPLICATE_SYMBOL", { userId, symbol: signal.symbol });
+      throw new Error("Duplicate open position for user and symbol is blocked");
+    }
+    if (openCount >= mcxConfig.risk.maxSimultaneousPositions) {
+      mcxLogger.warn("ENTRY_REJECTED: MAX_POSITIONS", { userId, openCount, max: mcxConfig.risk.maxSimultaneousPositions });
+      throw new Error("Max simultaneous MCX positions reached");
+    }
     const totalExposure = (exposure._sum.marginUsed || 0) + sizing.marginRequired;
-    if (totalExposure > wallet.equity * mcxConfig.risk.maxPortfolioExposurePct) throw new Error("Max portfolio exposure exceeded");
-    if (wallet.availableBalance < sizing.marginRequired) throw new Error("Insufficient available MCX wallet balance");
+    if (totalExposure > wallet.equity * mcxConfig.risk.maxPortfolioExposurePct) {
+      mcxLogger.warn("ENTRY_REJECTED: EXPOSURE_LIMIT", { userId, totalExposure, limit: wallet.equity * mcxConfig.risk.maxPortfolioExposurePct });
+      throw new Error("Max portfolio exposure exceeded");
+    }
+    if (wallet.availableBalance < sizing.marginRequired) {
+      mcxLogger.warn("ENTRY_REJECTED: INSUFFICIENT_FUNDS", { userId, available: wallet.availableBalance, required: sizing.marginRequired });
+      throw new Error("Insufficient available MCX wallet balance");
+    }
   }
 
   static async enforceDailyRiskLock(wallet: McxWallet, db: Tx | PrismaClient = prisma) {

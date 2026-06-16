@@ -63,7 +63,8 @@ export class ConfidenceEngine {
 
     // 2. Market Regime Compatibility Match (Max +20, Min -10)
     let regimeScore = 0;
-    const regime = RegimeEngine.classify(context);
+    const rawRegime = RegimeEngine.classify(context);
+    const regime = rawRegime.toUpperCase();
     
     // Check compatibility based on strategy ID or indicators used
     const isTrendingStrat = strategyId && (
@@ -81,22 +82,19 @@ export class ConfidenceEngine {
     );
     const isBreakoutStrat = strategyId && strategyId.includes("breakout");
 
-    if (regime === "TRENDING") {
+    const isTrendRegime = regime.includes("TREND") || regime.includes("BREAKOUT");
+    const isRangeRegime = regime.includes("RANGE") || regime.includes("VOLATILITY") || regime.includes("ACCUMULATION") || regime.includes("DISTRIBUTION");
+
+    if (isTrendRegime) {
       if (isTrendingStrat) regimeScore = 20;
       else if (isMeanReversionStrat) regimeScore = -10;
-      else regimeScore = 5;
-    } else if (regime === "RANGING") {
+      else regimeScore = 10;
+    } else if (isRangeRegime) {
       if (isMeanReversionStrat) regimeScore = 20;
       else if (isTrendingStrat) regimeScore = -10;
-      else regimeScore = 5;
-    } else if (regime === "HIGH_VOLATILITY") {
-      if (isBreakoutStrat) regimeScore = 20;
-      else if (isTrendingStrat) regimeScore = 10;
-      else regimeScore = 5;
-    } else if (regime === "LOW_VOLATILITY") {
-      if (isMeanReversionStrat) regimeScore = 20;
-      else if (isBreakoutStrat) regimeScore = -10;
-      else regimeScore = 5;
+      else regimeScore = 10;
+    } else {
+      regimeScore = 5;
     }
     score += regimeScore;
 
